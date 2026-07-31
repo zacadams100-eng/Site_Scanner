@@ -1,0 +1,25 @@
+# The image copies files explicitly, but this keeps the build context small
+# and makes it impossible to send credentials to the builder by accident.
+
+# Credentials — never build these into an image
+service-account-key.json
+*.key.json
+.env
+.env.*
+
+.git/
+.github/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+venv/
+.venv/
+
+# Frontend and docs — deployed separately, see vercel.json
+site-scanner.html
+vercel.json
+.vercelignore
+*.md
+
+tests/

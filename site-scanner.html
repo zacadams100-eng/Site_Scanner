@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contour — Draw &amp; Analyse</title>
+<!-- Backend base URL. Leave empty to use the same origin, which the /api
+     rewrite in vercel.json proxies to Cloud Run. Set it to an absolute URL to
+     pin a specific backend instead. -->
+<meta name="contour-api" content="">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -226,9 +230,22 @@ const canvasRenderer = L.canvas();
 
 // ---------- BACKEND ----------
 // Points at app.py (real Earth Engine) or mock_ee_backend.py — same contract
-// either way. Override for a deployed backend with ?api=https://your-host
-const API_BASE = (new URLSearchParams(location.search).get('api') || 'http://localhost:8000')
-  .replace(/\/+$/, '');
+// either way. Resolution order, first match wins:
+//   1. ?api=https://host    — ad-hoc override, handy for testing a branch
+//   2. <meta name="contour-api">  — set it to pin a specific backend
+//   3. localhost:8000 when served locally; same-origin otherwise, which is
+//      what the /api proxy rewrite in vercel.json provides once deployed.
+function resolveApiBase(){
+  const q = new URLSearchParams(location.search).get('api');
+  if(q) return q.replace(/\/+$/, '');
+  const meta = document.querySelector('meta[name="contour-api"]');
+  if(meta && meta.content.trim()) return meta.content.trim().replace(/\/+$/, '');
+  const local = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) !== -1;
+  return local ? 'http://localhost:8000' : '';
+}
+const API_BASE = resolveApiBase();
+// '' means same-origin, which reads badly in an error message.
+const API_LABEL = API_BASE || location.origin;
 
 // 'live' = real Earth Engine, 'mock' = mock backend, 'sim' = in-browser fallback
 let dataSource = 'sim';
@@ -258,8 +275,8 @@ function updateSourceBadge(){
   const [cls, label] = SOURCE_TEXT[dataSource] || SOURCE_TEXT.sim;
   el.className = 'source ' + cls;
   el.title = dataSource === 'sim' && lastError
-    ? 'Could not reach ' + API_BASE + ' (' + lastError + ')'
-    : 'Figures served from ' + API_BASE;
+    ? 'Could not reach ' + API_LABEL + ' (' + lastError + ')'
+    : 'Figures served from ' + API_LABEL;
   document.getElementById('sourceLabel').textContent = label;
 }
 
@@ -717,7 +734,7 @@ async function computeReport(){
       if(seq === reportSeq){
         body.innerHTML = '<div class="placeholder">Backend unreachable, and the drawn shape is too '
           + 'small to sample the simulated grid. Draw a larger area, or start the backend.</div>'
-          + '<div class="err-note">' + esc(API_BASE) + ' — ' + esc(e.message) + '</div>';
+          + '<div class="err-note">' + esc(API_LABEL) + ' — ' + esc(e.message) + '</div>';
         document.getElementById('aiBtn').disabled = true;
         lastReport = null; updateSourceBadge();
       }
@@ -806,7 +823,7 @@ function renderReport(stats, score, simCats){
 
   if(dataSource === 'sim' && lastError){
     html += '<div class="err-note">Showing simulated figures — could not reach '
-         +  esc(API_BASE) + ' (' + esc(lastError) + ').</div>';
+         +  esc(API_LABEL) + ' (' + esc(lastError) + ').</div>';
   }
   document.getElementById('reportBody').innerHTML = html;
 }
@@ -831,7 +848,7 @@ async function generateSummary(){
       : 'Composed from the figures above without a language model'
         + (r.detail ? ' — ' + r.detail : '.');
   }catch(e){
-    out.textContent = 'Could not reach the site-note service at ' + API_BASE + '.';
+    out.textContent = 'Could not reach the site-note service at ' + API_LABEL + '.';
     meta.textContent = e.message;
   }
   btn.disabled = false; btn.textContent = 'Write Site Note';

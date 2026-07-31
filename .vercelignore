@@ -1,0 +1,25 @@
+# Only site-scanner.html is deployed to Vercel. The backend goes to Cloud Run
+# via the Dockerfile.
+#
+# Excluding requirements.txt also stops Vercel's framework detection from
+# treating this as a Python project and trying to build serverless functions.
+
+app.py
+summary.py
+mock_ee_backend.py
+requirements.txt
+requirements-dev.txt
+Dockerfile
+.dockerignore
+
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+service-account-key.json
+*.key.json
+.env
+.env.*
