@@ -1,0 +1,360 @@
+"""
+Contour — mock Earth Engine backend
+-----------------------------------
+A drop-in stand-in for app.py that needs no Earth Engine credentials, no GCP
+project and no network access to Google. It mirrors app.py's routes, request
+models, response keys and error codes exactly, so the frontend's real-data
+code path can be exercised and visually verified before Earth Engine is live.
+
+What is faithful to the real backend:
+  * identical route paths, HTTP methods and request bodies
+  * identical response keys, and identical *types* — in particular
+    landcover_histogram uses string keys and float pixel counts, which is what
+    ee.Reducer.frequencyHistogram().getInfo() actually returns
+  * identical error contract — a bad geometry is a 500 with {"detail": ...},
+    a malformed body is FastAPI's usual 422
+
+What is fake:
+  * tile URLs point at real public XYZ basemaps (Esri imagery / OSM) rather
+    than earthengine.googleapis.com, so tiles genuinely render in Leaflet
+  * statistics are generated, but deterministically per (year, area) and
+    within plausible UK ranges — the same drawn shape always returns the same
+    numbers, so the report panel is stable across reloads
+
+Every response carries an `X-Contour-Mock: true` header. Nothing but the
+header distinguishes these payloads from the real ones, which is the point.
+
+Run locally:
+  pip install -r requirements.txt
+  uvicorn mock_ee_backend:app --reload --port 8000
+
+Environment overrides (all optional):
+  MOCK_TILE_URL_NDVI        XYZ template served by /api/tile/ndvi
+  MOCK_TILE_URL_LANDCOVER   XYZ template served by /api/tile/landcover
+  MOCK_STATS_ALL_CLASSES    "1" forces all 11 WorldCover classes into every
+                            histogram (useful for exercising legend rendering;
+                            off by default because a UK site never has
+                            mangroves or permanent snow)
+  MOCK_LATENCY_MS           artificial delay per request, to make loading
+                            states visible in the UI
+"""
+
+import asyncio
+import hashlib
+import math
+import os
+import random
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+# Real, public, key-free XYZ sources. Leaflet substitutes the named
+# placeholders, so the {z}/{y}/{x} ordering Esri uses is handled for us.
+DEFAULT_TILE_URL_NDVI = (
+    "https://server.arcgisonline.com/ArcGIS/rest/services/"
+    "World_Imagery/MapServer/tile/{z}/{y}/{x}"
+)
+DEFAULT_TILE_URL_LANDCOVER = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+
+def _tile_url(layer: str) -> str:
+    if layer == "ndvi":
+        return os.environ.get("MOCK_TILE_URL_NDVI", DEFAULT_TILE_URL_NDVI)
+    return os.environ.get("MOCK_TILE_URL_LANDCOVER", DEFAULT_TILE_URL_LANDCOVER)
+
+
+def _all_classes_forced() -> bool:
+    return os.environ.get("MOCK_STATS_ALL_CLASSES", "").strip() == "1"
+
+
+def _latency_seconds() -> float:
+    try:
+        return max(0.0, float(os.environ.get("MOCK_LATENCY_MS", "0"))) / 1000.0
+    except ValueError:
+        return 0.0
+
+
+# ESA WorldCover v100/v200 class codes, with the weight each is given when
+# generating a histogram for a UK site. Codes are the real ones; the weights
+# are what keeps the output plausible for lowland England rather than uniform
+# nonsense. Snow (70), mangroves (95) and moss/lichen (100) are weighted to
+# zero — they exist in the table so the full code set is representable via
+# MOCK_STATS_ALL_CLASSES, not because a Surrey field will ever return them.
+WORLDCOVER_CLASSES: Dict[int, Dict[str, Any]] = {
+    10: {"label": "Tree cover", "weight": 3.0},
+    20: {"label": "Shrubland", "weight": 0.8},
+    30: {"label": "Grassland", "weight": 5.0},
+    40: {"label": "Cropland", "weight": 4.5},
+    50: {"label": "Built-up", "weight": 2.0},
+    60: {"label": "Bare / sparse vegetation", "weight": 0.3},
+    70: {"label": "Snow and ice", "weight": 0.0},
+    80: {"label": "Permanent water bodies", "weight": 0.6},
+    90: {"label": "Herbaceous wetland", "weight": 0.4},
+    95: {"label": "Mangroves", "weight": 0.0},
+    100: {"label": "Moss and lichen", "weight": 0.0},
+}
+
+WORLDCOVER_CODES: List[int] = sorted(WORLDCOVER_CLASSES)
+
+# WorldCover is a 10 m product, so one pixel covers 100 m².
+WORLDCOVER_PIXEL_AREA_M2 = 100.0
+
+EARTH_RADIUS_M = 6378137.0
+
+
+# ---------------------------------------------------------------------------
+# Request models — byte-for-byte the same as app.py's
+# ---------------------------------------------------------------------------
+class TileRequest(BaseModel):
+    year: int
+    month: Optional[int] = None
+
+
+class StatsRequest(BaseModel):
+    year: int
+    geometry: dict
+
+
+class PriceRequest(BaseModel):
+    postcode_district: str
+
+
+# ---------------------------------------------------------------------------
+# Geometry — a real geodesic area, so area_ha actually tracks what was drawn
+# ---------------------------------------------------------------------------
+def _ring_area_m2(ring: List[Any]) -> float:
+    """Spherical polygon area for a closed linear ring of [lng, lat] pairs."""
+    if not isinstance(ring, (list, tuple)) or len(ring) < 4:
+        raise ValueError("Linear ring must be a closed list of at least 4 positions")
+
+    total = 0.0
+    for i in range(len(ring) - 1):
+        p1, p2 = ring[i], ring[i + 1]
+        if len(p1) < 2 or len(p2) < 2:
+            raise ValueError("Each position must be [longitude, latitude]")
+        lon1, lat1 = math.radians(float(p1[0])), math.radians(float(p1[1]))
+        lon2, lat2 = math.radians(float(p2[0])), math.radians(float(p2[1]))
+        total += (lon2 - lon1) * (2.0 + math.sin(lat1) + math.sin(lat2))
+    return abs(total * EARTH_RADIUS_M * EARTH_RADIUS_M / 2.0)
+
+
+def _polygon_area_m2(rings: List[Any]) -> float:
+    """Outer ring minus any holes."""
+    if not rings:
+        raise ValueError("Polygon has no coordinates")
+    area = _ring_area_m2(rings[0])
+    for hole in rings[1:]:
+        area -= _ring_area_m2(hole)
+    return max(0.0, area)
+
+
+def geometry_area_m2(geometry: dict) -> float:
+    """Area of a GeoJSON Polygon or MultiPolygon, in square metres.
+
+    Raises ValueError on anything malformed, which the endpoints turn into the
+    same 500 that ee.Geometry() failures produce in app.py.
+    """
+    if not isinstance(geometry, dict):
+        raise ValueError("geometry must be a GeoJSON object")
+
+    geom_type = geometry.get("type")
+    coords = geometry.get("coordinates")
+    if coords is None:
+        raise ValueError("geometry is missing 'coordinates'")
+
+    if geom_type == "Polygon":
+        return _polygon_area_m2(coords)
+    if geom_type == "MultiPolygon":
+        return sum(_polygon_area_m2(poly) for poly in coords)
+    raise ValueError(
+        f"Unsupported geometry type {geom_type!r} — expected Polygon or MultiPolygon"
+    )
+
+
+def geometry_centroid(geometry: dict) -> tuple:
+    """Rough centroid of the first ring — only ever used to seed the RNG."""
+    coords = geometry.get("coordinates") or []
+    ring = coords[0] if geometry.get("type") == "Polygon" else coords[0][0]
+    lngs = [float(p[0]) for p in ring]
+    lats = [float(p[1]) for p in ring]
+    return (sum(lngs) / len(lngs), sum(lats) / len(lats))
+
+
+# ---------------------------------------------------------------------------
+# Deterministic generation
+# ---------------------------------------------------------------------------
+def _seeded_rng(*parts: Any) -> random.Random:
+    """Stable across processes and runs — unlike hash(), which is salted."""
+    key = "|".join(str(p) for p in parts).encode("utf-8")
+    seed = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return random.Random(seed)
+
+
+def make_landcover_histogram(rng: random.Random, area_m2: float) -> Dict[str, float]:
+    """A frequencyHistogram-shaped dict: string codes -> float pixel counts.
+
+    Only classes actually present are returned, which is what Earth Engine
+    does — the frontend must not assume all 11 keys exist.
+    """
+    total_pixels = max(1.0, area_m2 / WORLDCOVER_PIXEL_AREA_M2)
+
+    force_all = _all_classes_forced()
+    weights: Dict[int, float] = {}
+    for code, meta in WORLDCOVER_CLASSES.items():
+        weight = meta["weight"]
+        if force_all:
+            weight = max(weight, 0.25)
+        if weight <= 0:
+            continue
+        # Most sites are a mix of two or three classes, not all of them.
+        # The cap stays below 1.0 so that even a dominant class can be absent —
+        # a purely wooded or purely built-up site has to be reachable.
+        if not force_all and rng.random() > min(0.92, 0.25 + weight / 5.0):
+            continue
+        weights[code] = weight * rng.uniform(0.4, 1.6)
+
+    if not weights:  # never leave a site with no land cover at all
+        weights = {30: 1.0}
+
+    total_weight = sum(weights.values())
+    histogram: Dict[str, float] = {}
+    for code, weight in sorted(weights.items()):
+        pixels = round(total_pixels * (weight / total_weight), 4)
+        if pixels > 0:
+            histogram[str(code)] = pixels
+    return histogram
+
+
+def _ndvi_from_histogram(rng: random.Random, histogram: Dict[str, float], year: int) -> float:
+    """NDVI consistent with the land cover, rather than an unrelated number.
+
+    Per-class annual-median NDVI values in the ranges a Sentinel-2 composite
+    over lowland England actually lands in.
+    """
+    per_class = {
+        10: 0.80, 20: 0.62, 30: 0.68, 40: 0.58, 50: 0.24,
+        60: 0.16, 70: 0.02, 80: -0.05, 90: 0.55, 95: 0.72, 100: 0.30,
+    }
+    total = sum(histogram.values()) or 1.0
+    ndvi = sum(per_class.get(int(c), 0.5) * p for c, p in histogram.items()) / total
+    # A little year-on-year drift plus noise, then clamp to the sensor range.
+    ndvi += (year - 2020) * 0.004 + rng.uniform(-0.035, 0.035)
+    return round(max(-1.0, min(1.0, ndvi)), 4)
+
+
+def _flood_proxy(rng: random.Random, histogram: Dict[str, float]) -> float:
+    """Mirrors app.py's proxy: surface-water occurrence plus a low-lying flag,
+    so the range is 0 .. ~1.3 and most inland sites sit well under 0.5."""
+    total = sum(histogram.values()) or 1.0
+    water_fraction = (
+        histogram.get("80", 0.0) + 0.5 * histogram.get("90", 0.0)
+    ) / total
+    value = water_fraction * rng.uniform(0.6, 1.0) + rng.uniform(0.0, 0.22)
+    if rng.random() < 0.12:  # occasional genuinely low-lying site
+        value += 0.25
+    return round(max(0.0, min(1.3, value)), 4)
+
+
+def make_stats(year: int, geometry: dict) -> Dict[str, Any]:
+    """The full /api/stats payload. Pure and deterministic — tests call this
+    directly, without going through HTTP."""
+    area_m2 = geometry_area_m2(geometry)
+    lng, lat = geometry_centroid(geometry)
+    rng = _seeded_rng(year, round(lng, 4), round(lat, 4), round(area_m2, 1))
+
+    histogram = make_landcover_histogram(rng, area_m2)
+    return {
+        "ndvi_mean": _ndvi_from_histogram(rng, histogram, year),
+        "landcover_histogram": histogram,
+        "flood_proxy_mean": _flood_proxy(rng, histogram),
+        "area_ha": round(area_m2 / 10000.0, 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+app = FastAPI(title="Contour Earth Engine API (mock)")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def mark_and_delay(request: Request, call_next):
+    delay = _latency_seconds()
+    if delay:
+        await asyncio.sleep(delay)
+    response = await call_next(request)
+    response.headers["X-Contour-Mock"] = "true"
+    return response
+
+
+@app.get("/")
+def health():
+    return {
+        "status": "ok",
+        "message": "Contour Earth Engine API is running (MOCK — no Earth Engine)",
+        "mock": True,
+    }
+
+
+@app.post("/api/tile/ndvi")
+def tile_ndvi(req: TileRequest):
+    try:
+        if req.month is not None and not 1 <= req.month <= 12:
+            raise ValueError(f"month must be between 1 and 12, got {req.month}")
+        return {"tile_url_template": _tile_url("ndvi")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/tile/landcover")
+def tile_landcover(req: TileRequest):
+    try:
+        if req.month is not None and not 1 <= req.month <= 12:
+            raise ValueError(f"month must be between 1 and 12, got {req.month}")
+        return {"tile_url_template": _tile_url("landcover")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stats")
+def stats(req: StatsRequest):
+    try:
+        return make_stats(req.year, req.geometry)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stats/price")
+def price_stats(req: PriceRequest):
+    """Stand-in for the HM Land Registry lookup. Not Earth Engine, but the
+    frontend may call it, so the mock answers in the same shape."""
+    try:
+        district = req.postcode_district.strip().upper()
+        if not district:
+            raise ValueError("postcode_district must not be empty")
+        rng = _seeded_rng("price", district)
+        return {
+            "postcode_district": district,
+            "avg_price": round(rng.uniform(240_000, 685_000), 2),
+            "count": rng.randint(40, 900),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)

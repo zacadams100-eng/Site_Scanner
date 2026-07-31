@@ -43,6 +43,46 @@ uvicorn app:app --reload --port 8000
 
 Visit http://localhost:8000 — you should see `{"status": "ok", ...}`.
 
+## Running without Earth Engine credentials (mock backend)
+
+`mock_ee_backend.py` is a stand-in for `app.py` that needs no service account,
+no GCP project and no network access to Google. Use it to build and verify the
+frontend while Earth Engine setup happens in parallel.
+
+```bash
+pip install -r requirements.txt      # no extra dependencies needed
+uvicorn mock_ee_backend:app --reload --port 8000
+```
+
+It serves the same routes, request bodies, response keys and error codes as
+`app.py`. The differences are deliberate and limited to two things:
+
+- **Tile URLs point at real public XYZ basemaps** (Esri World Imagery for
+  `/api/tile/ndvi`, OpenStreetMap for `/api/tile/landcover`) instead of
+  `earthengine.googleapis.com`, so `L.tileLayer(tile_url_template)` genuinely
+  renders something.
+- **Statistics are generated**, but deterministically per `(year, area)` and
+  within plausible UK ranges — the same drawn shape always returns the same
+  numbers, so the report panel doesn't flicker between reloads. `area_ha` is a
+  real geodesic area of the polygon you send, so it tracks what was drawn.
+
+`landcover_histogram` deliberately reproduces Earth Engine's actual shape:
+string class codes mapped to **float pixel counts**, with only the classes
+present on that site included. Do not assume all eleven keys exist.
+
+Every response carries an `X-Contour-Mock: true` header, so it is always
+obvious which backend answered.
+
+| Env var | Effect |
+| --- | --- |
+| `MOCK_TILE_URL_NDVI` | Override the XYZ template for `/api/tile/ndvi` |
+| `MOCK_TILE_URL_LANDCOVER` | Override the XYZ template for `/api/tile/landcover` |
+| `MOCK_STATS_ALL_CLASSES=1` | Force all 11 WorldCover classes into every histogram, for exercising legend rendering |
+| `MOCK_LATENCY_MS` | Artificial per-request delay, to make loading states visible |
+
+Switching to the real backend is a one-word change — `uvicorn app:app` instead
+of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
+
 ## 3. Testing the endpoints
 
 ```bash
