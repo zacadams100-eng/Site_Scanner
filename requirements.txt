@@ -2,3 +2,11 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 earthengine-api==1.1.2
 pydantic==2.9.2
+
+# Used by app.py's /api/stats/price (HM Land Registry lookup) — this was
+# imported but never declared.
+requests==2.33.1
+
+# Used by summary.py's /api/summary. Optional at runtime: with no
+# ANTHROPIC_API_KEY set, the deterministic summary is returned instead.
+anthropic==0.120.2

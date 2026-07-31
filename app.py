@@ -27,6 +27,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 
+from summary import SummaryRequest, generate_summary
+
 # ---------------------------------------------------------------------------
 # Earth Engine auth — uses a service account, NOT a personal Google login.
 # This is the piece that has to run server-side; it cannot run in a browser.
@@ -239,5 +241,19 @@ def stats(req: StatsRequest):
         }).getInfo()
 
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/summary")
+def summary(req: SummaryRequest):
+    """Writes the report panel's one-paragraph site note. Not Earth Engine —
+    this takes the already-computed figures and turns them into prose.
+
+    The Anthropic API key stays server-side; see summary.py. With no key set,
+    a deterministic paragraph is returned instead of failing.
+    """
+    try:
+        return generate_summary(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

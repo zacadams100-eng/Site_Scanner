@@ -50,6 +50,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from summary import SummaryRequest, generate_summary
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -286,6 +288,9 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    # Without this the browser hides X-Contour-Mock from JavaScript, and the
+    # frontend can't tell the mock apart from the real backend.
+    expose_headers=["X-Contour-Mock"],
 )
 
 
@@ -332,6 +337,16 @@ def tile_landcover(req: TileRequest):
 def stats(req: StatsRequest):
     try:
         return make_stats(req.year, req.geometry)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/summary")
+def summary(req: SummaryRequest):
+    """Identical to app.py's — the summary layer isn't Earth Engine, so the
+    mock delegates to exactly the same code the real backend uses."""
+    try:
+        return generate_summary(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

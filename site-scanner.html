@@ -78,14 +78,60 @@
 
   .report{margin-top:26px;}
   .report .placeholder{font-size:12.5px;color:var(--paper-dim);line-height:1.5;}
-  .stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 4px;border-bottom:1px solid var(--rule);font-size:13px;}
-  .stat-row.area{background:rgba(217,168,60,0.10);border-radius:8px;margin-bottom:6px;padding:10px 10px;border-bottom:none;}
-  .stat-label{color:var(--paper-dim);}
-  .stat-val{font-family:'IBM Plex Mono',monospace;color:var(--paper);font-weight:500;}
-  .lc-bars{display:grid;gap:5px;margin:4px 4px 12px;}
-  .lc-bar-row{display:grid;grid-template-columns:70px 1fr 32px;gap:6px;align-items:center;font-size:11px;}
-  .lc-track{height:5px;background:var(--ink3);border-radius:3px;overflow:hidden;}
-  .lc-fill{height:100%;border-radius:3px;}
+
+  /* --- data source badge --- */
+  .source{
+    display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;
+    letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:20px;
+    border:1px solid var(--rule);color:var(--paper-dim);margin-bottom:14px;
+  }
+  .source .dot{width:6px;height:6px;border-radius:50%;background:var(--paper-dim);flex-shrink:0;}
+  .source.live{color:var(--brass-bright);border-color:var(--brass-dim);}
+  .source.live .dot{background:var(--brass);}
+  .source.mock{color:#7FA8C4;border-color:rgba(127,168,196,0.35);}
+  .source.mock .dot{background:#7FA8C4;}
+  .source.sim .dot{background:var(--paper-dim);}
+
+  /* --- headline score --- */
+  .score-head{display:flex;align-items:center;gap:15px;margin-bottom:20px;}
+  .score-ring{
+    width:78px;height:78px;border-radius:50%;flex-shrink:0;position:relative;
+    background:conic-gradient(var(--brass) calc(var(--pct) * 1%), var(--ink3) 0);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .score-ring::after{content:'';position:absolute;inset:7px;border-radius:50%;background:var(--ink2);}
+  .score-num{position:relative;z-index:1;font-size:24px;font-weight:800;letter-spacing:-.02em;}
+  .score-num small{font-size:11px;font-weight:600;color:var(--paper-dim);}
+  .score-band{font-size:14px;font-weight:700;margin-bottom:3px;}
+  .score-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--paper-dim);line-height:1.5;}
+
+  /* --- category breakdown --- */
+  .cat-list{display:grid;gap:11px;margin-bottom:6px;}
+  .cat-row.is-sim{opacity:.62;}
+  .cat-head{display:flex;align-items:baseline;gap:6px;margin-bottom:5px;}
+  .cat-name{font-size:12.5px;flex:1;}
+  .cat-val{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;}
+  .sim-tag{
+    font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--paper-dim);border:1px solid var(--rule);border-radius:4px;padding:1px 4px;
+  }
+  .cat-track{height:5px;background:var(--ink3);border-radius:3px;overflow:hidden;}
+  .cat-fill{height:100%;border-radius:3px;background:var(--brass);}
+  .cat-row.is-sim .cat-fill{background:var(--paper-dim);}
+  .cat-note{font-size:11px;color:var(--paper-dim);line-height:1.5;margin-top:12px;opacity:.8;}
+
+  /* --- land cover composition --- */
+  .comp{margin-top:16px;padding-top:14px;border-top:1px solid var(--rule);}
+  .comp h3{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--paper-dim);margin:0 0 9px;}
+  .comp-row{display:grid;grid-template-columns:82px 1fr 32px;gap:7px;align-items:center;
+    font-size:11px;margin-bottom:5px;}
+  .comp-track{height:5px;background:var(--ink3);border-radius:3px;overflow:hidden;}
+  .comp-fill{height:100%;border-radius:3px;}
+  .comp-pct{font-family:'IBM Plex Mono',monospace;text-align:right;color:var(--paper-dim);}
+
+  .err-note{font-size:11.5px;color:var(--paper-dim);line-height:1.5;margin-top:10px;
+    padding:9px 10px;border-radius:7px;background:var(--ink3);}
   button.ai{
     width:100%;margin-top:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
     background:var(--brass);color:#141414;border:none;padding:13px;border-radius:9px;cursor:pointer;
@@ -94,6 +140,7 @@
   button.ai:hover:not(:disabled){background:var(--brass-bright);}
   button.ai:disabled{background:var(--brass-dim);cursor:not-allowed;opacity:.6;}
   .ai-out{white-space:pre-wrap;font-size:13.5px;line-height:1.62;margin-top:12px;}
+  .ai-meta{font-size:10.5px;color:var(--paper-dim);opacity:.75;margin-top:8px;line-height:1.5;}
   .footnote{font-size:11px;color:var(--paper-dim);opacity:.65;margin-top:24px;line-height:1.5;}
   .leaflet-container{background:#0b0b0b;font-family:'Inter',sans-serif;}
   @media(max-width:760px){ .side{width:260px;} h1{font-size:17px;} }
@@ -150,12 +197,16 @@
 
       <div class="report">
         <h2 style="margin-top:24px;">Site Report</h2>
+        <div class="source sim" id="sourceBadge" title="Where the figures in this report came from">
+          <span class="dot"></span><span id="sourceLabel">No data yet</span>
+        </div>
         <div id="reportBody"><div class="placeholder">Draw a rectangle, circle, or freehand shape on the map to generate a report.</div></div>
-        <button class="ai" id="aiBtn" onclick="generateSummary()" disabled>Generate AI Summary</button>
+        <button class="ai" id="aiBtn" onclick="generateSummary()" disabled>Write Site Note</button>
         <div id="aiOut" class="ai-out"></div>
+        <div id="aiMeta" class="ai-meta"></div>
       </div>
 
-      <div class="footnote">All layer values in this demo are simulated for illustration, not live satellite data. A production version would call Google Earth Engine server-side (Sentinel-2, flood model, ALC, price index APIs) and return the same report shape shown here.</div>
+      <div class="footnote">The screening score is an indicative weighting of satellite-derived habitat, vegetation and flood-proxy figures — not a Biodiversity Metric calculation, and not a substitute for a site visit. The flood layer is a surface-water and elevation proxy, not Environment Agency flood zone data. Layers marked <em>simulated</em> have no real data source yet and are excluded from the score.</div>
     </div>
   </div>
 </div>
@@ -172,6 +223,61 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution:'&copy; OpenStreetMap', opacity:0.5
 }).addTo(map);
 const canvasRenderer = L.canvas();
+
+// ---------- BACKEND ----------
+// Points at app.py (real Earth Engine) or mock_ee_backend.py — same contract
+// either way. Override for a deployed backend with ?api=https://your-host
+const API_BASE = (new URLSearchParams(location.search).get('api') || 'http://localhost:8000')
+  .replace(/\/+$/, '');
+
+// 'live' = real Earth Engine, 'mock' = mock backend, 'sim' = in-browser fallback
+let dataSource = 'sim';
+let lastError = null;
+
+async function apiPost(path, body){
+  const res = await fetch(API_BASE + path, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch(_){}
+    throw new Error(res.status + ' — ' + detail);
+  }
+  // The mock tags every response; the real backend doesn't.
+  dataSource = res.headers.get('X-Contour-Mock') ? 'mock' : 'live';
+  return res.json();
+}
+
+const SOURCE_TEXT = {
+  live: ['live', 'Live Earth Engine'],
+  mock: ['mock', 'Mock backend'],
+  sim:  ['sim',  'Simulated — backend unreachable'],
+};
+function updateSourceBadge(){
+  const el = document.getElementById('sourceBadge');
+  const [cls, label] = SOURCE_TEXT[dataSource] || SOURCE_TEXT.sim;
+  el.className = 'source ' + cls;
+  el.title = dataSource === 'sim' && lastError
+    ? 'Could not reach ' + API_BASE + ' (' + lastError + ')'
+    : 'Figures served from ' + API_BASE;
+  document.getElementById('sourceLabel').textContent = label;
+}
+
+// ---------- REAL TILE LAYERS ----------
+// These two have a server-side equivalent; the rest stay simulated.
+const REAL_TILE_LAYERS = new Set(['ndvi', 'landcover']);
+const realTiles = {};
+
+async function showRealTile(id, year){
+  const {tile_url_template} = await apiPost('/api/tile/' + id, {year});
+  const layer = L.tileLayer(tile_url_template, {opacity:0.65, crossOrigin:true});
+  layer.addTo(map);
+  if(realTiles[id]) map.removeLayer(realTiles[id]);   // swap only once the new one is in
+  realTiles[id] = layer;
+}
+function hideRealTile(id){
+  if(realTiles[id]){ map.removeLayer(realTiles[id]); delete realTiles[id]; }
+}
 
 // ---------- NOISE / SIMULATED FIELDS ----------
 function hash(i,j,seed){ let x = Math.sin(i*12.9898 + j*78.233 + seed*37.719) * 43758.5453; return x - Math.floor(x); }
@@ -293,11 +399,37 @@ LAYERS.forEach(L_ => {
     <span class="unit">${L_.unit}</span>`;
   layerListEl.appendChild(row);
   document.getElementById('chk-'+L_.id).addEventListener('change', (e)=>{
-    if(e.target.checked){ layerGroups[L_.id].addTo(map); } else { map.removeLayer(layerGroups[L_.id]); }
-    if(currentAOI) computeReport();
+    setLayerVisible(L_.id, e.target.checked);
   });
 });
-document.getElementById('chk-ndvi').checked = true; layerGroups['ndvi'].addTo(map);
+
+// Prefers a real server-rendered tile layer; falls back to the simulated grid
+// if the backend can't be reached.
+async function setLayerVisible(id, visible){
+  if(!visible){
+    map.removeLayer(layerGroups[id]);
+    hideRealTile(id);
+    if(currentAOI) computeReport();
+    return;
+  }
+  if(REAL_TILE_LAYERS.has(id)){
+    try{
+      await showRealTile(id, currentYear);
+      map.removeLayer(layerGroups[id]);   // the real tiles replace the grid
+      updateSourceBadge();
+      if(currentAOI) computeReport();
+      return;
+    }catch(e){
+      lastError = e.message;              // fall through to the simulated grid
+    }
+  }
+  hideRealTile(id);
+  layerGroups[id].addTo(map);
+  if(currentAOI) computeReport();
+}
+
+// The default layer is switched on at the very end of this script —
+// setLayerVisible() touches drawing state that isn't declared until below.
 
 // ---------- TIME BAR ----------
 let currentYear = 2024;
@@ -308,6 +440,9 @@ function repaintYear(year){
   yearDisplay.textContent = year;
   LAYERS.forEach(L_ => {
     if(!document.getElementById('chk-'+L_.id).checked) return;
+    // A real tile layer for this year replaces the grid; the grid only needs
+    // recolouring when it's the one actually on screen.
+    if(realTiles[L_.id]){ showRealTile(L_.id, year).catch(e => { lastError = e.message; }); return; }
     for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
       rectRefs[L_.id][j][i].setStyle({fillColor: L_.color(i,j,year)});
     }
@@ -347,9 +482,12 @@ function setTool(t){
 function clearAOI(){
   if(currentAOI) map.removeLayer(currentAOI);
   currentAOI = null;
+  reportSeq++;   // cancel any /api/stats response still in flight
+  lastReport = null;
   document.getElementById('reportBody').innerHTML = '<div class="placeholder">Draw a rectangle, circle, or freehand shape on the map to generate a report.</div>';
   document.getElementById('aiBtn').disabled = true;
   document.getElementById('aiOut').textContent = '';
+  document.getElementById('aiMeta').textContent = '';
 }
 function eventLatLng(e){
   const src = e.touches && e.touches.length ? e.touches[0] : (e.changedTouches && e.changedTouches.length ? e.changedTouches[0] : e);
@@ -435,69 +573,275 @@ function aoiAreaHa(){
   return 0;
 }
 
-let lastStats = null;
-function computeReport(){
-  const active = LAYERS.filter(L_ => document.getElementById('chk-'+L_.id).checked);
-  let cellsIn = 0;
-  const sums = {}; const lcCounts = {};
-  active.forEach(L_ => sums[L_.id] = {sum:0,count:0});
-  for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
-    const [lat,lng] = cellCenter(i,j);
-    if(pointInAOI(lat,lng)){
-      cellsIn++;
-      active.forEach(L_ => {
-        const v = L_.value(i,j,currentYear);
-        sums[L_.id].sum += v; sums[L_.id].count++;
-        if(L_.id==='landcover'){ const cn = lcClass(v).name; lcCounts[cn]=(lcCounts[cn]||0)+1; }
-      });
-    }
+// ---------- AOI -> GeoJSON ----------
+// Leaflet's own toGeoJSON() returns a Point for circles, which the backend
+// can't reduce over, so each shape is built explicitly.
+function aoiGeoJSON(){
+  if(!currentAOI) return null;
+  if(currentAOI._shape === 'circle'){
+    const c = currentAOI.getLatLng();
+    return turf.circle([c.lng, c.lat], currentAOI.getRadius()/1000,
+                       {steps:64, units:'kilometers'}).geometry;
   }
-  const body = document.getElementById('reportBody');
-  if(cellsIn===0 || active.length===0){
-    body.innerHTML = '<div class="placeholder">No ticked layers intersect the drawn area, or no layers selected. Tick at least one layer.</div>';
-    document.getElementById('aiBtn').disabled = true; lastStats=null; return;
+  if(currentAOI._shape === 'rect'){
+    const b = currentAOI.getBounds();
+    return {type:'Polygon', coordinates:[[
+      [b.getWest(),b.getSouth()], [b.getEast(),b.getSouth()],
+      [b.getEast(),b.getNorth()], [b.getWest(),b.getNorth()], [b.getWest(),b.getSouth()]
+    ]]};
   }
-  let html = `<div class="stat-row area"><span class="stat-label">Area sampled</span><span class="stat-val">${aoiAreaHa().toFixed(2)} ha · ${cellsIn} cells · ${currentYear}</span></div>`;
-  const statsForAI = {};
-  active.forEach(L_ => {
-    const s = sums[L_.id]; const avg = s.count ? s.sum/s.count : 0;
-    if(L_.id==='landcover'){
-      const total = Object.values(lcCounts).reduce((a,b)=>a+b,0) || 1;
-      html += `<div class="stat-row" style="grid-template-columns:1fr;"><div class="stat-label">${L_.name}</div></div><div class="lc-bars">`;
-      LC_CLASSES.forEach(c => {
-        const pct = Math.round(((lcCounts[c.name]||0)/total)*100);
-        if(pct>0) html += `<div class="lc-bar-row"><span>${c.name}</span><div class="lc-track"><div class="lc-fill" style="width:${pct}%;background:rgb(${c.color.join(',')})"></div></div><span>${pct}%</span></div>`;
-      });
-      html += '</div>';
-      statsForAI[L_.name] = Object.entries(lcCounts).map(([k,v])=>`${k} ${Math.round((v/total)*100)}%`).join(', ');
-    } else {
-      html += `<div class="stat-row"><span class="stat-label">${L_.name}</span><span class="stat-val">${L_.format(avg)}</span></div>`;
-      statsForAI[L_.name] = L_.format(avg) + ' ' + L_.unit;
-    }
-  });
-  body.innerHTML = html;
-  document.getElementById('aiBtn').disabled = false;
-  document.getElementById('aiOut').textContent = '';
-  lastStats = statsForAI;
+  const ring = currentAOI.getLatLngs()[0].map(p => [p.lng, p.lat]);
+  if(ring.length < 3) return null;
+  const f = ring[0], l = ring[ring.length-1];
+  if(f[0] !== l[0] || f[1] !== l[1]) ring.push(f);   // GeoJSON rings must close
+  return {type:'Polygon', coordinates:[ring]};
 }
 
-async function callClaude(promptText){
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:900, messages:[{role:"user", content:promptText}] })
-  });
-  const data = await response.json();
-  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n') || 'No response generated.';
+// ---------- SCORING ----------
+// An indicative screening weight per ESA WorldCover class (0-100). This is a
+// heuristic for triage, NOT Biodiversity Metric distinctiveness banding.
+const HABITAT_VALUE = {10:85, 20:60, 30:55, 40:25, 50:5, 60:15, 70:10, 80:70, 90:90, 95:95, 100:45};
+const CODE_LABEL = {10:'Tree cover',20:'Shrubland',30:'Grassland',40:'Cropland',50:'Built-up',
+  60:'Bare / sparse',70:'Snow & ice',80:'Water',90:'Wetland',95:'Mangroves',100:'Moss & lichen'};
+const CODE_COLOR = {10:[45,92,58],20:[122,140,74],30:[122,168,84],40:[201,167,88],50:[140,110,100],
+  60:[150,140,125],70:[214,222,230],80:[46,92,138],90:[80,150,150],95:[60,130,100],100:[170,180,150]};
+// Lets the simulated grid emit the same histogram shape as ESA WorldCover.
+const SIM_LC_CODE = {'Water':80,'Woodland':10,'Grassland':30,'Arable':40,'Urban':50};
+
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const num = v => Number.isFinite(Number(v)) ? Number(v) : null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function bandFor(score){
+  if(score >= 75) return 'Strong baseline';
+  if(score >= 55) return 'Good baseline';
+  if(score >= 35) return 'Moderate baseline';
+  return 'Limited baseline';
 }
+
+// Only layers with a real backend source feed the headline score.
+function scoreFromStats(stats){
+  const hist = stats.landcover_histogram || {};
+  const total = Object.values(hist).reduce((a,b)=>a+Number(b), 0) || 1;
+  let habitat = 0, weighed = false;
+  for(const [code, px] of Object.entries(hist)){
+    habitat += (HABITAT_VALUE[Number(code)] ?? 40) * (Number(px)/total);
+    weighed = true;
+  }
+  const ndvi  = num(stats.ndvi_mean);
+  const proxy = num(stats.flood_proxy_mean);
+  const cats = [];
+  if(weighed)        cats.push({name:'Habitat quality',   score:Math.round(habitat),                       weight:0.45});
+  if(ndvi !== null)  cats.push({name:'Vegetation vigour', score:Math.round(clamp01((ndvi-0.15)/0.60)*100), weight:0.35});
+  if(proxy !== null) cats.push({name:'Flood headroom',    score:Math.round((1-clamp01(proxy/0.6))*100),    weight:0.20});
+
+  const wsum = cats.reduce((a,c)=>a+c.weight, 0);
+  const overall = wsum ? Math.round(cats.reduce((a,c)=>a + c.score*c.weight, 0) / wsum) : 0;
+  return {overall, band: bandFor(overall),
+          categories: cats.map(c => ({name:c.name, score:c.score, simulated:false}))};
+}
+
+// ---------- SIMULATED FALLBACK ----------
+function cellsInAOI(){
+  const cells = [];
+  for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
+    const [lat,lng] = cellCenter(i,j);
+    if(pointInAOI(lat,lng)) cells.push([i,j]);
+  }
+  return cells;
+}
+
+// Same shape as /api/stats, built from the in-browser noise fields, so the
+// renderer below doesn't need to know which path produced it.
+// The simulated flood field is raw 0-1 noise averaging ~0.5, whereas the real
+// proxy (surface-water occurrence + a low-lying flag) sits far lower — around
+// 0.14 for a typical inland site. Without this rescale the fallback scores
+// every site as maximally flood-constrained.
+const SIM_FLOOD_SCALE = 0.45;
+
+function simulatedStats(cells){
+  let ndvi = 0, flood = 0; const hist = {};
+  for(const c of cells){
+    const i = c[0], j = c[1];
+    ndvi  += ndviAt(i,j,currentYear);
+    flood += floodAt(i,j,currentYear) * SIM_FLOOD_SCALE;
+    const code = SIM_LC_CODE[lcClass(lcValAt(i,j,currentYear)).name];
+    hist[code] = (hist[code] || 0) + 1;
+  }
+  const n = cells.length || 1;
+  return {ndvi_mean: ndvi/n, landcover_histogram: hist,
+          flood_proxy_mean: flood/n, area_ha: aoiAreaHa()};
+}
+
+// The three layers with no backend equivalent — shown, tagged, and kept out
+// of the headline score.
+const SIM_ONLY = [
+  {id:'change', name:'Vegetation trend',   toScore: m => (m + 0.3) / 0.6},
+  {id:'price',  name:'Land value context', toScore: m => m / 9000},
+  {id:'solar',  name:'Solar potential',    toScore: m => (m - 900) / 250},
+];
+function simulatedCategories(cells){
+  if(!cells.length) return [];
+  const out = [];
+  for(const s of SIM_ONLY){
+    if(!document.getElementById('chk-'+s.id).checked) continue;
+    const L_ = LAYERS.find(l => l.id === s.id);
+    let sum = 0;
+    for(const c of cells) sum += L_.value(c[0], c[1], currentYear);
+    const mean = sum / cells.length;
+    out.push({name: s.name, score: Math.round(clamp01(s.toScore(mean))*100),
+              simulated: true, raw: L_.format(mean) + ' ' + L_.unit});
+  }
+  return out;
+}
+
+// ---------- REPORT ----------
+let lastReport = null;
+let reportSeq = 0;
+
+async function computeReport(){
+  const seq = ++reportSeq;
+  const body = document.getElementById('reportBody');
+  const geometry = aoiGeoJSON();
+  if(!geometry) return;
+
+  const cells = cellsInAOI();
+  let stats;
+  try{
+    stats = await apiPost('/api/stats', {year: currentYear, geometry: geometry});
+    lastError = null;
+  }catch(e){
+    lastError = e.message;
+    dataSource = 'sim';
+    if(!cells.length){
+      if(seq === reportSeq){
+        body.innerHTML = '<div class="placeholder">Backend unreachable, and the drawn shape is too '
+          + 'small to sample the simulated grid. Draw a larger area, or start the backend.</div>'
+          + '<div class="err-note">' + esc(API_BASE) + ' — ' + esc(e.message) + '</div>';
+        document.getElementById('aiBtn').disabled = true;
+        lastReport = null; updateSourceBadge();
+      }
+      return;
+    }
+    stats = simulatedStats(cells);
+  }
+  if(seq !== reportSeq) return;   // a newer draw already landed; discard this one
+
+  const score = scoreFromStats(stats);
+  const simCats = simulatedCategories(cells);
+  renderReport(stats, score, simCats);
+
+  lastReport = {
+    stats: stats,
+    score: {overall: score.overall, band: score.band,
+            categories: score.categories.concat(simCats)},
+    simulated: Object.fromEntries(simCats.map(c => [c.name, c.raw])),
+  };
+  document.getElementById('aiBtn').disabled = false;
+  document.getElementById('aiOut').textContent = '';
+  document.getElementById('aiMeta').textContent = '';
+  updateSourceBadge();
+}
+
+function renderReport(stats, score, simCats){
+  const hist = stats.landcover_histogram || {};
+  const total = Object.values(hist).reduce((a,b)=>a+Number(b), 0) || 1;
+  const comp = Object.entries(hist)
+    .map(kv => ({code: Number(kv[0]), pct: Number(kv[1])/total*100}))
+    .filter(r => r.pct >= 0.5)
+    .sort((a,b) => b.pct - a.pct);
+
+  const ndvi  = num(stats.ndvi_mean);
+  const proxy = num(stats.flood_proxy_mean);
+  const area  = num(stats.area_ha);
+
+  let html = ''
+    + '<div class="score-head">'
+    +   '<div class="score-ring" style="--pct:' + score.overall + '">'
+    +     '<div class="score-num">' + score.overall + '<small>/100</small></div>'
+    +   '</div>'
+    +   '<div>'
+    +     '<div class="score-band">' + esc(score.band) + '</div>'
+    +     '<div class="score-sub">'
+    +       (area !== null ? area.toFixed(2) + ' ha · ' : '') + currentYear + '<br>'
+    +       (ndvi  !== null ? 'NDVI ' + ndvi.toFixed(2) : '')
+    +       (ndvi !== null && proxy !== null ? ' · ' : '')
+    +       (proxy !== null ? 'flood ' + proxy.toFixed(2) : '')
+    +     '</div>'
+    +   '</div>'
+    + '</div>';
+
+  html += '<div class="cat-list">';
+  const allCats = score.categories.concat(simCats);
+  for(const c of allCats){
+    html += '<div class="cat-row' + (c.simulated ? ' is-sim' : '') + '">'
+         +    '<div class="cat-head">'
+         +      '<span class="cat-name">' + esc(c.name) + '</span>'
+         +      (c.simulated ? '<span class="sim-tag">simulated</span>' : '')
+         +      '<span class="cat-val">' + c.score + '</span>'
+         +    '</div>'
+         +    '<div class="cat-track"><div class="cat-fill" style="width:' + c.score + '%"></div></div>'
+         +  '</div>';
+  }
+  html += '</div>';
+
+  if(simCats.length){
+    html += '<div class="cat-note">Simulated layers are shown for context and are excluded '
+         +  'from the score above.</div>';
+  }
+
+  if(comp.length){
+    html += '<div class="comp"><h3>Land cover</h3>';
+    for(const r of comp){
+      const colour = CODE_COLOR[r.code] || [120,120,120];
+      html += '<div class="comp-row">'
+           +    '<span>' + esc(CODE_LABEL[r.code] || ('Class ' + r.code)) + '</span>'
+           +    '<div class="comp-track"><div class="comp-fill" style="width:' + r.pct.toFixed(0)
+           +      '%;background:rgb(' + colour.join(',') + ')"></div></div>'
+           +    '<span class="comp-pct">' + r.pct.toFixed(0) + '%</span>'
+           +  '</div>';
+    }
+    html += '</div>';
+  }
+
+  if(dataSource === 'sim' && lastError){
+    html += '<div class="err-note">Showing simulated figures — could not reach '
+         +  esc(API_BASE) + ' (' + esc(lastError) + ').</div>';
+  }
+  document.getElementById('reportBody').innerHTML = html;
+}
+
+// ---------- SITE NOTE ----------
+// The Anthropic API key stays server-side; this only ever calls our backend.
 async function generateSummary(){
-  if(!lastStats) return;
-  const btn = document.getElementById('aiBtn'); const out = document.getElementById('aiOut');
-  btn.disabled=true; btn.textContent='Generating...'; out.textContent='Drafting summary...';
-  const lines = Object.entries(lastStats).map(([k,v])=>`- ${k}: ${v}`).join('\n');
-  const prompt = `You are summarising a multi-layer land/site scan for a UK land agent or developer, for the year ${currentYear}. Here is the data for the drawn area:\n${lines}\n\nWrite one short paragraph (under 110 words) in plain English describing what this area looks like and whether it seems worth a closer look, based only on these figures. No headers, no bullet points. Note this is illustrative/simulated demo data, not a certified assessment.`;
-  try{ out.textContent = await callClaude(prompt); }catch(e){ out.textContent = 'Could not reach the AI service.'; }
-  btn.disabled=false; btn.textContent='Generate AI Summary';
+  if(!lastReport) return;
+  const btn  = document.getElementById('aiBtn');
+  const out  = document.getElementById('aiOut');
+  const meta = document.getElementById('aiMeta');
+  btn.disabled = true; btn.textContent = 'Writing...';
+  out.textContent = 'Reading the figures...'; meta.textContent = '';
+  try{
+    const r = await apiPost('/api/summary', {
+      year: currentYear, stats: lastReport.stats,
+      score: lastReport.score, simulated: lastReport.simulated,
+    });
+    out.textContent = r.summary;
+    meta.textContent = r.generated_by === 'claude'
+      ? 'Written by ' + r.model + ' from the figures above.'
+      : 'Composed from the figures above without a language model'
+        + (r.detail ? ' — ' + r.detail : '.');
+  }catch(e){
+    out.textContent = 'Could not reach the site-note service at ' + API_BASE + '.';
+    meta.textContent = e.message;
+  }
+  btn.disabled = false; btn.textContent = 'Write Site Note';
 }
+
+// ---------- BOOT ----------
+// Last, so every declaration setLayerVisible() reaches is already initialised.
+document.getElementById('chk-ndvi').checked = true;
+setLayerVisible('ndvi', true);
+updateSourceBadge();
 </script>
 </body>
 </html>
