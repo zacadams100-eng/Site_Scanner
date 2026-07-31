@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contour — Draw &amp; Analyse</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#121212; --ink2:#1B1B1B; --ink3:#232323; --paper:#EDEDED; --paper-dim:#8C8C8C;
+    --brass:#D9A83C; --brass-bright:#E6BB5C; --brass-dim:#7A6226; --rule:rgba(255,255,255,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:'Inter',sans-serif;background:var(--ink);color:var(--paper);-webkit-tap-highlight-color:transparent;}
+  .app{display:flex;flex-direction:column;height:100vh;}
+  header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px 22px;border-bottom:1px solid var(--rule);flex-wrap:wrap;gap:12px;
+    background:var(--ink);
+  }
+  .brandmark{display:flex;align-items:center;gap:10px;}
+  .brandmark svg{width:26px;height:26px;flex-shrink:0;}
+  h1{font-weight:800;font-size:19px;margin:0;letter-spacing:-.01em;}
+
+  .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .tools{display:flex;gap:4px;background:var(--ink3);border:1px solid var(--rule);border-radius:10px;padding:4px;}
+  .tools button{
+    display:flex;align-items:center;gap:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+    background:transparent;border:none;color:var(--paper-dim);
+    padding:9px 14px;border-radius:7px;cursor:pointer;transition:all .15s ease;
+  }
+  .tools button svg{width:14px;height:14px;flex-shrink:0;}
+  .tools button.active{background:var(--brass);color:var(--ink);font-weight:600;}
+  .tools button:hover:not(.active){color:var(--paper);background:rgba(231,238,226,0.06);}
+  .tools .divider{width:1px;background:var(--rule);margin:4px 2px;}
+
+  .hint{font-family:'Inter',sans-serif;font-size:12.5px;color:var(--paper-dim);}
+
+  .timebar{
+    display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--ink2);
+    border-bottom:1px solid var(--rule);
+  }
+  .timebar .year-display{
+    font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:var(--brass);min-width:56px;
+  }
+  .timebar button.play{
+    background:var(--ink3);border:1px solid var(--rule);color:var(--paper);width:36px;height:36px;border-radius:50%;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .timebar button.play:hover{border-color:var(--brass-dim);}
+  .timebar input[type=range]{
+    flex:1; -webkit-appearance:none; height:4px; background:var(--rule); border-radius:2px; outline:none;
+  }
+  .timebar input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--brass);
+    border:2px solid var(--ink); cursor:pointer; box-shadow:0 0 0 1px var(--brass-dim);
+  }
+  .timebar .year-labels{
+    display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--paper-dim);
+    opacity:.6; position:absolute; left:20px; right:20px; margin-top:22px; pointer-events:none;
+  }
+  .timebar-inner{flex:1; position:relative;}
+
+  .body{flex:1;display:flex;min-height:0;}
+  #map{flex:1;background:#0b1712;cursor:default;}
+  #map.tool-active{cursor:crosshair;}
+
+  .side{width:310px;flex-shrink:0;background:var(--ink2);border-left:1px solid var(--rule);overflow-y:auto;padding:20px;}
+  .side h2{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:var(--paper);margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--rule);}
+  .layer-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-radius:8px;transition:background .15s;}
+  .layer-item:hover{background:var(--ink3);}
+  .swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .layer-item label{font-size:13.5px;flex:1;cursor:pointer;}
+  .layer-item .unit{font-size:10px;color:var(--paper-dim);opacity:.8;}
+  input[type=checkbox]{accent-color:var(--brass);width:16px;height:16px;cursor:pointer;}
+  .legend-note{font-size:12px;color:var(--paper-dim);line-height:1.55;margin-top:14px;opacity:.85;}
+
+  .report{margin-top:26px;}
+  .report .placeholder{font-size:12.5px;color:var(--paper-dim);line-height:1.5;}
+  .stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 4px;border-bottom:1px solid var(--rule);font-size:13px;}
+  .stat-row.area{background:rgba(217,168,60,0.10);border-radius:8px;margin-bottom:6px;padding:10px 10px;border-bottom:none;}
+  .stat-label{color:var(--paper-dim);}
+  .stat-val{font-family:'IBM Plex Mono',monospace;color:var(--paper);font-weight:500;}
+  .lc-bars{display:grid;gap:5px;margin:4px 4px 12px;}
+  .lc-bar-row{display:grid;grid-template-columns:70px 1fr 32px;gap:6px;align-items:center;font-size:11px;}
+  .lc-track{height:5px;background:var(--ink3);border-radius:3px;overflow:hidden;}
+  .lc-fill{height:100%;border-radius:3px;}
+  button.ai{
+    width:100%;margin-top:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+    background:var(--brass);color:#141414;border:none;padding:13px;border-radius:9px;cursor:pointer;
+    transition:background .15s;
+  }
+  button.ai:hover:not(:disabled){background:var(--brass-bright);}
+  button.ai:disabled{background:var(--brass-dim);cursor:not-allowed;opacity:.6;}
+  .ai-out{white-space:pre-wrap;font-size:13.5px;line-height:1.62;margin-top:12px;}
+  .footnote{font-size:11px;color:var(--paper-dim);opacity:.65;margin-top:24px;line-height:1.5;}
+  .leaflet-container{background:#0b0b0b;font-family:'Inter',sans-serif;}
+  @media(max-width:760px){ .side{width:260px;} h1{font-size:17px;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brandmark">
+      <svg viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="28" stroke="#D9A83C" stroke-width="2.5" opacity="0.35"/>
+        <circle cx="32" cy="32" r="19" stroke="#D9A83C" stroke-width="2.5" opacity="0.65"/>
+        <circle cx="32" cy="32" r="10" fill="#D9A83C"/>
+      </svg>
+      <h1>Contour</h1>
+    </div>
+    <div class="toolbar">
+      <div class="tools">
+        <button id="btn-rect" onclick="setTool('rect')" title="Drag to draw a rectangle">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4" width="11" height="8" rx="1"/></svg>
+          Rectangle
+        </button>
+        <button id="btn-circle" onclick="setTool('circle')" title="Drag from centre outward">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/></svg>
+          Circle
+        </button>
+        <button id="btn-free" onclick="setTool('free')" title="Drag to trace a shape">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 10c1-4 3-6.5 5.5-6.5S11 7 13.5 6"/></svg>
+          Freehand
+        </button>
+        <div class="divider"></div>
+        <button id="btn-clear" onclick="clearAOI()" title="Remove drawn shape">Clear</button>
+      </div>
+      <span class="hint" id="hintText">Pick a tool, then drag on the map</span>
+    </div>
+  </header>
+
+  <div class="timebar">
+    <button class="play" id="playBtn" onclick="togglePlay()" title="Play through years">
+      <svg id="playIcon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
+    </button>
+    <div class="year-display" id="yearDisplay">2024</div>
+    <div class="timebar-inner">
+      <input type="range" id="yearSlider" min="2016" max="2026" step="1" value="2024">
+    </div>
+  </div>
+
+  <div class="body">
+    <div id="map"></div>
+    <div class="side">
+      <h2>Data Layers</h2>
+      <div id="layerList"></div>
+      <div class="legend-note">Tick a layer to preview it on the map for the selected year. Draw a shape to compute stats across every ticked layer at once.</div>
+
+      <div class="report">
+        <h2 style="margin-top:24px;">Site Report</h2>
+        <div id="reportBody"><div class="placeholder">Draw a rectangle, circle, or freehand shape on the map to generate a report.</div></div>
+        <button class="ai" id="aiBtn" onclick="generateSummary()" disabled>Generate AI Summary</button>
+        <div id="aiOut" class="ai-out"></div>
+      </div>
+
+      <div class="footnote">All layer values in this demo are simulated for illustration, not live satellite data. A production version would call Google Earth Engine server-side (Sentinel-2, flood model, ALC, price index APIs) and return the same report shape shown here.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script>
+// ---------- MAP SETUP ----------
+const BOUNDS = { s: 51.195, w: -0.665, n: 51.285, e: -0.495 };
+const NX = 32, NY = 24;
+const mapEl = document.getElementById('map');
+const map = L.map(mapEl, {zoomControl:true, doubleClickZoom:true}).setView([51.240, -0.580], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; OpenStreetMap', opacity:0.5
+}).addTo(map);
+const canvasRenderer = L.canvas();
+
+// ---------- NOISE / SIMULATED FIELDS ----------
+function hash(i,j,seed){ let x = Math.sin(i*12.9898 + j*78.233 + seed*37.719) * 43758.5453; return x - Math.floor(x); }
+function makeField(seed, blurPasses){
+  let g = [];
+  for(let j=0;j<NY;j++){ let row=[]; for(let i=0;i<NX;i++){ row.push(hash(i,j,seed)); } g.push(row); }
+  for(let p=0;p<blurPasses;p++){
+    let ng = [];
+    for(let j=0;j<NY;j++){ let row=[];
+      for(let i=0;i<NX;i++){
+        let sum=0,count=0;
+        for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){
+          const jj=j+dj, ii=i+di;
+          if(jj>=0&&jj<NY&&ii>=0&&ii<NX){ sum+=g[jj][ii]; count++; }
+        }
+        row.push(sum/count);
+      }
+      ng.push(row);
+    }
+    g = ng;
+  }
+  return g;
+}
+const fieldNDVI  = makeField(1, 4);
+const fieldFlood = makeField(2, 5);
+const fieldLC    = makeField(3, 3);
+const fieldSolar = makeField(4, 5);
+const fieldPriceNoise = makeField(5, 4);
+const driftNDVI  = makeField(11, 4).map(r=>r.map(v=>v*2-1));
+const urbanDrift = makeField(12, 4).map(r=>r.map(v=>Math.max(0,v-0.4)*1.6));
+const floodDrift = makeField(13, 4);
+
+function cellBounds(i,j){
+  const dLat=(BOUNDS.n-BOUNDS.s)/NY, dLng=(BOUNDS.e-BOUNDS.w)/NX;
+  const s=BOUNDS.s+j*dLat, n=s+dLat, w=BOUNDS.w+i*dLng, e=w+dLng;
+  return [[s,w],[n,e]];
+}
+function cellCenter(i,j){ const b=cellBounds(i,j); return [(b[0][0]+b[1][0])/2, (b[0][1]+b[1][1])/2]; }
+function lerpColor(t,c1,c2){ t=Math.max(0,Math.min(1,t)); return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*t)},${Math.round(c1[1]+(c2[1]-c1[1])*t)},${Math.round(c1[2]+(c2[2]-c1[2])*t)})`; }
+
+const LC_CLASSES = [
+  {name:'Water',     max:0.12, color:[46,92,138]},
+  {name:'Woodland',  max:0.35, color:[45,92,58]},
+  {name:'Grassland', max:0.60, color:[122,168,84]},
+  {name:'Arable',    max:0.82, color:[201,167,88]},
+  {name:'Urban',     max:1.01, color:[140,110,100]},
+];
+function lcClass(v){ for(const c of LC_CLASSES){ if(v<=c.max) return c; } return LC_CLASSES[LC_CLASSES.length-1]; }
+
+function ndviAt(i,j,year){
+  const base = fieldNDVI[j][i]*0.9-0.05;
+  return Math.max(-0.1, Math.min(0.9, base + driftNDVI[j][i]*(year-2016)*0.012));
+}
+function lcValAt(i,j,year){
+  return Math.max(0, Math.min(1, fieldLC[j][i] + urbanDrift[j][i]*(year-2016)*0.015));
+}
+function floodAt(i,j,year){
+  return Math.max(0, Math.min(1, fieldFlood[j][i] + floodDrift[j][i]*0.15 + (year-2016)*0.004));
+}
+function priceAt(i,j,year){
+  const lcv = lcValAt(i,j,year);
+  const basePrice = 3000 + (fieldPriceNoise[j][i]*0.5 + lcClass(lcv).max*0.5)*4500;
+  return basePrice * Math.pow(1.032, year-2016);
+}
+function solarAt(i,j){ return 900 + fieldSolar[j][i]*(1150-900) - fieldLC[j][i]*30; }
+
+const LAYERS = [
+  { id:'ndvi', name:'Vegetation Health (NDVI)', unit:'index', swatch:[122,168,84],
+    value:(i,j,y)=> ndviAt(i,j,y),
+    color:(i,j,y)=> lerpColor((ndviAt(i,j,y)+0.1)/1.0, [138,109,61],[90,168,90]),
+    format:(v)=> v.toFixed(2) },
+  { id:'change', name:'Vegetation Change (6yr)', unit:'Δ index', swatch:[196,146,63],
+    value:(i,j,y)=> ndviAt(i,j,y) - ndviAt(i,j,Math.max(2016,y-6)),
+    color:(i,j,y)=>{ const d=ndviAt(i,j,y)-ndviAt(i,j,Math.max(2016,y-6)); return d>=0 ? lerpColor(Math.min(d*3,1)+0.001,[220,220,210],[86,168,90]) : lerpColor(Math.min(-d*3,1)+0.001,[220,220,210],[196,90,74]); },
+    format:(v)=> (v>=0?'+':'')+v.toFixed(2) },
+  { id:'flood', name:'Flood Risk', unit:'risk score', swatch:[122,150,196],
+    value:(i,j,y)=> floodAt(i,j,y),
+    color:(i,j,y)=> lerpColor(floodAt(i,j,y), [70,90,80],[98,130,196]),
+    format:(v)=> v<0.5?'Low':v<0.75?'Medium':'High' },
+  { id:'landcover', name:'Land Cover', unit:'class', swatch:[122,168,84],
+    value:(i,j,y)=> lcValAt(i,j,y),
+    color:(i,j,y)=> `rgb(${lcClass(lcValAt(i,j,y)).color.join(',')})`,
+    format:(v)=> lcClass(v).name, categorical:true },
+  { id:'price', name:'Property Price Index', unit:'£/m²', swatch:[196,146,63],
+    value:(i,j,y)=> priceAt(i,j,y),
+    color:(i,j,y)=> lerpColor(Math.min(priceAt(i,j,y)/9000,1), [90,110,95],[196,146,63]),
+    format:(v)=> '£'+Math.round(v).toLocaleString() },
+  { id:'solar', name:'Solar Energy Potential', unit:'kWh/m²/yr', swatch:[214,178,90],
+    value:(i,j)=> solarAt(i,j),
+    color:(i,j)=> lerpColor(fieldSolar[j][i], [80,80,70],[230,190,90]),
+    format:(v)=> Math.round(v) },
+];
+
+// build rect refs per layer for fast recolor
+const rectRefs = {};
+const layerGroups = {};
+LAYERS.forEach(L_ => {
+  const group = L.layerGroup();
+  rectRefs[L_.id] = [];
+  for(let j=0;j<NY;j++){ const row=[];
+    for(let i=0;i<NX;i++){
+      const rect = L.rectangle(cellBounds(i,j), {
+        stroke:false, fillColor: L_.color(i,j,2024), fillOpacity:0.5, renderer: canvasRenderer
+      }).addTo(group);
+      row.push(rect);
+    }
+    rectRefs[L_.id].push(row);
+  }
+  layerGroups[L_.id] = group;
+});
+
+// ---------- SIDEBAR LAYER LIST ----------
+const layerListEl = document.getElementById('layerList');
+LAYERS.forEach(L_ => {
+  const row = document.createElement('div'); row.className='layer-item';
+  row.innerHTML = `<input type="checkbox" id="chk-${L_.id}">
+    <span class="swatch" style="background:rgb(${L_.swatch.join(',')})"></span>
+    <label for="chk-${L_.id}">${L_.name}</label>
+    <span class="unit">${L_.unit}</span>`;
+  layerListEl.appendChild(row);
+  document.getElementById('chk-'+L_.id).addEventListener('change', (e)=>{
+    if(e.target.checked){ layerGroups[L_.id].addTo(map); } else { map.removeLayer(layerGroups[L_.id]); }
+    if(currentAOI) computeReport();
+  });
+});
+document.getElementById('chk-ndvi').checked = true; layerGroups['ndvi'].addTo(map);
+
+// ---------- TIME BAR ----------
+let currentYear = 2024;
+const slider = document.getElementById('yearSlider');
+const yearDisplay = document.getElementById('yearDisplay');
+function repaintYear(year){
+  currentYear = year;
+  yearDisplay.textContent = year;
+  LAYERS.forEach(L_ => {
+    if(!document.getElementById('chk-'+L_.id).checked) return;
+    for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
+      rectRefs[L_.id][j][i].setStyle({fillColor: L_.color(i,j,year)});
+    }
+  });
+  if(currentAOI) computeReport();
+}
+slider.addEventListener('input', (e)=> repaintYear(parseInt(e.target.value)));
+
+let playing = false, playInterval = null;
+function togglePlay(){
+  playing = !playing;
+  document.getElementById('playIcon').innerHTML = playing
+    ? '<rect x="3" y="2.5" width="3.4" height="11" rx="0.8"/><rect x="9.6" y="2.5" width="3.4" height="11" rx="0.8"/>'
+    : '<path d="M4 2.5l9 5.5-9 5.5z"/>';
+  if(playing){
+    playInterval = setInterval(()=>{
+      let y = parseInt(slider.value)+1;
+      if(y>2026) y=2016;
+      slider.value = y; repaintYear(y);
+    }, 900);
+  } else { clearInterval(playInterval); }
+}
+
+// ---------- DRAWING TOOLS (mouse + touch) ----------
+let tool=null, drawing=false, tempLayer=null, currentAOI=null, freePoints=[], startLatLng=null;
+const hintEl = document.getElementById('hintText');
+const HINTS = { rect:'Drag across the map to draw a rectangle', circle:'Drag from the centre outward', free:'Drag to trace any shape' };
+
+function setTool(t){
+  tool = (tool===t) ? null : t;
+  ['rect','circle','free'].forEach(x => document.getElementById('btn-'+x).classList.toggle('active', tool===x));
+  mapEl.classList.toggle('tool-active', !!tool);
+  map.dragging[tool ? 'disable' : 'enable']();
+  map.doubleClickZoom[tool ? 'disable' : 'enable']();
+  hintEl.textContent = tool ? HINTS[tool] : 'Pick a tool, then drag on the map';
+}
+function clearAOI(){
+  if(currentAOI) map.removeLayer(currentAOI);
+  currentAOI = null;
+  document.getElementById('reportBody').innerHTML = '<div class="placeholder">Draw a rectangle, circle, or freehand shape on the map to generate a report.</div>';
+  document.getElementById('aiBtn').disabled = true;
+  document.getElementById('aiOut').textContent = '';
+}
+function eventLatLng(e){
+  const src = e.touches && e.touches.length ? e.touches[0] : (e.changedTouches && e.changedTouches.length ? e.changedTouches[0] : e);
+  const point = map.mouseEventToContainerPoint({clientX:src.clientX, clientY:src.clientY});
+  return map.containerPointToLatLng(point);
+}
+function startDraw(e){
+  if(!tool) return;
+  drawing = true;
+  startLatLng = eventLatLng(e);
+  if(tool==='free'){ freePoints=[startLatLng]; }
+  if(e.cancelable) e.preventDefault();
+}
+function moveDraw(e){
+  if(!drawing || !tool) return;
+  const ll = eventLatLng(e);
+  if(tempLayer) map.removeLayer(tempLayer);
+  if(tool==='rect'){
+    tempLayer = L.rectangle(L.latLngBounds(startLatLng, ll), {color:'#C4923F', weight:2, fillOpacity:0.1, dashArray:'4,3'});
+  } else if(tool==='circle'){
+    const r = startLatLng.distanceTo(ll);
+    tempLayer = L.circle(startLatLng, {radius:r, color:'#C4923F', weight:2, fillOpacity:0.1, dashArray:'4,3'});
+  } else if(tool==='free'){
+    freePoints.push(ll);
+    tempLayer = L.polygon(freePoints, {color:'#C4923F', weight:2, fillOpacity:0.1});
+  }
+  tempLayer.addTo(map);
+  if(e.cancelable) e.preventDefault();
+}
+function endDraw(e){
+  if(!drawing || !tool) return;
+  drawing = false;
+  const ll = eventLatLng(e);
+  if(currentAOI) map.removeLayer(currentAOI);
+  if(tool==='rect'){
+    currentAOI = L.rectangle(L.latLngBounds(startLatLng, ll), {color:'#DDAE5C', weight:2.5, fillOpacity:0.06});
+    currentAOI._shape='rect';
+  } else if(tool==='circle'){
+    const r = startLatLng.distanceTo(ll);
+    currentAOI = L.circle(startLatLng, {radius:r, color:'#DDAE5C', weight:2.5, fillOpacity:0.06});
+    currentAOI._shape='circle';
+  } else if(tool==='free'){
+    if(freePoints.length>2){
+      let coords = freePoints.map(p=>[p.lng,p.lat]); coords.push(coords[0]);
+      try{ coords = turf.simplify(turf.polygon([coords]), {tolerance:0.0006}).geometry.coordinates[0]; }catch(e){}
+      currentAOI = L.polygon(coords.map(c=>[c[1],c[0]]), {color:'#DDAE5C', weight:2.5, fillOpacity:0.06});
+      currentAOI._shape='poly';
+    }
+  }
+  if(tempLayer){ map.removeLayer(tempLayer); tempLayer=null; }
+  if(currentAOI){ currentAOI.addTo(map); computeReport(); }
+}
+const mapContainer = map.getContainer();
+mapContainer.addEventListener('mousedown', startDraw);
+mapContainer.addEventListener('mousemove', moveDraw);
+window.addEventListener('mouseup', endDraw);
+mapContainer.addEventListener('touchstart', startDraw, {passive:false});
+mapContainer.addEventListener('touchmove', moveDraw, {passive:false});
+mapContainer.addEventListener('touchend', endDraw, {passive:false});
+
+function pointInAOI(lat,lng){
+  if(!currentAOI) return false;
+  if(currentAOI._shape==='rect') return currentAOI.getBounds().contains([lat,lng]);
+  if(currentAOI._shape==='circle') return currentAOI.getLatLng().distanceTo(L.latLng(lat,lng)) <= currentAOI.getRadius();
+  if(currentAOI._shape==='poly'){
+    const coords = currentAOI.getLatLngs()[0].map(p=>[p.lng,p.lat]); coords.push(coords[0]);
+    return turf.booleanPointInPolygon(turf.point([lng,lat]), turf.polygon([coords]));
+  }
+  return false;
+}
+function aoiAreaHa(){
+  if(!currentAOI) return 0;
+  if(currentAOI._shape==='circle') return (Math.PI*Math.pow(currentAOI.getRadius(),2))/10000;
+  if(currentAOI._shape==='rect'){
+    const b = currentAOI.getBounds();
+    const poly = turf.polygon([[[b.getWest(),b.getSouth()],[b.getEast(),b.getSouth()],[b.getEast(),b.getNorth()],[b.getWest(),b.getNorth()],[b.getWest(),b.getSouth()]]]);
+    return turf.area(poly)/10000;
+  }
+  if(currentAOI._shape==='poly'){
+    const coords = currentAOI.getLatLngs()[0].map(p=>[p.lng,p.lat]); coords.push(coords[0]);
+    return turf.area(turf.polygon([coords]))/10000;
+  }
+  return 0;
+}
+
+let lastStats = null;
+function computeReport(){
+  const active = LAYERS.filter(L_ => document.getElementById('chk-'+L_.id).checked);
+  let cellsIn = 0;
+  const sums = {}; const lcCounts = {};
+  active.forEach(L_ => sums[L_.id] = {sum:0,count:0});
+  for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
+    const [lat,lng] = cellCenter(i,j);
+    if(pointInAOI(lat,lng)){
+      cellsIn++;
+      active.forEach(L_ => {
+        const v = L_.value(i,j,currentYear);
+        sums[L_.id].sum += v; sums[L_.id].count++;
+        if(L_.id==='landcover'){ const cn = lcClass(v).name; lcCounts[cn]=(lcCounts[cn]||0)+1; }
+      });
+    }
+  }
+  const body = document.getElementById('reportBody');
+  if(cellsIn===0 || active.length===0){
+    body.innerHTML = '<div class="placeholder">No ticked layers intersect the drawn area, or no layers selected. Tick at least one layer.</div>';
+    document.getElementById('aiBtn').disabled = true; lastStats=null; return;
+  }
+  let html = `<div class="stat-row area"><span class="stat-label">Area sampled</span><span class="stat-val">${aoiAreaHa().toFixed(2)} ha · ${cellsIn} cells · ${currentYear}</span></div>`;
+  const statsForAI = {};
+  active.forEach(L_ => {
+    const s = sums[L_.id]; const avg = s.count ? s.sum/s.count : 0;
+    if(L_.id==='landcover'){
+      const total = Object.values(lcCounts).reduce((a,b)=>a+b,0) || 1;
+      html += `<div class="stat-row" style="grid-template-columns:1fr;"><div class="stat-label">${L_.name}</div></div><div class="lc-bars">`;
+      LC_CLASSES.forEach(c => {
+        const pct = Math.round(((lcCounts[c.name]||0)/total)*100);
+        if(pct>0) html += `<div class="lc-bar-row"><span>${c.name}</span><div class="lc-track"><div class="lc-fill" style="width:${pct}%;background:rgb(${c.color.join(',')})"></div></div><span>${pct}%</span></div>`;
+      });
+      html += '</div>';
+      statsForAI[L_.name] = Object.entries(lcCounts).map(([k,v])=>`${k} ${Math.round((v/total)*100)}%`).join(', ');
+    } else {
+      html += `<div class="stat-row"><span class="stat-label">${L_.name}</span><span class="stat-val">${L_.format(avg)}</span></div>`;
+      statsForAI[L_.name] = L_.format(avg) + ' ' + L_.unit;
+    }
+  });
+  body.innerHTML = html;
+  document.getElementById('aiBtn').disabled = false;
+  document.getElementById('aiOut').textContent = '';
+  lastStats = statsForAI;
+}
+
+async function callClaude(promptText){
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:900, messages:[{role:"user", content:promptText}] })
+  });
+  const data = await response.json();
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n') || 'No response generated.';
+}
+async function generateSummary(){
+  if(!lastStats) return;
+  const btn = document.getElementById('aiBtn'); const out = document.getElementById('aiOut');
+  btn.disabled=true; btn.textContent='Generating...'; out.textContent='Drafting summary...';
+  const lines = Object.entries(lastStats).map(([k,v])=>`- ${k}: ${v}`).join('\n');
+  const prompt = `You are summarising a multi-layer land/site scan for a UK land agent or developer, for the year ${currentYear}. Here is the data for the drawn area:\n${lines}\n\nWrite one short paragraph (under 110 words) in plain English describing what this area looks like and whether it seems worth a closer look, based only on these figures. No headers, no bullet points. Note this is illustrative/simulated demo data, not a certified assessment.`;
+  try{ out.textContent = await callClaude(prompt); }catch(e){ out.textContent = 'Could not reach the AI service.'; }
+  btn.disabled=false; btn.textContent='Generate AI Summary';
+}
+</script>
+</body>
+</html>
