@@ -83,6 +83,41 @@ obvious which backend answered.
 Switching to the real backend is a one-word change — `uvicorn app:app` instead
 of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
 
+## Running the test suite
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+No credentials, no network, no Earth Engine. `tests/conftest.py` installs a
+stand-in `ee` module into `sys.modules` before `app.py` is imported, and serves
+`mock_ee_backend`'s payloads through it — so the tests assert against the same
+response shapes the real backend produces. The Anthropic client is stubbed the
+same way, and `ANTHROPIC_API_KEY` is cleared for every test so a developer with
+one exported can't accidentally make live calls.
+
+What's covered: request/response shapes for every endpoint on both backends,
+parity between them (routes, request models), the error contract (422 for a
+malformed body, 500 with a `detail` for a bad geometry or an upstream
+failure), caching, and the summary branch selection.
+
+## Caching
+
+`/api/tile/*` and `/api/stats` are cached in-process, keyed by a hash of the
+request (`cache.py`) — the README's own recommendation, now implemented.
+Redrawing the same shape or stepping the year slider back and forth no longer
+re-runs `reduceRegion`.
+
+`GET /api/cache` reports hits, misses and entry counts. `CONTOUR_CACHE_TTL=0`
+disables it; the default TTL is 15 minutes.
+
+Worth being clear about the limit: this is **per-process**. Cloud Run runs
+several instances and recycles them, so a cold instance always misses and two
+users drawing the same field may not share an entry. It removes the obvious
+waste — one person re-examining one site — and nothing more. A shared cache is
+the thing that helps at scale.
+
 ## 3. Testing the endpoints
 
 ```bash

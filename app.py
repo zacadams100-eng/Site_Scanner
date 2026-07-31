@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from summary import SummaryRequest, generate_summary
+from cache import build_cache, cache_key
 
 # ---------------------------------------------------------------------------
 # Earth Engine auth — uses a service account, NOT a personal Google login.
@@ -130,9 +131,24 @@ def flood_proxy_image():
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+# Earth Engine has compute quotas and reduceRegion is slow over large areas.
+# Redrawing the same shape, or stepping the year slider back and forth, would
+# otherwise re-run the whole computation each time. Per-process only — see
+# cache.py for what that does and doesn't buy.
+TILE_CACHE = build_cache()
+STATS_CACHE = build_cache()
+
+
 @app.get("/")
 def health():
     return {"status": "ok", "message": "Site Scanner Earth Engine API is running"}
+
+
+@app.get("/api/cache")
+def cache_info():
+    """Hit/miss counters, so cache behaviour is observable in a deployed
+    instance rather than guessed at."""
+    return {"tiles": TILE_CACHE.info(), "stats": STATS_CACHE.info()}
 
 
 class PriceRequest(BaseModel):
@@ -182,10 +198,17 @@ def price_stats(req: PriceRequest):
 @app.post("/api/tile/ndvi")
 def tile_ndvi(req: TileRequest):
     try:
+        key = cache_key("tile", "ndvi", req.year, req.month)
+        cached = TILE_CACHE.get(key)
+        if cached is not None:
+            return cached
+
         img = ndvi_image(req.year, req.month)
         vis_params = {"min": -0.1, "max": 0.9, "palette": ["8a6d3d", "c9a758", "7aa854", "2d5c3a"]}
         map_id = ee.Image(img).getMapId(vis_params)
-        return {"tile_url_template": map_id["tile_fetcher"].url_format}
+        result = {"tile_url_template": map_id["tile_fetcher"].url_format}
+        TILE_CACHE.set(key, result)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -193,6 +216,11 @@ def tile_ndvi(req: TileRequest):
 @app.post("/api/tile/landcover")
 def tile_landcover(req: TileRequest):
     try:
+        key = cache_key("tile", "landcover", req.year, req.month)
+        cached = TILE_CACHE.get(key)
+        if cached is not None:
+            return cached
+
         img = landcover_image(req.year)
         # ESA WorldCover has a built-in palette in its metadata; a simple generic
         # palette is used here for clarity.
@@ -204,7 +232,9 @@ def tile_landcover(req: TileRequest):
             ],
         }
         map_id = ee.Image(img).getMapId(vis_params)
-        return {"tile_url_template": map_id["tile_fetcher"].url_format}
+        result = {"tile_url_template": map_id["tile_fetcher"].url_format}
+        TILE_CACHE.set(key, result)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -214,6 +244,11 @@ def stats(req: StatsRequest):
     """Server-side aggregation — the browser only ever receives a handful
     of numbers here, never raw imagery or pixel data."""
     try:
+        key = cache_key("stats", req.year, req.geometry)
+        cached = STATS_CACHE.get(key)
+        if cached is not None:
+            return cached
+
         geom = ee.Geometry(req.geometry)
 
         ndvi = ndvi_image(req.year)
@@ -240,6 +275,7 @@ def stats(req: StatsRequest):
             "area_ha": area_ha,
         }).getInfo()
 
+        STATS_CACHE.set(key, result)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,0 +1,5 @@
+# Test-only dependencies. The runtime image doesn't need these; see Dockerfile.
+-r requirements.txt
+
+pytest==8.3.3
+httpx==0.27.2          # required by fastapi.testclient
