@@ -30,6 +30,40 @@ quota issues — that's normal for a first Earth Engine integration.
 ## 2. Running locally
 
 ```bash
+./setup.sh
+```
+
+That's the whole thing. It creates the venv if it's missing, installs
+dependencies only when `requirements.txt` has changed, finds the service
+account key, exports it, and starts the server on port 8000.
+
+This exists because Cloud Shell keeps your home directory but discards
+environment variables and venv activation on every reconnect, which turns the
+five manual lines below into a repeated chore. Put the JSON key next to
+`app.py` and the script finds it by content — the Cloud console's generated
+filenames differ per key, so nothing is hardcoded.
+
+| Command | What it does |
+| --- | --- |
+| `./setup.sh` | Set up, then run the real Earth Engine backend |
+| `./setup.sh --mock` | Run `mock_ee_backend` instead — no credentials needed |
+| `./setup.sh --smoke` | Run the Earth Engine smoke test (this is what proves the key works) |
+| `./setup.sh --check` | Verify the key and dependencies, start nothing |
+| `source ./setup.sh` | Configure **this** shell and stop — use in the tab you curl from |
+
+Also takes `--key FILE`, `--project ID`, `--port N`, `--no-run`, `--help`.
+
+Sourcing is the one worth remembering: in a second Cloud Shell tab,
+`source ./setup.sh` leaves the venv active and the credentials exported in your
+own shell, so `curl`, `pytest` and `python scripts/ee_smoke_test.py` all just
+work without repeating the exports.
+
+Visit http://localhost:8000 — you should see `{"status": "ok", ...}`.
+
+<details>
+<summary>The equivalent by hand, if you'd rather not use the script</summary>
+
+```bash
 cd ee-backend
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
@@ -41,7 +75,16 @@ export EE_PROJECT="your-gcp-project-id"
 uvicorn app:app --reload --port 8000
 ```
 
-Visit http://localhost:8000 — you should see `{"status": "ok", ...}`.
+Note that `GOOGLE_APPLICATION_CREDENTIALS_JSON` takes the key's *contents*, not
+its path — exporting the path is the usual first-try mistake.
+</details>
+
+### Keep the key out of git
+
+A downloaded key is a live credential, and a committed one has to be rotated
+rather than deleted. `.gitignore` covers the Cloud console's
+`<project>-<hex>.json` naming as well as the obvious names, and `setup.sh`
+warns if the key it found is inside the repo without being ignored.
 
 ## Running without Earth Engine credentials (mock backend)
 

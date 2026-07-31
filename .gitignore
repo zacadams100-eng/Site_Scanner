@@ -3,6 +3,14 @@ __pycache__/
 .pytest_cache/
 venv/
 .venv/
+.env
+
+# Service account keys. The Cloud console names a downloaded key
+# <project>-<12 hex chars>.json, which none of the obvious patterns catch —
+# so match that shape too. A key committed to a repo has to be rotated, not
+# deleted, so this list errs wide.
 service-account-key.json
 *.key.json
-.env
+*service-account*.json
+*serviceaccount*.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json

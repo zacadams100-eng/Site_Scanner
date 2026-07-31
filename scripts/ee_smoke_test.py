@@ -27,6 +27,7 @@ import json
 import math
 import os
 import pathlib
+import re
 import sys
 import time
 
@@ -60,6 +61,26 @@ def square_around(lat: float, lon: float, area_ha: float) -> dict:
     }
 
 
+# Earth Engine puts the whole credentials dict into some of its exception
+# messages — a bad key raises an error containing the live private key. Printing
+# that lands the credential in the terminal scrollback, and in the CI log of
+# anyone who runs this in CI. Everything here goes through _redact first.
+_SECRET_FIELDS = ("private_key", "private_key_id", "client_id", "refresh_token")
+_SECRET_RE = re.compile(
+    r"""(['"]?(?:%s)['"]?\s*[:=]\s*)(['"])(?:\\.|(?!\2).)*\2"""
+    % "|".join(_SECRET_FIELDS)
+)
+_PEM_RE = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+    re.DOTALL,
+)
+
+
+def _redact(text: str) -> str:
+    text = _SECRET_RE.sub(r"\1'<redacted>'", text)
+    return _PEM_RE.sub("<redacted private key>", text)
+
+
 class Step:
     """Times a block and prints a one-line verdict."""
 
@@ -78,7 +99,7 @@ class Step:
             print(f"ok   {ms:8.0f} ms")
         else:
             print(f"FAIL {ms:8.0f} ms")
-            print(f"\n    {exc_type.__name__}: {exc}\n")
+            print(f"\n    {exc_type.__name__}: {_redact(str(exc))}\n")
             explain(exc)
         return False
 
@@ -95,6 +116,8 @@ HINTS = [
     ("caller does not have",  "IAM role missing on the service account — add Earth Engine\n"
                              "    Resource Viewer (or Writer)."),
     ("invalid_grant",         "The key JSON is malformed, or the system clock is skewed."),
+    ("converted to bytes",    "The key's private_key isn't a usable PEM. Usually this means the\n"
+                              "    file was edited, truncated, or is a placeholder — re-download it."),
     ("quota",                 "You've hit a rate or compute quota. Wait, or check your EE plan."),
     ("too many pixels",       "maxPixels exceeded — the area is too big for this scale.\n"
                              "    This is a real finding: see the notes at the end."),
