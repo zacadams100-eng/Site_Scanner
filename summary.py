@@ -54,7 +54,9 @@ ambiguous, say so rather than padding.
 
 Say what the land appears to be, what stands out for BNG purposes, and \
 whether it looks worth a closer look. Where a figure is flagged as simulated \
-or as a proxy, do not present it as measured fact.
+or as a proxy, do not present it as measured fact. If a limit of the screen is \
+listed, reflect it — a reader may forward this note to a client, so it must not \
+read more confidently than the data supports.
 
 Close by noting this is an automated screen from satellite data, not a \
 Biodiversity Metric assessment or a substitute for a site visit."""
@@ -68,6 +70,8 @@ class SummaryRequest(BaseModel):
     stats: dict                          # the /api/stats payload
     score: Optional[dict] = None         # {"overall": int, "band": str, "categories": [...]}
     simulated: Optional[dict] = None     # layers with no real backing, e.g. {"Solar potential": "1043 kWh/m²/yr"}
+    caveats: Optional[List[str]] = None  # where the screen is weak, e.g. a land cover
+                                         # class that spans several distinctiveness bands
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +158,11 @@ def build_prompt(req: SummaryRequest) -> str:
             + ", ".join(f"{k} {v}" for k, v in req.simulated.items())
         )
 
+    if req.caveats:
+        lines.append("Known limits of this screen — reflect these, do not write around them:")
+        for c in req.caveats:
+            lines.append(f"  - {c}")
+
     return "Site screening figures:\n" + "\n".join(lines)
 
 
@@ -205,6 +214,9 @@ def fallback_summary(req: SummaryRequest) -> str:
             if overall >= 55
             else ", so temper expectations before committing survey budget. "
         )
+
+    if req.caveats:
+        bits.append(" ".join(req.caveats) + " ")
 
     bits.append(
         "Treat all of the above as an automated satellite screen, not a Biodiversity "

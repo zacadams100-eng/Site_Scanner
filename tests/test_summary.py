@@ -236,3 +236,39 @@ def test_response_always_has_the_same_keys(monkeypatch, with_key):
     out = generate_summary(req())
     assert {"summary", "generated_by", "model"} <= set(out)
     assert out["generated_by"] in ("claude", "fallback")
+
+
+# ---------------------------------------------------------------------------
+# Caveats — where the screen is weak. These matter most because the paragraph
+# is the artefact a land agent is most likely to forward to a client.
+# ---------------------------------------------------------------------------
+CAVEAT = ("Grassland is 62% of the site. Grassland spans modified pasture "
+          "through to species-rich meadow.")
+
+
+def test_caveats_reach_the_prompt():
+    p = build_prompt(req(caveats=[CAVEAT]))
+    assert "Known limits of this screen" in p
+    assert CAVEAT in p
+
+
+def test_system_prompt_requires_caveats_to_be_honoured():
+    from summary import SYSTEM_PROMPT
+
+    assert "limit of the screen" in SYSTEM_PROMPT
+    assert "forward this note to a client" in SYSTEM_PROMPT
+
+
+def test_caveats_reach_the_fallback_text():
+    assert CAVEAT in fallback_summary(req(caveats=[CAVEAT]))
+
+
+def test_caveats_are_optional():
+    assert "Known limits" not in build_prompt(req())
+    assert fallback_summary(req(caveats=[]))
+
+
+def test_caveats_survive_the_round_trip(monkeypatch):
+    captured = _stub_anthropic(monkeypatch)
+    generate_summary(req(caveats=[CAVEAT]))
+    assert CAVEAT in captured["messages"][0]["content"]

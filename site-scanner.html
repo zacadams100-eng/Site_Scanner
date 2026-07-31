@@ -134,6 +134,11 @@
   .comp-fill{height:100%;border-radius:3px;}
   .comp-pct{font-family:'IBM Plex Mono',monospace;text-align:right;color:var(--paper-dim);}
 
+  .caveat{font-size:11.5px;color:var(--paper-dim);line-height:1.55;margin-top:14px;
+    padding:10px 11px;border-radius:7px;background:var(--ink3);
+    border-left:2px solid var(--brass-dim);}
+  .caveat strong{color:var(--paper);font-weight:600;}
+
   .err-note{font-size:11.5px;color:var(--paper-dim);line-height:1.5;margin-top:10px;
     padding:9px 10px;border-radius:7px;background:var(--ink3);}
   button.ai{
@@ -452,17 +457,34 @@ async function setLayerVisible(id, visible){
 let currentYear = 2024;
 const slider = document.getElementById('yearSlider');
 const yearDisplay = document.getElementById('yearDisplay');
+// The slider fires 'input' continuously while being dragged, and every year
+// change costs a tile request plus a reduceRegion — which is slow and counts
+// against Earth Engine's quota. Dragging 2016 to 2026 would otherwise fire an
+// analysis for each of the eleven years, ten of which the user never looks at.
+// The local grid recolours immediately so the drag still feels live; only the
+// backend work waits for the slider to settle.
+const YEAR_SETTLE_MS = 250;
+let yearSettleTimer = null;
+
 function repaintYear(year){
   currentYear = year;
   yearDisplay.textContent = year;
   LAYERS.forEach(L_ => {
     if(!document.getElementById('chk-'+L_.id).checked) return;
-    // A real tile layer for this year replaces the grid; the grid only needs
-    // recolouring when it's the one actually on screen.
-    if(realTiles[L_.id]){ showRealTile(L_.id, year).catch(e => { lastError = e.message; }); return; }
+    // Where a real tile layer is on screen the grid is hidden, so there's
+    // nothing to recolour — that layer is refreshed below instead.
+    if(realTiles[L_.id]) return;
     for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
       rectRefs[L_.id][j][i].setStyle({fillColor: L_.color(i,j,year)});
     }
+  });
+  clearTimeout(yearSettleTimer);
+  yearSettleTimer = setTimeout(refreshYearFromBackend, YEAR_SETTLE_MS);
+}
+
+function refreshYearFromBackend(){
+  Object.keys(realTiles).forEach(id => {
+    showRealTile(id, currentYear).catch(e => { lastError = e.message; });
   });
   if(currentAOI) computeReport();
 }
@@ -615,9 +637,41 @@ function aoiGeoJSON(){
 }
 
 // ---------- SCORING ----------
-// An indicative screening weight per ESA WorldCover class (0-100). This is a
-// heuristic for triage, NOT Biodiversity Metric distinctiveness banding.
-const HABITAT_VALUE = {10:85, 20:60, 30:55, 40:25, 50:5, 60:15, 70:10, 80:70, 90:90, 95:95, 100:45};
+// Indicative screening weight (0-100) per ESA WorldCover class.
+//
+// These are NOT biodiversity metric distinctiveness scores, and they cannot be.
+// The statutory metric scores UK Habitat Classification types; one WorldCover
+// class can span several distinctiveness bands, and condition — which drives
+// much of a habitat's value — isn't visible from orbit at all. The numbers
+// below are midpoints picked for triage. They are the most arguable thing in
+// this file: tune them to match how you actually rank sites.
+const HABITAT_VALUE = {
+  10:  85,   // Tree cover — woodland, reliably high value
+  20:  60,   // Shrubland — scrub; may be transitional or priority heathland
+  30:  55,   // Grassland — the widest spread of any class, see below
+  40:  25,   // Cropland — arable; low unless margins are counted separately
+  50:   5,   // Built-up — sealed surface, effectively nil
+  60:  15,   // Bare / sparse vegetation
+  70:  10,   // Snow and ice — not applicable in the UK
+  80:  70,   // Permanent water bodies
+  90:  90,   // Herbaceous wetland — high value and slow to recreate
+  95:  95,   // Mangroves — not applicable in the UK
+  100: 45,   // Moss and lichen
+};
+
+// Classes where the weight above could be materially wrong in either
+// direction, because WorldCover can't resolve what the metric needs. Surfaced
+// in the panel when one of them dominates the site, so the screen says where
+// it is weakest instead of implying uniform confidence.
+const HABITAT_AMBIGUOUS = {
+  30: 'Grassland spans modified pasture through to species-rich meadow — several '
+    + 'distinctiveness bands apart. 10 m satellite land cover cannot tell them apart.',
+  20: 'Shrubland covers both low-value scrub and priority heathland.',
+  90: 'Wetland value depends heavily on condition, which is not visible from satellite.',
+  40: 'Cropland scores low here, but field margins and hedgerows within it are '
+    + 'often where the biodiversity value actually sits.',
+};
+const AMBIGUOUS_SHARE = 40;   // percent of the site before it's worth flagging
 const CODE_LABEL = {10:'Tree cover',20:'Shrubland',30:'Grassland',40:'Cropland',50:'Built-up',
   60:'Bare / sparse',70:'Snow & ice',80:'Water',90:'Wetland',95:'Mangroves',100:'Moss & lichen'};
 const CODE_COLOR = {10:[45,92,58],20:[122,140,74],30:[122,168,84],40:[201,167,88],50:[140,110,100],
@@ -656,6 +710,25 @@ function scoreFromStats(stats){
   const overall = wsum ? Math.round(cats.reduce((a,c)=>a + c.score*c.weight, 0) / wsum) : 0;
   return {overall, band: bandFor(overall),
           categories: cats.map(c => ({name:c.name, score:c.score, simulated:false}))};
+}
+
+// Where the screen is weakest. If a class the satellite can't resolve
+// dominates the site, the habitat score is the midpoint of a wide range —
+// say so, rather than implying uniform confidence. Used by both the panel and
+// the written note, so the note a client might be forwarded carries it too.
+function habitatCaveat(stats){
+  const hist = stats.landcover_histogram || {};
+  const total = Object.values(hist).reduce((a,b)=>a+Number(b), 0) || 1;
+  let top = null;
+  for(const kv of Object.entries(hist)){
+    const pct = Number(kv[1])/total*100;
+    if(!top || pct > top.pct) top = {code: Number(kv[0]), pct: pct};
+  }
+  if(top && top.pct >= AMBIGUOUS_SHARE && HABITAT_AMBIGUOUS[top.code]){
+    return {code: top.code, label: CODE_LABEL[top.code] || ('Class ' + top.code),
+            pct: top.pct, text: HABITAT_AMBIGUOUS[top.code]};
+  }
+  return null;
 }
 
 // ---------- SIMULATED FALLBACK ----------
@@ -748,11 +821,16 @@ async function computeReport(){
   const simCats = simulatedCategories(cells);
   renderReport(stats, score, simCats);
 
+  const caveat = habitatCaveat(stats);
   lastReport = {
     stats: stats,
     score: {overall: score.overall, band: score.band,
             categories: score.categories.concat(simCats)},
     simulated: Object.fromEntries(simCats.map(c => [c.name, c.raw])),
+    // Sent to the site note as well, so the paragraph a client might be
+    // forwarded doesn't read more confidently than the data supports.
+    caveats: caveat ? [caveat.label + ' is ' + caveat.pct.toFixed(0) + '% of the site. '
+                       + caveat.text] : [],
   };
   document.getElementById('aiBtn').disabled = false;
   document.getElementById('aiOut').textContent = '';
@@ -821,6 +899,13 @@ function renderReport(stats, score, simCats){
     html += '</div>';
   }
 
+  const caveat = habitatCaveat(stats);
+  if(caveat){
+    html += '<div class="caveat"><strong>' + esc(caveat.label) + ' is '
+         +  caveat.pct.toFixed(0) + '% of this site.</strong> ' + esc(caveat.text)
+         +  ' A UKHab survey is what settles it.</div>';
+  }
+
   if(dataSource === 'sim' && lastError){
     html += '<div class="err-note">Showing simulated figures — could not reach '
          +  esc(API_LABEL) + ' (' + esc(lastError) + ').</div>';
@@ -841,6 +926,7 @@ async function generateSummary(){
     const r = await apiPost('/api/summary', {
       year: currentYear, stats: lastReport.stats,
       score: lastReport.score, simulated: lastReport.simulated,
+      caveats: lastReport.caveats,
     });
     out.textContent = r.summary;
     meta.textContent = r.generated_by === 'claude'
