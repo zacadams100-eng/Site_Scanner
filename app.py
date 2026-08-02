@@ -139,6 +139,14 @@ TILE_CACHE = build_cache()
 STATS_CACHE = build_cache()
 
 
+# Catalogue and time-series routes — shared verbatim with mock_ee_backend.py
+# so the two cannot drift. Nothing in there imports Earth Engine; when the real
+# data layer lands, routes_catalog._series_for becomes the H3 aggregate query.
+from routes_catalog import router as catalog_router  # noqa: E402
+
+app.include_router(catalog_router)
+
+
 @app.get("/")
 def health():
     return {"status": "ok", "message": "Site Scanner Earth Engine API is running"}

@@ -127,64 +127,16 @@ class PriceRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Geometry — a real geodesic area, so area_ha actually tracks what was drawn
+# Geometry — a real geodesic area, so area_ha actually tracks what was drawn.
+# Lives in geometry.py so production routes can use it without importing the
+# mock; re-exported here because tests and endpoints below refer to it.
 # ---------------------------------------------------------------------------
-def _ring_area_m2(ring: List[Any]) -> float:
-    """Spherical polygon area for a closed linear ring of [lng, lat] pairs."""
-    if not isinstance(ring, (list, tuple)) or len(ring) < 4:
-        raise ValueError("Linear ring must be a closed list of at least 4 positions")
-
-    total = 0.0
-    for i in range(len(ring) - 1):
-        p1, p2 = ring[i], ring[i + 1]
-        if len(p1) < 2 or len(p2) < 2:
-            raise ValueError("Each position must be [longitude, latitude]")
-        lon1, lat1 = math.radians(float(p1[0])), math.radians(float(p1[1]))
-        lon2, lat2 = math.radians(float(p2[0])), math.radians(float(p2[1]))
-        total += (lon2 - lon1) * (2.0 + math.sin(lat1) + math.sin(lat2))
-    return abs(total * EARTH_RADIUS_M * EARTH_RADIUS_M / 2.0)
-
-
-def _polygon_area_m2(rings: List[Any]) -> float:
-    """Outer ring minus any holes."""
-    if not rings:
-        raise ValueError("Polygon has no coordinates")
-    area = _ring_area_m2(rings[0])
-    for hole in rings[1:]:
-        area -= _ring_area_m2(hole)
-    return max(0.0, area)
-
-
-def geometry_area_m2(geometry: dict) -> float:
-    """Area of a GeoJSON Polygon or MultiPolygon, in square metres.
-
-    Raises ValueError on anything malformed, which the endpoints turn into the
-    same 500 that ee.Geometry() failures produce in app.py.
-    """
-    if not isinstance(geometry, dict):
-        raise ValueError("geometry must be a GeoJSON object")
-
-    geom_type = geometry.get("type")
-    coords = geometry.get("coordinates")
-    if coords is None:
-        raise ValueError("geometry is missing 'coordinates'")
-
-    if geom_type == "Polygon":
-        return _polygon_area_m2(coords)
-    if geom_type == "MultiPolygon":
-        return sum(_polygon_area_m2(poly) for poly in coords)
-    raise ValueError(
-        f"Unsupported geometry type {geom_type!r} — expected Polygon or MultiPolygon"
-    )
-
-
-def geometry_centroid(geometry: dict) -> tuple:
-    """Rough centroid of the first ring — only ever used to seed the RNG."""
-    coords = geometry.get("coordinates") or []
-    ring = coords[0] if geometry.get("type") == "Polygon" else coords[0][0]
-    lngs = [float(p[0]) for p in ring]
-    lats = [float(p[1]) for p in ring]
-    return (sum(lngs) / len(lngs), sum(lats) / len(lats))
+from geometry import (  # noqa: E402,F401
+    _ring_area_m2,
+    _polygon_area_m2,
+    geometry_area_m2,
+    geometry_centroid,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +319,13 @@ def price_stats(req: PriceRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Catalogue and time-series routes. Shared verbatim with app.py so the two
+# backends cannot drift — see routes_catalog.py.
+from routes_catalog import router as catalog_router  # noqa: E402
+
+app.include_router(catalog_router)
 
 
 if __name__ == "__main__":
