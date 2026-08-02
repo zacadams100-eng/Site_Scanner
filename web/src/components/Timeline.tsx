@@ -22,6 +22,9 @@ export default function Timeline() {
   const setTimeIndex = useStore((s) => s.setTimeIndex)
   const playing = useStore((s) => s.playing)
   const setPlaying = useStore((s) => s.setPlaying)
+  const compareIndex = useStore((s) => s.compareIndex)
+  const setCompareIndex = useStore((s) => s.setCompareIndex)
+  const setTab = useStore((s) => s.setTab)
 
   const steps = catalog?.time.steps ?? []
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -140,6 +143,16 @@ export default function Timeline() {
     })
     ctx.stroke()
 
+    // The comparison marker, when a second position is pinned.
+    if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
+      const cx = x(compareIndex)
+      ctx.strokeStyle = 'rgba(127,179,163,0.9)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([3, 2])
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
+      ctx.setLineDash([])
+    }
+
     // Availability strip: how much of the area produced a usable observation.
     primarySeries.points.forEach((p, i) => {
       const px = x(i)
@@ -150,7 +163,7 @@ export default function Timeline() {
         : `rgba(127,179,163,${0.18 + 0.62 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
-  }, [primarySeries, steps])
+  }, [primarySeries, steps, compareIndex])
 
   const step = steps[timeIndex] ?? steps[0]
   const point = primarySeries?.points[timeIndex]
@@ -193,7 +206,14 @@ export default function Timeline() {
             )}
           </div>
         )}
-        {factorName && <div className="time-factor">{factorName}</div>}
+        {compareIndex !== null && primarySeries ? (
+          <button className="time-compare" onClick={() => setCompareIndex(null)}
+                  title="Clear the comparison point">
+            vs {labelStep(steps[compareIndex] ?? '')} ×
+          </button>
+        ) : (
+          factorName && <div className="time-factor">{factorName}</div>
+        )}
       </div>
 
       <div className="track-wrap">
@@ -201,6 +221,17 @@ export default function Timeline() {
         <input
           type="range"
           className="track-input"
+          onPointerDown={(e) => {
+            // Shift-click pins a second position rather than moving the head,
+            // which keeps comparison one gesture away instead of a mode.
+            if (!e.shiftKey) return
+            e.preventDefault()
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const frac = (e.clientX - r.left) / r.width
+            setCompareIndex(Math.max(0, Math.min(steps.length - 1,
+              Math.round(frac * (steps.length - 1)))))
+            setTab('charts')
+          }}
           min={0}
           max={Math.max(0, steps.length - 1)}
           step={1}

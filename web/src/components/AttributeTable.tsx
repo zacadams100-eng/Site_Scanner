@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { confidenceBand, formatValue, labelStep } from '../lib/format'
 import type { Series } from '../types'
@@ -137,9 +137,10 @@ export default function AttributeTable() {
               const isCurrent = y === currentYear
               const open = expanded.has(y)
               return (
-                <>
+                // The fragment needs the key, not the row inside it — React
+                // cannot see through an unkeyed wrapper.
+                <Fragment key={y}>
                   <tr
-                    key={y}
                     className={`year-row${isCurrent ? ' is-current' : ''}${open ? ' is-open' : ''}`}
                     onClick={() => toggle(y)}
                   >
@@ -188,7 +189,7 @@ export default function AttributeTable() {
                         ))}
                       </tr>
                     ))}
-                </>
+                </Fragment>
               )
             })}
           </tbody>

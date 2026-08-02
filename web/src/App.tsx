@@ -7,6 +7,9 @@ import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
 import Provenance from './components/Provenance'
+import Toolbar from './components/Toolbar'
+import Templates from './components/Templates'
+import Compare from './components/Compare'
 import { formatArea } from './lib/format'
 import type { DrawMode } from './types'
 
@@ -42,6 +45,11 @@ export default function App() {
   const error = useStore((s) => s.error)
   const tab = useStore((s) => s.activeTab)
   const setTab = useStore((s) => s.setTab)
+  const undo = useStore((s) => s.undo)
+  const redo = useStore((s) => s.redo)
+  const canUndo = useStore((s) => s.past.length > 0)
+  const canRedo = useStore((s) => s.future.length > 0)
+  const setAoiFromDrop = useStore((s) => s.setAoi)
 
   useEffect(() => {
     fetch('/api/catalog')
@@ -59,6 +67,39 @@ export default function App() {
           .catch((e) => setCatalogError(e?.message ?? 'Could not reach the API'))
       })
   }, [setCatalog, setCatalogError, setMock])
+
+  // Undo/redo, and drag-and-drop of a boundary file anywhere on the map.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        e.shiftKey ? redo() : undo()
+      }
+    }
+    const stop = (e: DragEvent) => { e.preventDefault() }
+    const onDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      const file = e.dataTransfer?.files?.[0]
+      if (!file) return
+      const { readAoiFile } = await import('./lib/exports')
+      try {
+        setAoiFromDrop(await readAoiFile(file))
+      } catch {
+        /* Toolbar's picker surfaces the detailed message; a silent no-op is
+           right for a stray drag of an unrelated file. */
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('dragover', stop)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('dragover', stop)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [undo, redo, setAoiFromDrop])
 
   const hint = drawMode
     ? TOOLS.find((t) => t.id === drawMode)!.hint
@@ -87,6 +128,20 @@ export default function App() {
             </svg>
           </button>
         ))}
+        <button className="tool tool-sep" onClick={undo} disabled={!canUndo}
+                title="Undo (Cmd+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
+               stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 5L3.5 8.5 7 12" /><path d="M3.5 8.5H12a4.5 4.5 0 010 9H8" />
+          </svg>
+        </button>
+        <button className="tool" onClick={redo} disabled={!canRedo}
+                title="Redo (Cmd+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
+               stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 5l3.5 3.5L13 12" /><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4" />
+          </svg>
+        </button>
         {aoi && (
           <button className="tool tool-clear" onClick={() => setAoi(null)} title="Remove the drawn shape">
             <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
@@ -137,6 +192,7 @@ export default function App() {
               </button>
             ))}
           </div>
+          <Toolbar />
         </div>
 
         <div className="panel-body">
@@ -177,7 +233,7 @@ export default function App() {
           {!loading && !error && data && (
             <>
               {tab === 'table' && <AttributeTable />}
-              {tab === 'charts' && <ChartStack />}
+              {tab === 'charts' && <><Compare /><ChartStack /></>}
               {tab === 'sources' && <Provenance />}
             </>
           )}
@@ -185,6 +241,7 @@ export default function App() {
       </aside>
 
       <Timeline />
+      <Templates />
     </div>
   )
 }
