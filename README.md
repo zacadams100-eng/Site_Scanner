@@ -83,6 +83,65 @@ obvious which backend answered.
 Switching to the real backend is a one-word change — `uvicorn app:app` instead
 of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
 
+## The web app (`web/`)
+
+The React frontend that replaces `site-scanner.html`. Vite + TypeScript +
+MapLibre, talking to whichever backend is on port 8000.
+
+```bash
+# terminal 1 — the API
+uvicorn mock_ee_backend:app --reload --port 8000
+
+# terminal 2 — the frontend
+cd web
+npm install
+npm run dev          # http://localhost:5173
+```
+
+Vite proxies `/api` to `127.0.0.1:8000`, so the same build works against a
+deployed API without an edit.
+
+What it does today:
+
+- **Draw** a rectangle, circle or freehand shape. Freehand is simplified with
+  Douglas-Peucker on release and repaired if it self-intersects, so a scribble
+  does not become a 600-vertex polygon that slows every later call.
+- **Scrub** 180 monthly steps from 2011 to 2025. The timeline draws the area's
+  whole series inside its own track, with a data-availability strip beneath —
+  it is a chart you can already read before you touch it. Scrubbing repaints
+  the map from memory and issues no requests.
+- **Read** an attribute table of one row per year, each expandable into its
+  twelve months. Copy pastes as TSV straight into Excel; CSV downloads.
+- **See** up to four charts chosen automatically from the selected factors,
+  grouped so that two different units never share an axis.
+- **Check** every number's source, resolution and licence under Sources.
+
+Keyboard: `←`/`→` step a month, `PgUp`/`PgDn` a year, `Home`/`End` jump to the
+ends, `space` plays. The timeline is a real `<input type="range">` underneath
+the custom rendering, so screen readers and touch work without reimplementation.
+
+### The data layer
+
+`catalog.py` holds 118 factors resolving to 20 base datasets, only 7 of which
+need monthly storage. That split is the point: slope, aspect, ruggedness and
+height-above-drainage all come off one elevation raster, and NDVI, NDWI, EVI
+and SAVI off the same two Sentinel-2 bands. A factor marked `derived` is
+arithmetic applied at read time and costs nothing to store — which is what
+makes a 100+ factor catalogue affordable at England scale.
+
+`series.py` generates the monthly series. Optical factors return `null` in
+months with too few usable pixels rather than an interpolated guess, and every
+point carries a `valid_fraction` so the UI can grey out a number built from a
+handful of clear pixels.
+
+`routes_catalog.py` is mounted by **both** `app.py` and `mock_ee_backend.py`,
+so the two cannot drift. When the real data layer lands, one function changes:
+`_series_for` stops calling the generator and starts issuing the H3 aggregate
+query described in `TECHNICAL_PLAN.md` §3.4.
+
+See `TECHNICAL_PLAN.md` for the full architecture, the storage cost arithmetic
+and the challenges worth knowing about early.
+
 ## Running the test suite
 
 ```bash

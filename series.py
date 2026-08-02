@@ -31,9 +31,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from catalog import CLASS_VALUES, FACTOR_BY_ID, TIME_END, TIME_START
 
-# Factors whose observation depends on a clear sky. Everything from Sentinel-2
-# optical and MODIS thermal has cloud gaps; radar and modelled reanalysis do not.
-CLOUD_LIMITED_BASES = {"sentinel2_sr", "modis_lst", "esa_worldcover"}
+# Factors whose observation depends on a clear sky at the moment of capture.
+# Sentinel-2 optical and MODIS thermal have cloud gaps; radar and modelled
+# reanalysis do not.
+#
+# ESA WorldCover is deliberately *not* here. It is an annual composite built
+# from a full year of imagery, so cloud is already resolved upstream — it does
+# not blank out in December the way a monthly optical index does. Treating it
+# as cloud-limited put spurious holes in a product that has none.
+CLOUD_LIMITED_BASES = {"sentinel2_sr", "modis_lst"}
 
 # Below this fraction of valid pixels we report no value at all rather than a
 # number nobody should trust.

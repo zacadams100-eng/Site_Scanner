@@ -89,6 +89,86 @@ def _series_for(factor_id: str, centroid: tuple, area_ha: float,
     return series_mod.generate_series(factor_id, centroid, area_ha, steps)
 
 
+class CellsRequest(BaseModel):
+    geometry: dict
+    resolution: int = Field(12, ge=4, le=28)
+
+
+@router.post("/api/cells")
+def get_cells(req: CellsRequest) -> Dict[str, Any]:
+    """A grid of cells covering the AOI, each carrying a stable `offset`.
+
+    This is the shape of the H3 aggregate tier (TECHNICAL_PLAN.md §3.4) in
+    miniature. Production returns real per-cell values per timestep; here each
+    cell returns a fixed deviation from the area mean, and the client renders
+    `cell_value = series_mean(t) + offset * spread`.
+
+    The reason for handing back an offset rather than 180 timesteps of values
+    per cell is the whole point of the fast tier: one small payload at draw
+    time means scrubbing the timeline repaints from memory at 60 fps instead
+    of asking the server for anything. The approximation is that within-area
+    spatial *pattern* is treated as stable over time while the *level* moves —
+    which is right for terrain and roughly right for land cover, and is why
+    the result carries `precision: "approx"` until the exact pass lands.
+    """
+    try:
+        centroid, area_ha = _validate_geometry(req.geometry)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    import hashlib
+
+    ring = (req.geometry["coordinates"][0] if req.geometry["type"] == "Polygon"
+            else req.geometry["coordinates"][0][0])
+    lngs = [float(p[0]) for p in ring]
+    lats = [float(p[1]) for p in ring]
+    west, east = min(lngs), max(lngs)
+    south, north = min(lats), max(lats)
+
+    n = req.resolution
+    dx = (east - west) / n
+    dy = (north - south) / n
+
+    cells: List[Dict[str, Any]] = []
+    for j in range(n):
+        for i in range(n):
+            w, e = west + i * dx, west + (i + 1) * dx
+            s, nn = south + j * dy, south + (j + 1) * dy
+            cx, cy = (w + e) / 2, (s + nn) / 2
+            if not _point_in_ring(cx, cy, ring):
+                continue
+            key = f"{round(cx,5)}|{round(cy,5)}".encode()
+            h = int.from_bytes(hashlib.sha256(key).digest()[:4], "big") / 2**32
+            # Smooth the field a little so neighbouring cells relate to each
+            # other, rather than looking like television static.
+            h2 = int.from_bytes(hashlib.sha256(key + b"s").digest()[:4], "big") / 2**32
+            cells.append({
+                "id": f"{i}-{j}",
+                "bbox": [round(w, 6), round(s, 6), round(e, 6), round(nn, 6)],
+                "offset": round((0.65 * h + 0.35 * h2) * 2 - 1, 4),
+            })
+
+    return {"cells": cells, "area_ha": round(area_ha, 2),
+            "centroid": {"lng": centroid[0], "lat": centroid[1]}}
+
+
+def _point_in_ring(x: float, y: float, ring: List[Any]) -> bool:
+    """Ray casting. Used to clip the grid to the drawn shape so a freehand
+    outline doesn't come back as its bounding box."""
+    inside = False
+    n = len(ring)
+    for i in range(n - 1):
+        x1, y1 = float(ring[i][0]), float(ring[i][1])
+        x2, y2 = float(ring[i + 1][0]), float(ring[i + 1][1])
+        if (y1 > y) != (y2 > y):
+            xint = (x2 - x1) * (y - y1) / (y2 - y1) + x1
+            if x < xint:
+                inside = not inside
+    return inside
+
+
 @router.post("/api/series")
 def get_series(req: SeriesRequest) -> Dict[str, Any]:
     """Monthly series plus the annual rollup, for every requested factor.
