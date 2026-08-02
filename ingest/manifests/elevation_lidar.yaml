@@ -1,0 +1,20 @@
+# One stored raster, thirteen factors. Slope, aspect, ruggedness, TPI,
+# curvature and height-above-drainage are all computed from this at read time.
+id: lidar_dtm
+kind: continuous
+unit: m
+nodata: -9999
+
+source:
+  driver: http
+  url: https://environment.data.gov.uk/lidar/composite-dtm-2m
+
+temporal:
+  step: static
+
+spatial:
+  resolution_m: 2
+  crs: EPSG:27700
+  bbox: [-6.42, 49.86, 1.77, 55.81]
+
+h3_resolutions: [7, 8]

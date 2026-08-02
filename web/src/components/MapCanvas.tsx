@@ -140,15 +140,25 @@ export default function MapCanvas() {
     if (!map) return
 
     // Dragging the map and drawing on it are the same gesture, so panning has
-    // to yield while a tool is active.
+    // to yield while a tool is active. On touch that goes further: a one-finger
+    // drag must draw rather than pan, and pinch-rotate has to stop hijacking
+    // the gesture mid-stroke.
     if (drawMode) {
       map.dragPan.disable()
       map.doubleClickZoom.disable()
+      map.touchZoomRotate.disable()
+      map.touchPitch.disable()
       map.getCanvas().style.cursor = 'crosshair'
+      // Without this the browser scrolls the page under the finger instead of
+      // delivering touchmove to us.
+      map.getCanvas().style.touchAction = 'none'
     } else {
       map.dragPan.enable()
       map.doubleClickZoom.enable()
+      map.touchZoomRotate.enable()
+      map.touchPitch.enable()
       map.getCanvas().style.cursor = ''
+      map.getCanvas().style.touchAction = ''
     }
 
     const setDraft = (g: GeoJSON.Polygon | null) => {
@@ -168,27 +178,31 @@ export default function MapCanvas() {
       return turf.circle([c.lng, c.lat], Math.max(km, 0.01), { steps: 64 }).geometry
     }
 
-    const onDown = (e: maplibregl.MapMouseEvent) => {
+    // The handlers take a plain LngLat rather than an event, so mouse and
+    // touch share one implementation. The prototype supported both and the
+    // first React rebuild quietly dropped touch — on a tablet, which is where
+    // the whole tactile premise of this tool lives.
+    const onDown = (ll: maplibregl.LngLat) => {
       if (!modeRef.current) return
       drawing.current = true
-      startLngLat.current = e.lngLat
-      freePoints.current = [[e.lngLat.lng, e.lngLat.lat]]
+      startLngLat.current = ll
+      freePoints.current = [[ll.lng, ll.lat]]
     }
 
-    const onMove = (e: maplibregl.MapMouseEvent) => {
+    const onMove = (ll: maplibregl.LngLat) => {
       if (!drawing.current || !modeRef.current || !startLngLat.current) return
       const mode = modeRef.current
-      if (mode === 'rect') setDraft(rectPolygon(startLngLat.current, e.lngLat))
-      else if (mode === 'circle') setDraft(circlePolygon(startLngLat.current, e.lngLat))
+      if (mode === 'rect') setDraft(rectPolygon(startLngLat.current, ll))
+      else if (mode === 'circle') setDraft(circlePolygon(startLngLat.current, ll))
       else {
-        freePoints.current.push([e.lngLat.lng, e.lngLat.lat])
+        freePoints.current.push([ll.lng, ll.lat])
         if (freePoints.current.length > 2) {
           setDraft({ type: 'Polygon', coordinates: [[...freePoints.current, freePoints.current[0]]] })
         }
       }
     }
 
-    const onUp = (e: maplibregl.MapMouseEvent) => {
+    const onUp = (ll: maplibregl.LngLat) => {
       if (!drawing.current || !modeRef.current || !startLngLat.current) return
       const mode = modeRef.current
       drawing.current = false
@@ -197,10 +211,10 @@ export default function MapCanvas() {
       let poly: GeoJSON.Polygon | null = null
       if (mode === 'rect') {
         const a = startLngLat.current
-        if (Math.abs(a.lng - e.lngLat.lng) < 1e-5) return
-        poly = rectPolygon(a, e.lngLat)
+        if (Math.abs(a.lng - ll.lng) < 1e-5) return
+        poly = rectPolygon(a, ll)
       } else if (mode === 'circle') {
-        poly = circlePolygon(startLngLat.current, e.lngLat)
+        poly = circlePolygon(startLngLat.current, ll)
       } else {
         if (freePoints.current.length < 4) return
         const ring = [...freePoints.current, freePoints.current[0]]
@@ -228,13 +242,50 @@ export default function MapCanvas() {
       if (poly) setAoi(poly)
     }
 
-    map.on('mousedown', onDown)
-    map.on('mousemove', onMove)
-    map.on('mouseup', onUp)
+    const mouseDown = (e: maplibregl.MapMouseEvent) => onDown(e.lngLat)
+    const mouseMove = (e: maplibregl.MapMouseEvent) => onMove(e.lngLat)
+    const mouseUp = (e: maplibregl.MapMouseEvent) => onUp(e.lngLat)
+
+    // MapTouchEvent.lngLat is the centroid of the active touches, which for a
+    // single-finger stroke is exactly the finger. On touchend the touch list
+    // is already empty, so the last known position is used instead.
+    let lastTouch: maplibregl.LngLat | null = null
+    const touchStart = (e: maplibregl.MapTouchEvent) => {
+      if (e.points.length > 1) return          // let multi-touch gestures be
+      lastTouch = e.lngLat
+      onDown(e.lngLat)
+    }
+    const touchMove = (e: maplibregl.MapTouchEvent) => {
+      if (!drawing.current) return
+      e.preventDefault()
+      lastTouch = e.lngLat
+      onMove(e.lngLat)
+    }
+    const touchEnd = () => { if (lastTouch) onUp(lastTouch) }
+    // A stroke interrupted by a system gesture must not leave a half-drawn
+    // shape stuck on screen.
+    const touchCancel = () => {
+      drawing.current = false
+      startLngLat.current = null
+      freePoints.current = []
+      setDraft(null)
+    }
+
+    map.on('mousedown', mouseDown)
+    map.on('mousemove', mouseMove)
+    map.on('mouseup', mouseUp)
+    map.on('touchstart', touchStart)
+    map.on('touchmove', touchMove)
+    map.on('touchend', touchEnd)
+    map.on('touchcancel', touchCancel)
     return () => {
-      map.off('mousedown', onDown)
-      map.off('mousemove', onMove)
-      map.off('mouseup', onUp)
+      map.off('mousedown', mouseDown)
+      map.off('mousemove', mouseMove)
+      map.off('mouseup', mouseUp)
+      map.off('touchstart', touchStart)
+      map.off('touchmove', touchMove)
+      map.off('touchend', touchEnd)
+      map.off('touchcancel', touchCancel)
     }
   }, [drawMode, setAoi])
 

@@ -1,0 +1,29 @@
+# Sentinel-2 NDVI, the workhorse of the catalogue.
+id: ndvi_s2
+kind: continuous
+unit: index
+nodata: -9999
+
+source:
+  driver: earthengine
+  collection: COPERNICUS/S2_SR_HARMONIZED
+  expression: "(B8 - B4) / (B8 + B4)"
+  cloud_mask:
+    band: SCL
+    exclude: [8, 9, 10]        # cloud medium/high probability, cirrus
+  composite: median
+
+temporal:
+  step: monthly
+  start: "2011-01"
+  end: "2025-12"
+
+spatial:
+  resolution_m: 10
+  crs: EPSG:27700
+  bbox: [-6.42, 49.86, 1.77, 55.81]     # England
+
+# Both tiers. BENCHMARK.md: res 8 answers AOIs up to 250 km2 instantly, res 7
+# takes over above that. Storing only one is slow at one end or coarse at the
+# other.
+h3_resolutions: [7, 8]

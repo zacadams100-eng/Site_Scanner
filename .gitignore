@@ -6,3 +6,6 @@ venv/
 service-account-key.json
 *.key.json
 .env
+
+# Benchmark / ingest scratch output
+/tmp-cogs/
