@@ -1,0 +1,80 @@
+<div id="app">
+  <div id="mapWrap">
+    <canvas id="map"></canvas>
+    <div class="scalebar"><i id="scaleBar" style="width:80px"></i><span id="scaleLabel">—</span></div>
+  </div>
+
+  <div class="top">
+    <div class="brand">
+      <span class="mark"></span>
+      <h1>Site Scanner</h1>
+      <span>England · 2011–2025</span>
+    </div>
+    <div class="top-right">
+      <span class="pill demo" title="Figures are generated for this demo, not observed">demo data</span>
+      <span class="pill approx" id="precision" title="From pre-aggregated cells; the exact pass refines this">approx</span>
+      <button class="btn" id="browserBtn" aria-expanded="false">
+        <b id="facCount">4</b> Factors
+      </button>
+    </div>
+  </div>
+
+  <div class="rail" role="toolbar" aria-label="Drawing tools">
+    <button class="tool" id="t-rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle — drag across the map">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4.5" width="14" height="11" rx="1.5"/></svg>
+    </button>
+    <button class="tool" id="t-circle" aria-pressed="false" aria-label="Circle" title="Circle — drag from the centre outward">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6.5"/></svg>
+    </button>
+    <button class="tool" id="t-free" aria-pressed="false" aria-label="Freehand" title="Freehand — drag to trace any shape">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 13c1-5 4-7 6-5s-1 5 1 6 4-2 5-5"/></svg>
+    </button>
+    <button class="tool sep" id="undoBtn" aria-label="Undo" title="Undo (Cmd+Z)" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5L3.5 8.5 7 12"/><path d="M3.5 8.5H12a4.5 4.5 0 010 9H8"/></svg>
+    </button>
+    <button class="tool" id="redoBtn" aria-label="Redo" title="Redo (Cmd+Shift+Z)" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l3.5 3.5L13 12"/><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4"/></svg>
+    </button>
+    <button class="tool danger" id="clearBtn" aria-label="Clear" title="Remove the drawn shape" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </div>
+
+  <div class="hint" id="hint">Pick a tool, then drag on the map</div>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><b id="panelTitle">No area drawn</b><em id="panelArea"></em></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="table">Table</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="charts">Charts</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="sources">Sources</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="tplBtn">Templates</button>
+        <button class="btn" id="saveBtn" disabled>Save</button>
+        <button class="btn" id="sitesBtn" aria-expanded="false">Sites</button>
+        <button class="btn" id="shareBtn" disabled>Share</button>
+        <button class="btn" id="exportBtn" aria-expanded="false" disabled>Export</button>
+      </div>
+    </div>
+    <div class="body" id="panelBody"></div>
+  </aside>
+
+  <div class="timeline">
+    <button class="play" id="playBtn" aria-label="Play through time" title="Play (space)">
+      <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M4.5 2.5l9 5.5-9 5.5z"/></svg>
+    </button>
+    <div class="readout">
+      <div class="step" id="roStep">Dec 2025</div>
+      <div class="val" id="roVal"></div>
+      <div class="who" id="roFac"></div>
+    </div>
+    <div class="track">
+      <canvas id="spark"></canvas>
+      <input type="range" id="range" min="0" max="179" value="179" step="1"
+             aria-label="Time position" />
+      <div class="years" id="years"></div>
+    </div>
+  </div>
+</div>

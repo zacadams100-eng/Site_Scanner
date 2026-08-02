@@ -1,0 +1,2036 @@
+<title>Site Scanner — interactive demo</title>
+<style>
+/*
+  Site Scanner — a field instrument, not a document.
+
+  The palette is the product's own: a cool green-cast near-black rather than a
+  neutral grey, one warm amber accent, and semantic colour (good/warn/bad) held
+  separate from that accent so a red cell never reads as "highlighted".
+
+  Two type roles: system-ui runs the interface, ui-monospace runs every number.
+  Data in a proportional face is the single fastest way to make a table look
+  untrustworthy.
+*/
+:root {
+  --ground: #0e1113;
+  --surface: #171c20;
+  --raised: #1e242a;
+  --sunken: #0b0e10;
+  --line: rgba(255,255,255,.09);
+  --line-2: rgba(255,255,255,.16);
+
+  --ink: #e8ecef;
+  --ink-2: #9aa4ab;
+  --ink-3: #6b757c;
+
+  --accent: #ddae5c;
+  --accent-2: #c4923f;
+  --accent-soft: rgba(221,174,92,.16);
+
+  --good: #7fb3a3;
+  --warn: #d2a35a;
+  --bad: #c47b72;
+
+  --land: #1b2226;
+  --land-line: rgba(221,174,92,.22);
+  --sea: #0b0f12;
+
+  --r: 12px;
+  --r-sm: 8px;
+  --shadow: 0 10px 34px rgba(0,0,0,.5);
+
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+
+  --panel: 430px;
+  --timeline: 104px;
+}
+
+/* Light theme is derived, not inverted: the ground lifts to a warm paper, the
+   accent darkens to hold contrast on it, and the land keeps its relationship
+   to the sea rather than flipping. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #f2f0ec; --surface: #fbfaf8; --raised: #fff; --sunken: #e8e5e0;
+    --line: rgba(20,26,30,.12); --line-2: rgba(20,26,30,.22);
+    --ink: #191f23; --ink-2: #55606a; --ink-3: #808b94;
+    --accent: #a2701c; --accent-2: #8a5e14; --accent-soft: rgba(162,112,28,.13);
+    --good: #3f7a68; --warn: #96661b; --bad: #a44c42;
+    --land: #e4e0d4; --land-line: rgba(162,112,28,.55); --sea: #d3d8da;
+    --shadow: 0 10px 30px rgba(30,35,40,.14);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1113; --surface: #171c20; --raised: #1e242a; --sunken: #0b0e10;
+  --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.16);
+  --ink: #e8ecef; --ink-2: #9aa4ab; --ink-3: #6b757c;
+  --accent: #ddae5c; --accent-2: #c4923f; --accent-soft: rgba(221,174,92,.16);
+  --good: #7fb3a3; --warn: #d2a35a; --bad: #c47b72;
+  --land: #1c2429; --land-line: rgba(221,174,92,.3); --sea: #0a0d10;
+  --shadow: 0 10px 34px rgba(0,0,0,.5);
+}
+:root[data-theme="light"] {
+  --ground: #f2f0ec; --surface: #fbfaf8; --raised: #fff; --sunken: #e8e5e0;
+  --line: rgba(20,26,30,.12); --line-2: rgba(20,26,30,.22);
+  --ink: #191f23; --ink-2: #55606a; --ink-3: #808b94;
+  --accent: #a2701c; --accent-2: #8a5e14; --accent-soft: rgba(162,112,28,.13);
+  --good: #3f7a68; --warn: #96661b; --bad: #a44c42;
+  --land: #e4e0d4; --land-line: rgba(162,112,28,.55); --sea: #d3d8da;
+  --shadow: 0 10px 30px rgba(30,35,40,.14);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  background: var(--ground); color: var(--ink);
+  font: 14px/1.5 var(--ui); -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+#app { position: relative; height: 100vh; width: 100%; }
+
+/* ---- map ---- */
+#mapWrap { position: absolute; inset: 0 var(--panel) var(--timeline) 0; background: var(--sea); }
+#map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#map.drawing { cursor: crosshair; }
+
+.scalebar {
+  position: absolute; left: 16px; bottom: 12px; font: 10px/1 var(--mono);
+  color: var(--ink-3); display: flex; align-items: center; gap: 6px;
+}
+.scalebar i { display: block; height: 6px; border: 1px solid var(--line-2); border-top: none; }
+
+/* ---- top bar ---- */
+.top {
+  position: absolute; top: 0; left: 0; right: var(--panel); height: 54px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; pointer-events: none; z-index: 6; gap: 12px;
+}
+.top > * { pointer-events: auto; }
+.brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.mark {
+  width: 12px; height: 12px; border-radius: 3px; align-self: center; flex: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 14px var(--accent-soft);
+}
+.brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin: 0; white-space: nowrap; }
+.brand span {
+  font: 10px/1 var(--mono); color: var(--ink-3); text-transform: uppercase;
+  letter-spacing: .08em; border: 1px solid var(--line); border-radius: 20px;
+  padding: 4px 7px; white-space: nowrap;
+}
+.top-right { display: flex; align-items: center; gap: 7px; }
+.pill {
+  font: 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em;
+  padding: 5px 8px; border-radius: 20px; border: 1px solid var(--line-2);
+  background: var(--surface); color: var(--ink-2); white-space: nowrap;
+}
+.pill.demo { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.pill.approx { color: var(--ink-2); }
+
+/* ---- tool rail ---- */
+.rail {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 5px; padding: 6px; z-index: 7;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--line); border-radius: 15px;
+  box-shadow: var(--shadow); backdrop-filter: blur(14px);
+}
+.tool {
+  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px;
+  color: var(--ink-2); border: 1px solid transparent;
+  transition: background .12s, color .12s, transform .1s;
+}
+.tool:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.tool:active:not(:disabled) { transform: scale(.93); }
+.tool[aria-pressed="true"] {
+  background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+.tool:disabled { opacity: .3; cursor: not-allowed; }
+.tool.sep { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 10px; }
+.tool.danger:hover { color: var(--bad); }
+
+.hint {
+  position: absolute; left: 66px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px;
+  pointer-events: none; z-index: 7; white-space: nowrap; backdrop-filter: blur(8px);
+}
+
+/* ---- panel ---- */
+.panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: var(--panel);
+  background: var(--surface); border-left: 1px solid var(--line);
+  display: flex; flex-direction: column; z-index: 8;
+}
+.panel-head { padding: 13px 15px 0; border-bottom: 1px solid var(--line); }
+.panel-title { display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px; }
+.panel-title b { font-size: 14px; font-weight: 600; }
+.panel-title em { font: 11px/1 var(--mono); color: var(--ink-3); font-style: normal; }
+
+.tabs { display: flex; gap: 1px; }
+.tab {
+  padding: 7px 12px; font-size: 12.5px; color: var(--ink-3);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: var(--ink-2); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 0 9px; position: relative; }
+.btn {
+  padding: 4px 9px; border-radius: 6px; font-size: 11.5px;
+  border: 1px solid var(--line-2); color: var(--ink-2);
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent-2); }
+.btn b { font: 9.5px/1.6 var(--mono); padding: 0 4px; border-radius: 7px;
+         background: var(--accent-soft); color: var(--accent); }
+
+.menu {
+  position: absolute; top: calc(100% - 2px); left: 0; z-index: 30; min-width: 240px;
+  background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column;
+  max-height: 300px; overflow-y: auto;
+}
+.menu button {
+  text-align: left; padding: 7px 9px; border-radius: 5px; font-size: 12px; color: var(--ink-2);
+}
+.menu button:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+.menu .empty { padding: 14px; text-align: center; font-size: 11.5px; color: var(--ink-3); }
+.menu .row { display: flex; align-items: center; }
+.menu .row button:first-child { flex: 1; display: flex; justify-content: space-between; gap: 10px; }
+.menu .row span { font: 10.5px/1 var(--mono); color: var(--ink-3); }
+.menu .row .del { width: 26px; text-align: center; color: var(--ink-3); font-size: 15px; }
+.menu .row .del:hover { color: var(--bad); }
+
+.flash {
+  position: absolute; top: calc(100% + 2px); right: 0; z-index: 40; max-width: 100%;
+  padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--good);
+  background: var(--raised); border: 1px solid var(--line-2); box-shadow: var(--shadow);
+}
+.flash.err { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+
+.body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+.empty-state { padding: 44px 26px; text-align: center; color: var(--ink-2); }
+.empty-state p { margin: 0 0 9px; font-size: 13px; }
+.empty-state .sub { font-size: 12px; color: var(--ink-3); }
+.empty-state .meta {
+  margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--line);
+  font: 11px/1.6 var(--mono); color: var(--ink-3);
+}
+
+/* ---- table: Excel conventions, deliberately ---- */
+.tbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-bottom: 1px solid var(--line);
+  font: 10.5px/1 var(--mono); color: var(--ink-3);
+}
+.tscroll { flex: 1; overflow: auto; }
+table.grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+table.grid th {
+  position: sticky; top: 0; z-index: 2; background: var(--raised);
+  border-bottom: 1px solid var(--line-2); padding: 7px 9px; text-align: right;
+  font-size: 10.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap;
+  vertical-align: bottom; cursor: pointer; user-select: none;
+}
+table.grid th:hover { color: var(--ink); }
+table.grid th u { display: block; font: 9px/1.4 var(--mono); color: var(--ink-3); text-decoration: none; }
+table.grid td {
+  padding: 5px 9px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  text-align: right; font: 11.5px/1.5 var(--mono); font-variant-numeric: tabular-nums;
+}
+.yr {
+  position: sticky; left: 0; z-index: 1; text-align: left !important;
+  background: var(--surface); font-weight: 600; border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+th.yr { z-index: 3; background: var(--raised); }
+tr.year { cursor: pointer; }
+tr.year:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+tr.year.now td { background: var(--accent-soft); }
+tr.year.now .yr, tr.year.open .yr { color: var(--accent); }
+tr.mo td { padding: 3px 9px; font-size: 11px; background: color-mix(in srgb, var(--sunken) 60%, transparent); color: var(--ink-2); }
+tr.mo { cursor: pointer; }
+tr.mo:hover td { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+tr.mo.now td { background: var(--accent-soft); color: var(--ink); }
+td.molab { padding-left: 22px !important; color: var(--ink-3); font-weight: 400 !important; }
+.caret { display: inline-block; width: 12px; font-size: 10px; line-height: 1; color: var(--accent-2); }
+
+/* Confidence is encoded in form, not just number: a mean from three cloud-free
+   pixels must not look as solid as one from thousands. */
+.c-fair { color: var(--ink-2); }
+.c-poor { color: var(--ink-3); font-style: italic; }
+.gapv { color: var(--ink-3); opacity: .5; }
+.part { color: var(--warn); opacity: .75; margin-left: 2px; }
+
+/* ---- cards, charts ---- */
+.stack { flex: 1; overflow-y: auto; padding: 11px; display: flex; flex-direction: column; gap: 11px; }
+.card { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 11px 12px 9px; }
+.card h3 { margin: 0; font-size: 12.5px; font-weight: 600; }
+.card .why { font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+.card svg { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 11px; margin-top: 7px; font: 10px/1 var(--mono); color: var(--ink-2); }
+.legend i { display: inline-block; width: 9px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
+.card.cmp { border-color: color-mix(in srgb, var(--good) 32%, transparent); }
+.cmp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+table.cmp { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11.5px; }
+table.cmp th {
+  text-align: right; font: 9.5px/1.4 var(--mono); color: var(--ink-3);
+  padding: 3px 5px; border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: .04em;
+}
+table.cmp th:first-child, table.cmp td:first-child { text-align: left; }
+table.cmp td {
+  padding: 4px 5px; text-align: right; font: 11px/1.5 var(--mono);
+  font-variant-numeric: tabular-nums; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+}
+table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
+.up { color: var(--good); } .down { color: var(--bad); }
+.flat, .same { color: var(--ink-3); } .chg { color: var(--warn); }
+.pct { opacity: .65; font-size: 10px; }
+.note { margin-top: 9px; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
+
+/* ---- sources ---- */
+.src { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px; }
+.src h3 { margin: 0 0 8px; font-size: 12.5px; }
+.src dl { display: grid; grid-template-columns: 104px 1fr; gap: 3px 10px; margin: 0 0 9px; font-size: 11.5px; }
+.src dt { color: var(--ink-3); } .src dd { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font: 10px/1.5 var(--mono); padding: 2px 7px; border-radius: 20px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--line); color: var(--ink-2);
+}
+.chip em { color: var(--accent-2); font-style: normal; }
+.src a { display: inline-block; margin-top: 9px; font: 10.5px/1 var(--mono); color: var(--ink-3); text-decoration: none; }
+.src a:hover { color: var(--accent); }
+
+/* ---- timeline ---- */
+.timeline {
+  position: absolute; left: 0; right: var(--panel); bottom: 0; height: var(--timeline);
+  display: flex; align-items: center; gap: 14px; padding: 10px 20px 14px;
+  background: var(--surface); border-top: 1px solid var(--line); z-index: 7;
+}
+.play {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--line-2); color: var(--accent);
+  background: color-mix(in srgb, var(--ink) 5%, transparent); transition: transform .1s, background .12s;
+}
+.play:hover { background: var(--accent-soft); }
+.play:active { transform: scale(.92); }
+
+.readout { width: 152px; flex: none; min-width: 0; }
+.readout .step { font: 600 14px/1.3 var(--mono); letter-spacing: -.01em; }
+.readout .val { font: 12px/1.4 var(--mono); color: var(--accent); display: flex; align-items: center; gap: 5px; }
+.readout .val.gap { color: var(--bad); font-style: italic; }
+.readout .lo { font: 9px/1.5 var(--mono); padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); font-style: normal; }
+.readout .who { font-size: 10.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.readout .vs {
+  font: 10.5px/1.5 var(--mono); color: var(--good); padding: 1px 7px; border-radius: 20px;
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--good) 32%, transparent);
+}
+
+.track { flex: 1; position: relative; height: 58px; min-width: 0; }
+#spark { position: absolute; inset: 0 0 15px; width: 100%; height: 43px; }
+#range {
+  position: absolute; inset: 0 0 15px; width: 100%; height: 43px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: none; cursor: ew-resize;
+}
+#range::-webkit-slider-runnable-track { height: 43px; background: none; }
+#range::-moz-range-track { height: 43px; background: none; }
+#range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 3px; height: 43px; border: none;
+  border-radius: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent);
+}
+#range::-moz-range-thumb {
+  width: 3px; height: 43px; border: none; border-radius: 2px;
+  background: var(--accent); box-shadow: 0 0 10px var(--accent);
+}
+.years { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; }
+.years span {
+  position: absolute; transform: translateX(-50%);
+  font: 9.5px/1 var(--mono); color: var(--ink-3);
+}
+
+/* ---- overlays ---- */
+.scrim {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 22px;
+  background: color-mix(in srgb, var(--ground) 72%, transparent); backdrop-filter: blur(4px);
+}
+.sheet {
+  width: min(720px, 100%); max-height: 84vh; overflow-y: auto; padding: 18px 20px 22px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  border-radius: var(--r); box-shadow: var(--shadow);
+}
+.sheet-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.sheet-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sheet-head p { margin: 3px 0 0; font-size: 12px; color: var(--ink-3); }
+.x { width: 30px; height: 30px; border-radius: 7px; color: var(--ink-3); font-size: 19px; line-height: 1; flex: none; }
+.x:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(216px, 1fr)); gap: 10px; }
+.tpl {
+  text-align: left; padding: 13px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--raised);
+  transition: border-color .12s, transform .12s;
+}
+.tpl:hover { border-color: var(--accent-2); transform: translateY(-1px); }
+.tpl b { display: block; font-size: 13px; margin-bottom: 3px; }
+.tpl p { margin: 0 0 9px; font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+
+/* factor browser */
+.browser {
+  position: absolute; top: 54px; right: calc(var(--panel) + 14px); width: 336px;
+  max-height: calc(100vh - var(--timeline) - 80px); z-index: 20;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  box-shadow: var(--shadow); backdrop-filter: blur(18px);
+}
+.browser header { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); }
+.browser input {
+  flex: 1; padding: 7px 10px; border-radius: var(--r-sm); font: inherit; font-size: 13px;
+  border: 1px solid var(--line-2); background: var(--sunken); color: var(--ink); outline: none;
+}
+.browser input:focus { border-color: var(--accent-2); }
+.browser .meta { padding: 7px 12px; font: 10.5px/1.5 var(--mono); color: var(--ink-3); border-bottom: 1px solid var(--line); }
+.browser .list { overflow-y: auto; padding: 4px 0 10px; }
+.grp {
+  width: 100%; display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+  font: 600 10px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3);
+}
+.grp:hover { color: var(--ink-2); }
+.grp em { margin-left: auto; font-style: normal; font-weight: 400; letter-spacing: 0; }
+.fac {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 14px; text-align: left; font-size: 12.5px; color: var(--ink-2);
+}
+.fac:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.fac[aria-pressed="true"] { color: var(--ink); }
+.fac:disabled { opacity: .32; cursor: not-allowed; }
+.fac i {
+  width: 14px; height: 14px; border-radius: 4px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--line-2); font-style: normal; font-size: 9px; color: var(--ground);
+}
+.fac[aria-pressed="true"] i { background: var(--accent); border-color: var(--accent); }
+.fac s { flex: 1; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fac .d { font: italic 11px/1 var(--mono); color: var(--accent-2); flex: none; }
+.fac .k { font: 8.5px/1.6 var(--mono); padding: 0 4px; border-radius: 3px; flex: none;
+          background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+.fac u { font: 10px/1 var(--mono); color: var(--ink-3); flex: none; text-decoration: none; }
+
+@media (max-width: 1080px) { :root { --panel: 360px; } }
+@media (max-width: 860px) {
+  :root { --panel: 0px; --timeline: 92px; }
+  #mapWrap { inset: 0 0 calc(52vh + var(--timeline)) 0; }
+  .panel { width: 100%; top: auto; height: 52vh; bottom: var(--timeline); border-left: none; border-top: 1px solid var(--line-2); }
+  .browser { right: 10px; width: calc(100% - 20px); }
+  .hint { display: none; }
+}
+</style>
+<div id="app">
+  <div id="mapWrap">
+    <canvas id="map"></canvas>
+    <div class="scalebar"><i id="scaleBar" style="width:80px"></i><span id="scaleLabel">—</span></div>
+  </div>
+
+  <div class="top">
+    <div class="brand">
+      <span class="mark"></span>
+      <h1>Site Scanner</h1>
+      <span>England · 2011–2025</span>
+    </div>
+    <div class="top-right">
+      <span class="pill demo" title="Figures are generated for this demo, not observed">demo data</span>
+      <span class="pill approx" id="precision" title="From pre-aggregated cells; the exact pass refines this">approx</span>
+      <button class="btn" id="browserBtn" aria-expanded="false">
+        <b id="facCount">4</b> Factors
+      </button>
+    </div>
+  </div>
+
+  <div class="rail" role="toolbar" aria-label="Drawing tools">
+    <button class="tool" id="t-rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle — drag across the map">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4.5" width="14" height="11" rx="1.5"/></svg>
+    </button>
+    <button class="tool" id="t-circle" aria-pressed="false" aria-label="Circle" title="Circle — drag from the centre outward">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6.5"/></svg>
+    </button>
+    <button class="tool" id="t-free" aria-pressed="false" aria-label="Freehand" title="Freehand — drag to trace any shape">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 13c1-5 4-7 6-5s-1 5 1 6 4-2 5-5"/></svg>
+    </button>
+    <button class="tool sep" id="undoBtn" aria-label="Undo" title="Undo (Cmd+Z)" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5L3.5 8.5 7 12"/><path d="M3.5 8.5H12a4.5 4.5 0 010 9H8"/></svg>
+    </button>
+    <button class="tool" id="redoBtn" aria-label="Redo" title="Redo (Cmd+Shift+Z)" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l3.5 3.5L13 12"/><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4"/></svg>
+    </button>
+    <button class="tool danger" id="clearBtn" aria-label="Clear" title="Remove the drawn shape" disabled>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
+    </button>
+  </div>
+
+  <div class="hint" id="hint">Pick a tool, then drag on the map</div>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><b id="panelTitle">No area drawn</b><em id="panelArea"></em></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="table">Table</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="charts">Charts</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="sources">Sources</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="tplBtn">Templates</button>
+        <button class="btn" id="saveBtn" disabled>Save</button>
+        <button class="btn" id="sitesBtn" aria-expanded="false">Sites</button>
+        <button class="btn" id="shareBtn" disabled>Share</button>
+        <button class="btn" id="exportBtn" aria-expanded="false" disabled>Export</button>
+      </div>
+    </div>
+    <div class="body" id="panelBody"></div>
+  </aside>
+
+  <div class="timeline">
+    <button class="play" id="playBtn" aria-label="Play through time" title="Play (space)">
+      <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M4.5 2.5l9 5.5-9 5.5z"/></svg>
+    </button>
+    <div class="readout">
+      <div class="step" id="roStep">Dec 2025</div>
+      <div class="val" id="roVal"></div>
+      <div class="who" id="roFac"></div>
+    </div>
+    <div class="track">
+      <canvas id="spark"></canvas>
+      <input type="range" id="range" min="0" max="179" value="179" step="1"
+             aria-label="Time position" />
+      <div class="years" id="years"></div>
+    </div>
+  </div>
+</div>
+<script>
+const DATA={"factors":[["ndvi","NDVI (vegetation vigour)","sentinel2_sr","Vegetation","index",0,0,-0.2,0.95,1,"Normalised difference of NIR and red. The workhorse greenness index."],["evi","EVI (enhanced vegetation)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Less prone to saturation than NDVI over dense canopy."],["savi","SAVI (soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Corrects for soil brightness on sparse cover."],["msavi","MSAVI (modified soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Self-adjusting soil correction; good on bare ground."],["gndvi","GNDVI (green NDVI)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Green-band variant, more sensitive to chlorophyll."],["ndmi","NDMI (moisture)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.6,1,"Canopy water content from NIR and SWIR."],["nbr","NBR (burn ratio)","sentinel2_sr","Vegetation","index",0,0,-0.6,0.9,1,"Fire severity and post-burn recovery."],["chlorophyll_index","Chlorophyll index","sentinel2_sr","Vegetation","index",0,0,0.0,8.0,1,"Red-edge chlorophyll proxy; early stress signal."],["leaf_area_index","Leaf area index","sentinel2_sr","Vegetation","m\u00b2/m\u00b2",0,0,0.0,7.0,1,"Modelled canopy leaf area per unit ground."],["greenness","Tasselled-cap greenness","sentinel2_sr","Vegetation","index",0,0,-0.2,0.6,1,"Canopy vigour component of the tasselled-cap transform."],["wetness","Tasselled-cap wetness","sentinel2_sr","Vegetation","index",0,0,-0.4,0.3,1,"Surface moisture component."],["brightness","Tasselled-cap brightness","sentinel2_sr","Vegetation","index",0,0,0.0,0.7,1,"Bare-soil and albedo component."],["bare_soil_index","Bare soil index","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Exposed soil fraction proxy."],["ndbi","NDBI (built-up index)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Spectral built-up signal from SWIR and NIR."],["ndwi","NDWI (open water)","sentinel2_sr","Vegetation","index",0,0,-0.8,0.8,1,"Open-water delineation from green and NIR."],["lc_tree_pct","Tree cover","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share of the area classed as tree cover."],["lc_shrub_pct","Shrubland","esa_worldcover","Land cover","%",0,1,0.0,60.0,1,"Share classed as shrubland."],["lc_grass_pct","Grassland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as grassland."],["lc_crop_pct","Cropland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as cropland."],["lc_built_pct","Built-up","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as built-up."],["lc_bare_pct","Bare / sparse","esa_worldcover","Land cover","%",0,1,0.0,40.0,1,"Share classed as bare or sparsely vegetated."],["lc_water_pct","Open water","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as permanent water."],["lc_wetland_pct","Wetland","esa_worldcover","Land cover","%",0,1,0.0,50.0,1,"Share classed as herbaceous wetland."],["lc_dominant","Dominant land cover","esa_worldcover","Land cover","class",1,1,null,null,1,"Most common class by area. Never averaged."],["lc_diversity","Land cover diversity","esa_worldcover","Land cover","Shannon H",0,1,0.0,2.2,1,"Shannon entropy across classes \u2014 habitat mosaic proxy."],["lc_fragmentation","Habitat fragmentation","esa_worldcover","Land cover","edge m/ha",0,1,0.0,400.0,1,"Edge density between cover patches."],["lc_change_rate","Land cover change rate","esa_worldcover","Land cover","%/yr",0,1,0.0,12.0,1,"Share of area changing class year on year."],["elevation_mean","Elevation (mean)","lidar_dtm","Terrain","m",0,2,-5.0,950.0,0,"Mean height above ordnance datum."],["elevation_min","Elevation (min)","lidar_dtm","Terrain","m",0,2,-5.0,900.0,1,"Lowest point in the area."],["elevation_max","Elevation (max)","lidar_dtm","Terrain","m",0,2,0.0,980.0,1,"Highest point in the area."],["elevation_range","Relief (max \u2212 min)","lidar_dtm","Terrain","m",0,2,0.0,600.0,1,"Vertical range across the area."],["slope_mean","Slope (mean)","lidar_dtm","Terrain","\u00b0",0,2,0.0,45.0,1,"Mean gradient \u2014 buildability and erosion risk."],["slope_max","Slope (max)","lidar_dtm","Terrain","\u00b0",0,2,0.0,70.0,1,"Steepest gradient present."],["aspect_dominant","Dominant aspect","lidar_dtm","Terrain","class",1,2,null,null,1,"Prevailing slope direction. Circular \u2014 never averaged."],["ruggedness","Terrain ruggedness (TRI)","lidar_dtm","Terrain","index",0,2,0.0,60.0,1,"Mean elevation difference between neighbouring cells."],["tpi","Topographic position","lidar_dtm","Terrain","index",0,2,-30.0,30.0,1,"Ridge (positive) to valley (negative) position."],["curvature","Profile curvature","lidar_dtm","Terrain","1/100 m",0,2,-5.0,5.0,1,"Convex or concave surface form; drives runoff."],["flow_accumulation","Flow accumulation","lidar_dtm","Terrain","cells",0,2,0.0,100000.0,1,"Upslope contributing area \u2014 where water collects."],["hand","Height above drainage","lidar_dtm","Terrain","m",0,2,0.0,120.0,1,"Elevation above nearest watercourse. Strong flood predictor."],["solar_aspect_score","Solar aspect score","lidar_dtm","Terrain","0\u20131",0,2,0.0,1.0,1,"South-facing, low-shade favourability for solar."],["lst_day","Land surface temp (day)","modis_lst","Temperature","\u00b0C",0,0,-5.0,42.0,0,"Daytime skin temperature."],["lst_night","Land surface temp (night)","modis_lst","Temperature","\u00b0C",0,0,-10.0,22.0,0,"Night-time skin temperature."],["lst_diurnal_range","Diurnal temp range","modis_lst","Temperature","\u00b0C",0,0,0.0,25.0,1,"Day minus night \u2014 thermal inertia proxy."],["heat_anomaly","Urban heat anomaly","modis_lst","Temperature","\u00b0C",0,0,-4.0,9.0,1,"Excess over the surrounding rural baseline."],["air_temp_mean","Air temperature (mean)","era5_land","Temperature","\u00b0C",0,0,-4.0,24.0,0,"2 m air temperature."],["air_temp_max","Air temperature (max)","era5_land","Temperature","\u00b0C",0,0,0.0,38.0,1,"Monthly maximum 2 m air temperature."],["air_temp_min","Air temperature (min)","era5_land","Temperature","\u00b0C",0,0,-12.0,16.0,1,"Monthly minimum 2 m air temperature."],["growing_degree_days","Growing degree days","era5_land","Temperature","\u00b0C\u00b7day",0,0,0.0,420.0,1,"Accumulated warmth above 5 \u00b0C \u2014 crop development."],["frost_days","Frost days","era5_land","Temperature","days",0,0,0.0,28.0,1,"Days with minimum below 0 \u00b0C."],["precip_total","Precipitation total","haduk_precip","Water","mm",0,0,0.0,320.0,0,"Monthly rainfall total."],["precip_anomaly","Rainfall anomaly","haduk_precip","Water","%",0,0,-100.0,200.0,1,"Departure from the 1991\u20132020 monthly normal."],["dry_days","Dry days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days below 1 mm."],["wet_days","Wet days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days at or above 1 mm."],["max_daily_precip","Heaviest daily rainfall","haduk_precip","Water","mm",0,0,0.0,110.0,1,"Wettest single day \u2014 surface-water flood driver."],["spi_3month","Drought index (SPI-3)","haduk_precip","Water","\u03c3",0,0,-3.0,3.0,1,"Standardised precipitation over three months."],["soil_moisture","Soil moisture","era5_land","Water","m\u00b3/m\u00b3",0,0,0.05,0.5,0,"Volumetric water in the top soil layer."],["evapotranspiration","Evapotranspiration","era5_land","Water","mm",0,0,0.0,140.0,0,"Water returned to atmosphere by soil and plants."],["humidity","Relative humidity","era5_land","Water","%",0,0,55.0,98.0,1,"Mean monthly relative humidity."],["water_occurrence","Surface water occurrence","jrc_surface_water","Flood & water","%",0,1,0.0,100.0,0,"Share of observations showing water present."],["water_seasonality","Water seasonality","jrc_surface_water","Flood & water","months",0,1,0.0,12.0,0,"Months per year with water present."],["water_change","Surface water change","jrc_surface_water","Flood & water","%",0,1,-60.0,60.0,1,"Gain or loss against the long-term baseline."],["flood_zone2_pct","Flood Zone 2 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-1000-year fluvial extent."],["flood_zone3_pct","Flood Zone 3 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-100-year fluvial extent."],["surface_water_risk","Surface water flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"EA risk of flooding from surface water."],["reservoir_risk","Reservoir flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"Extent of reservoir inundation scenarios."],["distance_to_water","Distance to watercourse","os_open","Flood & water","m",0,2,0.0,6000.0,1,"Straight-line distance to the nearest river or stream."],["built_pct","Built-up surface","ghsl_built","Built environment","%",0,3,0.0,100.0,0,"Impervious built surface share."],["built_volume","Built volume","ghsl_built","Built environment","m\u00b3/ha",0,3,0.0,90000.0,0,"Total built volume per hectare."],["built_change_rate","Built-up change rate","ghsl_built","Built environment","%/yr",0,3,-2.0,12.0,1,"Rate of built surface growth."],["impervious_pct","Impervious surface","ghsl_built","Built environment","%",0,3,0.0,100.0,1,"Sealed ground \u2014 runoff and heat driver."],["building_density","Building density","os_open","Built environment","bldg/ha",0,2,0.0,60.0,1,"Building footprints per hectare."],["road_density","Road density","os_open","Built environment","km/km\u00b2",0,2,0.0,22.0,1,"Total road length per unit area."],["distance_a_road","Distance to A road","os_open","Built environment","m",0,2,0.0,15000.0,1,"Straight-line distance to the nearest A road."],["distance_motorway","Distance to motorway","os_open","Built environment","m",0,2,0.0,60000.0,1,"Straight-line distance to the nearest motorway."],["distance_railway","Distance to railway","os_open","Built environment","m",0,2,0.0,40000.0,1,"Straight-line distance to the nearest railway line."],["population_density","Population density","worldpop","People & economy","people/km\u00b2",0,1,0.0,16000.0,0,"Modelled residential population."],["population_change","Population change","worldpop","People & economy","%/yr",0,1,-5.0,12.0,1,"Year-on-year population growth."],["imd_score","Deprivation score (IMD)","ons_imd","People & economy","score",0,4,0.5,92.0,0,"Overall index of multiple deprivation."],["imd_income_decile","IMD income decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_employment_decile","IMD employment decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_health_decile","IMD health decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_education_decile","IMD education decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["avg_sale_price","Average sale price","land_registry_ppd","People & economy","\u00a3",0,0,60000.0,1400000.0,0,"Mean residential transaction price."],["price_per_m2","Price per m\u00b2","land_registry_ppd","People & economy","\u00a3/m\u00b2",0,0,900.0,14000.0,1,"Sale price normalised by floor area."],["transaction_count","Transaction count","land_registry_ppd","People & economy","sales",0,0,0.0,400.0,0,"Residential sales completed in the month."],["price_change_yoy","Price change (YoY)","land_registry_ppd","People & economy","%",0,0,-25.0,30.0,1,"Year-on-year change in average price."],["soil_ph","Soil pH","soilgrids","Soil & geology","pH",0,2,3.8,8.4,0,"Topsoil acidity or alkalinity."],["soil_organic_carbon","Soil organic carbon","soilgrids","Soil & geology","g/kg",0,2,5.0,180.0,0,"Topsoil carbon content \u2014 fertility and sequestration."],["soil_clay_pct","Clay content","soilgrids","Soil & geology","%",0,2,3.0,60.0,0,"Clay fraction of topsoil."],["soil_sand_pct","Sand content","soilgrids","Soil & geology","%",0,2,3.0,90.0,0,"Sand fraction of topsoil."],["soil_silt_pct","Silt content","soilgrids","Soil & geology","%",0,2,3.0,70.0,0,"Silt fraction of topsoil."],["soil_bulk_density","Soil bulk density","soilgrids","Soil & geology","kg/m\u00b3",0,2,800.0,1700.0,0,"Compaction proxy; affects drainage and rooting."],["soil_water_capacity","Available water capacity","soilgrids","Soil & geology","mm/m",0,2,40.0,220.0,1,"Water the soil can hold for plant use."],["bedrock_class","Bedrock geology","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant bedrock unit. Never averaged."],["superficial_deposits","Superficial deposits","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant drift geology. Never averaged."],["radon_potential","Radon potential","bgs_geology","Soil & geology","%",0,2,0.0,30.0,0,"Share of homes estimated above the action level."],["no2","Nitrogen dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,1.0,70.0,0,"Traffic and combustion pollutant."],["pm25","PM2.5","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,2.0,32.0,0,"Fine particulates; the main health-burden pollutant."],["pm10","PM10","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,4.0,48.0,0,"Coarse particulates."],["o3","Ozone","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,20.0,110.0,0,"Ground-level ozone; peaks in summer."],["so2","Sulphur dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,0.2,14.0,0,"Industrial and shipping emissions."],["sar_vv","SAR backscatter (VV)","sentinel1_sar","Radar","dB",0,0,-25.0,2.0,0,"Co-polarised return; cloud-independent."],["sar_vh","SAR backscatter (VH)","sentinel1_sar","Radar","dB",0,0,-32.0,-5.0,0,"Cross-polarised return; sensitive to canopy volume."],["sar_ratio","SAR VH/VV ratio","sentinel1_sar","Radar","ratio",0,0,0.1,0.9,1,"Structure proxy that works through cloud."],["sar_soil_moisture","SAR soil moisture","sentinel1_sar","Radar","%",0,0,5.0,55.0,1,"Radar-derived near-surface wetness."],["sar_coherence","SAR coherence","sentinel1_sar","Radar","0\u20131",0,0,0.05,0.95,1,"Interferometric stability \u2014 detects ground disturbance."],["sssi_pct","SSSI coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within Sites of Special Scientific Interest."],["aonb_pct","National Landscape (AONB)","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Landscape."],["national_park_pct","National Park","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Park."],["sac_spa_pct","SAC / SPA coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within European-designated habitat sites."],["ancient_woodland_pct","Ancient woodland","natural_england","Designations","%",0,2,0.0,60.0,1,"Share on the ancient woodland inventory."],["green_belt_pct","Green Belt","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within designated Green Belt."],["priority_habitat_pct","Priority habitat","natural_england","Designations","%",0,2,0.0,90.0,1,"Share on the priority habitat inventory."],["nightlight_radiance","Night-time radiance","viirs_nightlights","Night lights","nW/cm\u00b2/sr",0,0,0.0,120.0,0,"Artificial light emission \u2014 activity and sprawl proxy."],["nightlight_change","Night-time light change","viirs_nightlights","Night lights","%/yr",0,0,-30.0,40.0,1,"Growth or decline in emitted light."],["solar_ghi","Global horizontal irradiance","pvgis","Solar","kWh/m\u00b2/yr",0,2,750.0,1250.0,0,"Total annual solar resource."],["solar_pv_potential","PV generation potential","pvgis","Solar","kWh/kWp/yr",0,2,700.0,1150.0,1,"Expected yield from an optimally tilted array."],["sunshine_hours","Sunshine hours","pvgis","Solar","hours",0,2,1150.0,1900.0,0,"Mean annual bright sunshine duration."]],"bases":[["sentinel2_sr","Sentinel-2 Surface Reflectance","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","5 days","monthly",10,1],["sentinel1_sar","Sentinel-1 SAR (C-band)","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","6 days","monthly",10,1],["esa_worldcover","ESA WorldCover Land Cover","ESA","CC BY 4.0","https://esa-worldcover.org/","annual","annual",10,1],["lidar_dtm","Environment Agency LIDAR Composite DTM","Environment Agency","OGL v3","https://environment.data.gov.uk/","static","static",2,1],["modis_lst","MODIS Land Surface Temperature","NASA LP DAAC","Public domain","https://lpdaac.usgs.gov/products/mod11a2v061/","8 days","monthly",1000,1],["era5_land","ERA5-Land Reanalysis","ECMWF / Copernicus C3S","Copernicus licence","https://cds.climate.copernicus.eu/","hourly","monthly",9000,1],["haduk_precip","HadUK-Grid Precipitation","Met Office","OGL v3","https://www.metoffice.gov.uk/research/climate/maps-and-data/data/haduk-grid/","daily","monthly",1000,1],["jrc_surface_water","JRC Global Surface Water","EC Joint Research Centre","Open","https://global-surface-water.appspot.com/","annual","annual",30,1],["ea_flood_zones","EA Flood Map for Planning","Environment Agency","OGL v3","https://environment.data.gov.uk/","quarterly","static",5,1],["ghsl_built","GHSL Built-Up Surface","EC Joint Research Centre","CC BY 4.0","https://ghsl.jrc.ec.europa.eu/","5 years","5 years",100,1],["os_open","OS OpenData (Roads, Rivers, Buildings)","Ordnance Survey","OGL v3","https://osdatahub.os.uk/downloads/open","biannual","static",10,1],["worldpop","WorldPop Population Density","WorldPop / Univ. Southampton","CC BY 4.0","https://www.worldpop.org/","annual","annual",100,1],["ons_imd","Indices of Multiple Deprivation","ONS / MHCLG","OGL v3","https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019","~4 years","periodic",null,1],["land_registry_ppd","HM Land Registry Price Paid Data","HM Land Registry","OGL v3","https://landregistry.data.gov.uk/","monthly","monthly",null,0],["soilgrids","SoilGrids 250m","ISRIC World Soil Information","CC BY 4.0","https://soilgrids.org/","static","static",250,1],["bgs_geology","BGS Geology & Radon","British Geological Survey","BGS Open Licence","https://www.bgs.ac.uk/","static","static",50,1],["copernicus_air","CAMS European Air Quality","Copernicus Atmosphere Monitoring Service","Copernicus licence","https://ads.atmosphere.copernicus.eu/","hourly","monthly",10000,1],["natural_england","Natural England Designated Sites","Natural England","OGL v3","https://naturalengland-defra.opendata.arcgis.com/","monthly","static",null,1],["viirs_nightlights","VIIRS Nighttime Lights","NOAA / Colorado School of Mines","Public domain","https://eogdata.mines.edu/products/vnl/","monthly","monthly",500,1],["pvgis","PVGIS Solar Irradiation","EC Joint Research Centre","Open","https://re.jrc.ec.europa.eu/pvg_tools/","static","static",5000,0]],"groups":["Vegetation","Land cover","Terrain","Temperature","Water","Flood & water","Built environment","People & economy","Soil & geology","Air quality","Radar","Designations","Night lights","Solar"],"classes":{"lc_dominant":["Tree cover","Shrubland","Grassland","Cropland","Built-up","Bare / sparse","Open water","Herbaceous wetland"],"aspect_dominant":["North","North-east","East","South-east","South","South-west","West","North-west"],"bedrock_class":["Chalk","Clay","Limestone","Sandstone","Mudstone","Granite","Gravel","Slate"],"superficial_deposits":["Alluvium","River terrace","Glacial till","Head","Sand and gravel","Peat","None recorded"]},"outline":[[-3.05,54.95],[-2.55,55.15],[-2.2,55.45],[-2.03,55.8],[-1.6,55.6],[-1.52,55.05],[-1.35,54.75],[-0.78,54.55],[-0.4,54.28],[-0.1,54.12],[-0.2,53.7],[0.15,53.6],[0.35,53.2],[0.35,52.9],[0.55,52.95],[1.35,52.92],[1.75,52.75],[1.6,52.3],[1.3,51.95],[1.05,51.78],[0.95,51.6],[1.42,51.38],[1.1,51.05],[0.6,50.85],[0.3,50.78],[-0.3,50.78],[-0.95,50.8],[-1.45,50.6],[-1.95,50.7],[-2.45,50.6],[-3.05,50.7],[-3.55,50.45],[-4.2,50.35],[-5.05,50.1],[-5.72,50.05],[-5.55,50.45],[-4.55,50.6],[-4.2,51.0],[-3.55,51.22],[-3.0,51.32],[-2.65,51.6],[-2.7,51.85],[-3.1,52.1],[-3.15,52.55],[-2.75,52.95],[-3.1,53.25],[-3.05,53.45],[-2.95,53.75],[-3.05,54.1],[-3.35,54.25],[-3.6,54.5],[-3.3,54.8],[-3.05,54.95]],"summary":{"factor_count":118,"base_count":20,"stored_base_count":18,"monthly_base_count":7,"derived_factor_count":80,"group_count":14}};
+/* =====================================================================
+   Site Scanner — demo engine
+
+   This is a faithful port of the real backend's series.py, running in the
+   browser so the demo needs no server. The figures are generated, but the
+   *behaviour* is the product's actual behaviour:
+
+     - optical factors go blank in cloudy months rather than being
+       interpolated, and carry a valid_fraction that the UI reads;
+     - annual products hold their value across the year and are flagged as
+       stepped rather than pretending to be monthly;
+     - static factors do not move;
+     - a site's character is stable, so two nearby shapes behave alike and a
+       northern upland reads differently from a southern city;
+     - categorical factors are never averaged.
+
+   Anything the real app would refuse to do, this refuses to do too.
+   ===================================================================== */
+
+/* ---- catalogue unpacking (positional arrays keep the payload small) ---- */
+const K_CAT = 1;
+const CAD = ['monthly', 'annual', 'static', '5 years', 'periodic'];
+
+const FACTORS = DATA.factors.map(a => ({
+  id: a[0], name: a[1], base: a[2], group: a[3], unit: a[4],
+  kind: a[5] === K_CAT ? 'categorical' : 'continuous',
+  cadence: CAD[a[6]], lo: a[7], hi: a[8], derived: !!a[9], note: a[10],
+}));
+const BASES = DATA.bases.map(a => ({
+  id: a[0], name: a[1], source: a[2], licence: a[3], url: a[4],
+  native: a[5], cadence: a[6], res: a[7], stored: !!a[8],
+}));
+const F_BY_ID = Object.fromEntries(FACTORS.map(f => [f.id, f]));
+const B_BY_ID = Object.fromEntries(BASES.map(b => [b.id, b]));
+
+/* ---- time ---- */
+const STEPS = (() => {
+  const out = [];
+  for (let y = 2011; y <= 2025; y++)
+    for (let m = 1; m <= 12; m++) out.push(`${y}-${String(m).padStart(2, '0')}`);
+  return out;
+})();
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const labelStep = s => `${MONTHS[+s.slice(5) - 1]} ${s.slice(0, 4)}`;
+
+/* ---- deterministic noise ---- */
+function hash(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  // Final avalanche, so neighbouring keys do not produce neighbouring values.
+  h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0;
+  h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/* Cloud-limited bases. ESA WorldCover is deliberately absent: it is an annual
+   composite built from a full year of imagery, so it has no monthly cloud
+   gaps. Treating it as cloud-limited put holes in a product that has none —
+   a real bug the Python test suite caught. */
+const CLOUDY = new Set(['sentinel2_sr', 'modis_lst']);
+const GAP_THRESHOLD = 0.15;
+
+const SEASON_PEAK = {
+  Vegetation: 7, Temperature: 7.5, Water: 0.5,
+  'Air quality': 1, Radar: 7, 'Night lights': 0,
+};
+const SEASON_AMP = {
+  Vegetation: .34, Temperature: .40, Water: .28, 'Air quality': .22,
+  Radar: .12, 'Night lights': .30, 'People & economy': .03,
+};
+
+function siteCharacter(lng, lat) {
+  const k = `${lng.toFixed(3)}|${lat.toFixed(3)}`;
+  const northness = Math.max(0, Math.min(1, (lat - 49.9) / (55.8 - 49.9)));
+  return {
+    urbanity: hash('u' + k),
+    wetness: 0.35 + 0.5 * hash('w' + k) + 0.15 * northness,
+    elevation: Math.pow(hash('e' + k), 1.6),
+    northness,
+    affluence: hash('a' + k),
+  };
+}
+
+function coherent(group, s) {
+  switch (group) {
+    case 'Temperature': return 0.75 - 0.45 * s.northness + 0.2 * s.urbanity;
+    case 'Water': case 'Flood & water': return 0.25 + 0.55 * s.wetness - 0.3 * s.elevation;
+    case 'Terrain': return s.elevation;
+    case 'People & economy': return 0.2 + 0.6 * s.affluence;
+    case 'Air quality': case 'Built environment': case 'Night lights':
+      return 0.1 + 0.8 * s.urbanity;
+    case 'Vegetation': case 'Land cover': case 'Designations':
+      return 0.8 - 0.55 * s.urbanity;
+    default: return 0.5;
+  }
+}
+
+const URBAN_LED = new Set(['lc_built_pct','impervious_pct','built_pct','building_density',
+  'road_density','population_density','no2','nightlight_radiance']);
+const GREEN_LED = new Set(['lc_tree_pct','lc_crop_pct','lc_grass_pct','ndvi','evi']);
+
+function baseline(f, s, areaHa) {
+  const span = f.hi - f.lo;
+  let pos = 0.35 * hash(`b${f.id}${s.urbanity.toFixed(4)}${s.northness.toFixed(4)}`)
+          + 0.65 * coherent(f.group, s);
+  if (URBAN_LED.has(f.id)) pos = Math.min(1, 0.15 + 0.85 * s.urbanity);
+  else if (GREEN_LED.has(f.id)) pos = Math.max(0, 0.85 - 0.6 * s.urbanity) * (0.7 + 0.6 * pos);
+
+  // Large areas regress toward the middle because they average over more
+  // varied ground. Real, and it matters to anyone comparing a field with a
+  // county.
+  const pull = Math.min(1, areaHa / 20000);
+  pos = pos * (1 - 0.45 * pull) + 0.5 * (0.45 * pull);
+  return f.lo + span * Math.max(0, Math.min(1, pos));
+}
+
+function trendPerYear(f, s) {
+  const jitter = (hash('t' + f.id + s.urbanity.toFixed(3)) - 0.5) * 0.004;
+  if (f.group === 'Temperature') return 0.006 + jitter;
+  if (f.id === 'frost_days') return -0.008 + jitter;
+  if (['lc_built_pct','built_pct','impervious_pct','building_density'].includes(f.id))
+    return 0.004 * (0.3 + s.urbanity) + jitter;
+  if (['avg_sale_price','price_per_m2'].includes(f.id)) return 0.021 + jitter;
+  if (['no2','pm25','pm10','so2'].includes(f.id)) return -0.010 + jitter;  // genuinely improved
+  if (['lc_tree_pct','ancient_woodland_pct'].includes(f.id)) return 0.001 + jitter;
+  if (['lc_crop_pct','lc_grass_pct'].includes(f.id)) return -0.002 + jitter;
+  return jitter;
+}
+
+function seasonal(f, month) {
+  const amp = SEASON_AMP[f.group] || 0;
+  if (!amp) return 0;
+  const peak = SEASON_PEAK[f.group] ?? 7;
+  const swing = Math.cos((month - peak) / 12 * 2 * Math.PI);
+  if (f.id === 'frost_days') return -amp * swing * 1.6;
+  if (['dry_days','sunshine_hours','o3','solar_ghi'].includes(f.id)) return -amp * swing;
+  if (f.id === 'growing_degree_days') return amp * Math.max(0, swing) * 1.8;
+  return amp * swing;
+}
+
+function validFraction(f, year, month, s) {
+  if (!CLOUDY.has(f.base)) return 1;
+  const clear = 0.5 + 0.42 * Math.cos((month - 7) / 12 * 2 * Math.PI);
+  const n = hash(`c${f.base}${year}${month}${s.wetness.toFixed(3)}`);
+  return Math.max(0, Math.min(1, clear * (0.55 + 0.75 * n) - 0.12 * s.wetness));
+}
+
+function categoricalValue(f, year, s) {
+  const classes = DATA.classes[f.id] || ['Unknown'];
+  let weights;
+  if (f.id === 'lc_dominant') {
+    const u = s.urbanity;
+    weights = [Math.max(.02, .9 - u), .12, Math.max(.05, .7 - .4 * u),
+               Math.max(.05, .8 - .6 * u), .1 + 1.4 * u, .05, .08, .05];
+  } else weights = classes.map(() => 1);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = hash(`k${f.id}${s.urbanity.toFixed(3)}${s.northness.toFixed(3)}${Math.floor(year / 5)}`) * total;
+  for (let i = 0; i < classes.length; i++) { r -= weights[i]; if (r <= 0) return classes[i]; }
+  return classes[classes.length - 1];
+}
+
+/** A full monthly series for one factor over one area. */
+function generateSeries(factorId, centroid, areaHa) {
+  const f = F_BY_ID[factorId];
+  const [lng, lat] = centroid;
+  const s = siteCharacter(lng, lat);
+  const stepped = ['annual', '5 years', 'periodic'].includes(f.cadence);
+  const points = [];
+
+  if (f.kind === 'categorical') {
+    for (const t of STEPS) {
+      const year = +t.slice(0, 4), month = +t.slice(5);
+      points.push({
+        t, value: categoricalValue(f, year, s),
+        valid: validFraction(f, year, month, s),
+        interp: stepped && month !== 1,
+      });
+    }
+    return { id: f.id, f, points, annual: rollup(points, f) };
+  }
+
+  const base = baseline(f, s, areaHa);
+  const span = f.hi - f.lo;
+  const trend = trendPerYear(f, s);
+
+  for (const t of STEPS) {
+    const year = +t.slice(0, 4), month = +t.slice(5);
+    let value, valid, interp = false;
+
+    if (f.cadence === 'static') { value = base; valid = 1; }
+    else {
+      const sm = stepped ? 1 : month;
+      const sy = f.cadence === '5 years' ? year - (year % 5) : year;
+      const drift = trend * (sy - 2011) * span;
+      const seas = seasonal(f, sm) * span;
+      const wob = (hash(`v${f.id}${sy}${sm}${lng.toFixed(3)}${lat.toFixed(3)}`) - 0.5) * 0.09 * span;
+      value = base + drift + seas + wob;
+      valid = validFraction(f, year, month, s);
+      interp = stepped && month !== 1;
+    }
+
+    value = Math.max(f.lo, Math.min(f.hi, value));
+
+    // The honest gap. Never interpolated, never guessed.
+    if (valid < GAP_THRESHOLD) { points.push({ t, value: null, valid, interp: false }); continue; }
+    points.push({ t, value: +value.toFixed(4), valid: +valid.toFixed(3), interp });
+  }
+  return { id: f.id, f, points, annual: rollup(points, f) };
+}
+
+/** Collapse to one row per year — the attribute table's default view. */
+function rollup(points, f) {
+  const byYear = new Map();
+  for (const p of points) {
+    const y = +p.t.slice(0, 4);
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(p);
+  }
+  const rows = [];
+  for (const [year, pts] of [...byYear].sort((a, b) => a[0] - b[0])) {
+    const good = pts.filter(p => p.value !== null);
+    if (!good.length) {
+      rows.push({ year, value: null, min: null, max: null, obs: 0, total: pts.length, conf: 0 });
+      continue;
+    }
+    if (f.kind === 'categorical') {
+      const counts = {};
+      for (const p of good) counts[p.value] = (counts[p.value] || 0) + 1;
+      const modal = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      rows.push({ year, value: modal, min: null, max: null, obs: good.length,
+                  total: pts.length, conf: good.reduce((a, p) => a + p.valid, 0) / good.length });
+      continue;
+    }
+    // Weighted by valid fraction: a month where 90% of pixels were clear
+    // counts for more than one where 20% were.
+    const w = good.map(p => Math.max(0.01, p.valid));
+    const sw = w.reduce((a, b) => a + b, 0);
+    const mean = good.reduce((a, p, i) => a + p.value * w[i], 0) / sw;
+    const vals = good.map(p => p.value);
+    rows.push({
+      year, value: +mean.toFixed(4),
+      min: +Math.min(...vals).toFixed(4), max: +Math.max(...vals).toFixed(4),
+      obs: good.length, total: pts.length, conf: sw / w.length,
+    });
+  }
+  return rows;
+}
+
+/* ---- geometry ---- */
+const R = 6378137;
+function ringAreaM2(ring) {
+  let total = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i], [x2, y2] = ring[i + 1];
+    total += (x2 - x1) * Math.PI / 180 *
+      (2 + Math.sin(y1 * Math.PI / 180) + Math.sin(y2 * Math.PI / 180));
+  }
+  return Math.abs(total * R * R / 2);
+}
+function polygonAreaHa(ring) {
+  const closed = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+    ? ring : [...ring, ring[0]];
+  return ringAreaM2(closed) / 10000;
+}
+function centroidOf(ring) {
+  const n = ring.length;
+  return [ring.reduce((a, p) => a + p[0], 0) / n, ring.reduce((a, p) => a + p[1], 0) / n];
+}
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+/** Douglas–Peucker. A two-second freehand scribble is several hundred
+ *  vertices; simplifying on release keeps everything downstream fast. */
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  const sq = t => t * t;
+  const segDist = (p, a, b) => {
+    let x = a[0], y = a[1], dx = b[0] - x, dy = b[1] - y;
+    if (dx || dy) {
+      const t = ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy);
+      if (t > 1) { x = b[0]; y = b[1]; } else if (t > 0) { x += dx * t; y += dy * t; }
+    }
+    return sq(p[0] - x) + sq(p[1] - y);
+  };
+  const run = (first, last, out) => {
+    let maxD = tol * tol, idx = 0;
+    for (let i = first + 1; i < last; i++) {
+      const d = segDist(pts[i], pts[first], pts[last]);
+      if (d > maxD) { idx = i; maxD = d; }
+    }
+    if (idx) { if (idx - first > 1) run(first, idx, out); out.push(pts[idx]); if (last - idx > 1) run(idx, last, out); }
+  };
+  const out = [pts[0]];
+  run(0, pts.length - 1, out);
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+/* =====================================================================
+   Site Scanner — UI
+   ===================================================================== */
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const TEMPLATES = [
+  { id:'veg',    name:'Vegetation change', blurb:'Is this land getting greener or browner over 15 years?', tool:'free',   factors:['ndvi','lc_tree_pct','lc_grass_pct','precip_total'] },
+  { id:'flood',  name:'Flood exposure',    blurb:'How exposed is this site to water, and is that changing?', tool:'rect', factors:['flood_zone3_pct','hand','water_occurrence','max_daily_precip'] },
+  { id:'urban',  name:'Urban growth',      blurb:'How fast is this area being built on?',                 tool:'rect',   factors:['lc_built_pct','built_volume','population_density','nightlight_radiance'] },
+  { id:'solar',  name:'Solar suitability', blurb:'Would a solar array work here?',                        tool:'circle', factors:['solar_ghi','slope_mean','solar_aspect_score','lc_built_pct'] },
+  { id:'heat',   name:'Urban heat',        blurb:'How much hotter is this area than its surroundings?',   tool:'rect',   factors:['lst_day','heat_anomaly','lc_tree_pct','impervious_pct'] },
+  { id:'crop',   name:'Crop performance',  blurb:'How has this field performed season by season?',        tool:'free',   factors:['ndvi','soil_organic_carbon','soil_moisture','growing_degree_days'] },
+];
+
+const S = {
+  aoi: null, tool: null, series: {}, cells: [],
+  selected: ['ndvi', 'lc_tree_pct', 'precip_total', 'lst_day'],
+  t: STEPS.indexOf('2025-07'), compare: null, playing: false,
+  tab: 'table', expanded: new Set(), sort: { col: 'year', asc: true },
+  past: [], future: [], saved: [], areaHa: 0, centroid: null,
+  menu: null, flash: null,
+};
+const MAX_FACTORS = 12;
+
+/* ---------- projection: equirectangular with a latitude correction, so
+     England is not stretched sideways. ---------- */
+const VIEW = { w: 0, h: 0, scale: 1, cx: 0, cy: 0 };
+const LAT0 = 53.0;
+const KX = Math.cos(LAT0 * Math.PI / 180);
+
+let viewInit = false;
+function fitView(w, h) {
+  VIEW.w = w; VIEW.h = h;
+  if (viewInit) return;            // resizing must not throw away the user's zoom
+  const xs = DATA.outline.map(p => p[0] * KX), ys = DATA.outline.map(p => p[1]);
+  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  VIEW.scale = Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.9;
+  VIEW.cx = (x0 + x1) / 2; VIEW.cy = (y0 + y1) / 2;
+  viewInit = true;
+}
+
+/** Frame a shape with room around it, so a loaded or restored AOI is visible
+ *  rather than filling the whole canvas edge to edge. */
+function frameRing(ring) {
+  const xs = ring.map(p => p[0] * KX), ys = ring.map(p => p[1]);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  VIEW.cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  VIEW.cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  VIEW.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE,
+    Math.min(VIEW.w / (w || 1e-4), VIEW.h / (h || 1e-4)) * 0.3));
+}
+const MIN_SCALE = 40, MAX_SCALE = 40000;
+function zoomAt(px, py, factor) {
+  const before = toLngLat(px, py);
+  VIEW.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, VIEW.scale * factor));
+  const after = toLngLat(px, py);
+  // Keep the point under the cursor fixed, which is what makes wheel zoom
+  // feel like a map rather than a slider.
+  VIEW.cx += (before[0] - after[0]) * KX;
+  VIEW.cy += before[1] - after[1];
+  drawMap();
+}
+function panBy(dx, dy) {
+  VIEW.cx -= dx / VIEW.scale;
+  VIEW.cy += dy / VIEW.scale;
+  drawMap();
+}
+
+const toPx = ([lng, lat]) => [
+  VIEW.w / 2 + (lng * KX - VIEW.cx) * VIEW.scale,
+  VIEW.h / 2 - (lat - VIEW.cy) * VIEW.scale,
+];
+const toLngLat = (px, py) => [
+  (VIEW.cx + (px - VIEW.w / 2) / VIEW.scale) / KX,
+  VIEW.cy - (py - VIEW.h / 2) / VIEW.scale,
+];
+
+/* ---------- colour ---------- */
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const RAMP_DARK = [[26,32,34],[42,66,58],[74,106,74],[138,154,84],[206,176,92],[237,206,138]];
+const RAMP_LIGHT = [[228,224,214],[186,196,170],[150,170,120],[196,176,96],[162,112,28],[110,74,16]];
+function isLight() {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t) return t === 'light';
+  return window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+function ramp(t, alpha = 1) {
+  const R_ = isLight() ? RAMP_LIGHT : RAMP_DARK;
+  const x = Math.max(0, Math.min(0.999, t)) * (R_.length - 1);
+  const i = Math.floor(x), fr = x - i;
+  const a = R_[i], b = R_[Math.min(R_.length - 1, i + 1)];
+  const c = a.map((v, k) => Math.round(v + (b[k] - v) * fr));
+  return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+}
+const SERIES_COLORS = ['#DDAE5C','#7FB3A3','#C98A6B','#8FA5C4','#B48EAD','#9BB068','#D4A0A0','#6FA8B8','#C4923F','#88A398','#B9846B','#7D8FB3'];
+const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
+
+/* ---------- formatting ---------- */
+function fmt(v, f) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'string') return v;
+  if (!isFinite(v)) return '—';
+  const u = f ? f.unit : '';
+  if (u === '£' || u === '£/m²') return '£' + Math.round(v).toLocaleString('en-GB');
+  if (u === '%') return v.toFixed(1) + '%';
+  if (u === '°' || u === '°C') return v.toFixed(1);
+  if (u === 'm' || u === 'mm') return Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-GB') : v.toFixed(1);
+  if (['days','sales','cells'].includes(u)) return Math.round(v).toLocaleString('en-GB');
+  if (Math.abs(v) >= 10000) return Math.round(v).toLocaleString('en-GB');
+  if (Math.abs(v) >= 100) return v.toFixed(1);
+  return v.toFixed(2);
+}
+const compact = v => v === null ? '—' : typeof v === 'string' ? v
+  : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M'
+  : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + 'k'
+  : Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(2);
+const fmtArea = ha => ha >= 10000 ? (ha / 100).toFixed(0) + ' km²'
+  : ha >= 100 ? Math.round(ha).toLocaleString('en-GB') + ' ha' : ha.toFixed(1) + ' ha';
+const band = c => c >= 0.7 ? '' : c >= 0.4 ? 'c-fair' : 'c-poor';
+
+/* ---------- map ---------- */
+const mapCv = $('#map'), mapCtx = mapCv.getContext('2d');
+let draft = null;
+
+function sizeMap() {
+  const r = mapCv.parentElement.getBoundingClientRect();
+  const dpr = devicePixelRatio || 1;
+  mapCv.width = r.width * dpr; mapCv.height = r.height * dpr;
+  mapCv.style.width = r.width + 'px'; mapCv.style.height = r.height + 'px';
+  mapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fitView(r.width, r.height);
+  drawMap();
+  drawSpark();
+}
+
+function drawMap() {
+  const { w, h } = VIEW;
+  mapCtx.clearRect(0, 0, w, h);
+  mapCtx.fillStyle = cssVar('--sea'); mapCtx.fillRect(0, 0, w, h);
+
+  // Graticule. Real coordinate lines that subdivide as you zoom, so the map
+  // keeps a sense of scale rather than becoming a flat expanse when you are in
+  // close on a single field.
+  const degPerPx = 1 / VIEW.scale;
+  const stepDeg = [2, 1, .5, .25, .1, .05, .02, .01, .005, .002, .001]
+    .find(d => d / degPerPx > 55) ?? .001;
+  mapCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.075)';
+  mapCtx.lineWidth = 1;
+  const tl = toLngLat(0, 0), br = toLngLat(w, h);
+  for (let lat = Math.floor(br[1] / stepDeg) * stepDeg; lat <= tl[1]; lat += stepDeg) {
+    const y = toPx([0, lat])[1];
+    mapCtx.beginPath(); mapCtx.moveTo(0, y); mapCtx.lineTo(w, y); mapCtx.stroke();
+  }
+  for (let lng = Math.floor(tl[0] / stepDeg) * stepDeg; lng <= br[0]; lng += stepDeg) {
+    const x = toPx([lng, 0])[0];
+    mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, h); mapCtx.stroke();
+  }
+
+  // England
+  mapCtx.beginPath();
+  DATA.outline.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
+  mapCtx.closePath();
+  mapCtx.fillStyle = cssVar('--land'); mapCtx.fill();
+  mapCtx.strokeStyle = cssVar('--land-line'); mapCtx.lineWidth = 1.2; mapCtx.stroke();
+
+  // Cell grid, coloured at the current timestep. The cells and their offsets
+  // were computed once when the shape was drawn, so scrubbing repaints from
+  // memory and never recomputes — this is the client-side shape of the H3
+  // fast tier.
+  const primary = S.selected[0];
+  const ser = S.series[primary];
+  if (S.cells.length && ser && ser.f.kind === 'continuous') {
+    const p = ser.points[S.t];
+    if (p && p.value !== null) {
+      const spread = (ser.f.hi - ser.f.lo) * 0.16;
+      for (const c of S.cells) {
+        const v = p.value + c.o * spread;
+        const t = (v - ser.f.lo) / (ser.f.hi - ser.f.lo);
+        const [x0, y0] = toPx([c.b[0], c.b[3]]);
+        const [x1, y1] = toPx([c.b[2], c.b[1]]);
+        mapCtx.fillStyle = ramp(t, 0.82);
+        mapCtx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+      }
+    }
+  }
+
+  const outline = (ring, stroke, fill, dash) => {
+    mapCtx.beginPath();
+    ring.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
+    mapCtx.closePath();
+    if (fill) { mapCtx.fillStyle = fill; mapCtx.fill(); }
+    mapCtx.setLineDash(dash || []);
+    mapCtx.strokeStyle = stroke; mapCtx.lineWidth = 2; mapCtx.stroke();
+    mapCtx.setLineDash([]);
+  };
+  if (S.aoi) outline(S.aoi, cssVar('--accent'), 'rgba(221,174,92,.06)');
+  if (draft) outline(draft, cssVar('--accent-2'), 'rgba(196,146,63,.10)', [5, 4]);
+
+  // Scale bar, recomputed for the current projection.
+  const kmPerPx = 111.32 * KX / VIEW.scale;
+  const target = 80 * kmPerPx;
+  const nice = [1,2,5,10,20,50,100,200,500].reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
+  $('#scaleBar').style.width = (nice / kmPerPx).toFixed(0) + 'px';
+  $('#scaleLabel').textContent = nice + ' km';
+}
+
+/* ---------- drawing ---------- */
+let drawing = false, start = null, freePts = [];
+
+function setTool(t) {
+  S.tool = S.tool === t ? null : t;
+  for (const id of ['rect', 'circle', 'free'])
+    $('#t-' + id).setAttribute('aria-pressed', String(S.tool === id));
+  mapCv.classList.toggle('drawing', !!S.tool);
+  $('#hint').textContent = S.tool
+    ? { rect: 'Drag across the map to draw a rectangle',
+        circle: 'Drag from the centre outward',
+        free: 'Drag to trace any shape' }[S.tool]
+    : S.aoi ? 'Scrub the timeline, or pick another tool to redraw'
+            : 'Pick a tool, then drag on the map';
+}
+
+function evPos(e) {
+  const r = mapCv.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return [p.clientX - r.left, p.clientY - r.top];
+}
+function rectRing(a, b) { return [a, [b[0], a[1]], b, [a[0], b[1]], a]; }
+function circleRing(c, edge) {
+  const dx = (edge[0] - c[0]) * KX, dy = edge[1] - c[1];
+  const r = Math.hypot(dx, dy);
+  const out = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = i / 64 * 2 * Math.PI;
+    out.push([c[0] + (r * Math.cos(a)) / KX, c[1] + r * Math.sin(a)]);
+  }
+  return out;
+}
+
+function onDown(e) {
+  if (!S.tool) return;
+  e.preventDefault();
+  drawing = true;
+  start = toLngLat(...evPos(e));
+  freePts = [start];
+}
+function onMove(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const ll = toLngLat(...evPos(e));
+  if (S.tool === 'rect') draft = rectRing(start, ll);
+  else if (S.tool === 'circle') draft = circleRing(start, ll);
+  else { freePts.push(ll); if (freePts.length > 2) draft = [...freePts, freePts[0]]; }
+  drawMap();
+}
+function onUp(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  drawing = false;
+  const ll = e.changedTouches ? toLngLat(...evPos({ touches: e.changedTouches })) : toLngLat(...evPos(e));
+  let ring = null;
+  if (S.tool === 'rect') { if (Math.abs(start[0] - ll[0]) > 1e-4) ring = rectRing(start, ll); }
+  else if (S.tool === 'circle') { if (Math.hypot(start[0] - ll[0], start[1] - ll[1]) > 1e-4) ring = circleRing(start, ll); }
+  else if (freePts.length >= 4) {
+    const tol = 6 / VIEW.scale;
+    const s = simplify(freePts, tol);
+    ring = [...s, s[0]];
+  }
+  draft = null; freePts = [];
+  if (ring) setAoi(ring);
+  else drawMap();
+}
+
+let panning = false, panLast = null;
+mapCv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = mapCv.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.18 : 1 / 1.18);
+}, { passive: false });
+
+mapCv.addEventListener('mousedown', e => {
+  if (S.tool) return;
+  panning = true; panLast = [e.clientX, e.clientY];
+  mapCv.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!panning) return;
+  panBy(e.clientX - panLast[0], e.clientY - panLast[1]);
+  panLast = [e.clientX, e.clientY];
+});
+window.addEventListener('mouseup', () => { panning = false; mapCv.style.cursor = ''; });
+
+mapCv.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+mapCv.addEventListener('touchstart', onDown, { passive: false });
+window.addEventListener('touchmove', onMove, { passive: false });
+window.addEventListener('touchend', onUp, { passive: false });
+
+/* ---------- AOI ---------- */
+function setAoi(ring, opts = {}) {
+  if (!opts.skipHistory) { S.past.push(S.aoi); if (S.past.length > 40) S.past.shift(); S.future = []; }
+  S.aoi = ring;
+  S.tool = null; setTool(null);
+  if (!ring) { S.series = {}; S.cells = []; S.areaHa = 0; render(); drawMap(); syncUrl(); return; }
+
+  S.areaHa = polygonAreaHa(ring);
+  S.centroid = centroidOf(ring);
+  if (opts.frame !== false) frameRing(ring);
+  buildCells(ring);
+  recompute();
+  render(); drawMap(); syncUrl();
+}
+
+/** A grid of cells clipped to the shape, each with a stable offset — the
+ *  miniature of the pre-aggregated tier the real backend serves. */
+function buildCells(ring) {
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+  const w0 = Math.min(...xs), w1 = Math.max(...xs);
+  const s0 = Math.min(...ys), s1 = Math.max(...ys);
+  const n = 16, dx = (w1 - w0) / n, dy = (s1 - s0) / n;
+  S.cells = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const a = w0 + i * dx, b = s0 + j * dy;
+    const cx = a + dx / 2, cy = b + dy / 2;
+    if (!pointInRing(cx, cy, ring)) continue;
+    const k = `${cx.toFixed(5)}|${cy.toFixed(5)}`;
+    S.cells.push({ b: [a, b, a + dx, b + dy], o: (0.65 * hash(k) + 0.35 * hash(k + 's')) * 2 - 1 });
+  }
+}
+
+function recompute() {
+  S.series = {};
+  for (const id of S.selected) S.series[id] = generateSeries(id, S.centroid, S.areaHa);
+}
+
+/* ---------- URL state ---------- */
+function encodeRing(ring) {
+  let px = 0, py = 0;
+  return ring.map(([lng, lat]) => {
+    const x = Math.round(lng * 1e5), y = Math.round(lat * 1e5);
+    const s = `${x - px}.${y - py}`; px = x; py = y; return s;
+  }).join('_');
+}
+function decodeRing(s) {
+  let px = 0, py = 0; const out = [];
+  for (const part of s.split('_')) {
+    const i = part.indexOf('.', part[0] === '-' ? 1 : 0);
+    if (i < 0) continue;
+    px += +part.slice(0, i); py += +part.slice(i + 1);
+    out.push([px / 1e5, py / 1e5]);
+  }
+  return out;
+}
+function syncUrl() {
+  const parts = [];
+  if (S.aoi) parts.push('g=' + encodeRing(S.aoi));
+  parts.push('f=' + S.selected.join('.'), 't=' + S.t);
+  if (S.compare !== null) parts.push('c=' + S.compare);
+  history.replaceState(null, '', '#' + parts.join('&'));
+}
+function hydrate() {
+  const raw = location.hash.replace(/^#/, '');
+  if (!raw) return false;
+  let ring = null;
+  for (const kv of raw.split('&')) {
+    const i = kv.indexOf('='); if (i < 0) continue;
+    const k = kv.slice(0, i), v = kv.slice(i + 1);
+    if (k === 'g') { const r = decodeRing(v); if (r.length >= 3) ring = r; }
+    else if (k === 'f') { const f = v.split('.').filter(x => F_BY_ID[x]); if (f.length) S.selected = f.slice(0, MAX_FACTORS); }
+    else if (k === 't') S.t = Math.max(0, Math.min(STEPS.length - 1, +v || 0));
+    else if (k === 'c') S.compare = Math.max(0, Math.min(STEPS.length - 1, +v || 0));
+  }
+  if (ring) { setAoi(ring, { skipHistory: true }); return true; }
+  return false;
+}
+/* =====================================================================
+   Site Scanner — rendering: table, charts, sources, timeline
+   ===================================================================== */
+
+function cols() { return S.selected.map(id => S.series[id]).filter(Boolean); }
+
+/* ---------- table ---------- */
+function renderTable(root) {
+  const cs = cols();
+  if (!cs.length) return;
+  const years = cs[0].annual.map(r => r.year);
+  const sorted = [...years];
+  if (S.sort.col === 'year') sorted.sort((a, b) => S.sort.asc ? a - b : b - a);
+  else {
+    const s = cs.find(c => c.id === S.sort.col);
+    if (s) {
+      const by = new Map(s.annual.map(r => [r.year, r.value]));
+      sorted.sort((a, b) => {
+        const va = by.get(a), vb = by.get(b);
+        if (va === null) return 1; if (vb === null) return -1;
+        if (typeof va === 'string') return S.sort.asc ? String(va).localeCompare(vb) : String(vb).localeCompare(va);
+        return S.sort.asc ? va - vb : vb - va;
+      });
+    }
+  }
+  const nowYear = +STEPS[S.t].slice(0, 4);
+
+  const bar = el('div', 'tbar');
+  bar.innerHTML = `<span>one row per year · ${years.length} years · ${cs.length} factor${cs.length > 1 ? 's' : ''}</span>`;
+  const acts = el('div');
+  const copyBtn = el('button', 'btn', 'Copy');
+  copyBtn.title = 'Copy as TSV — pastes straight into Excel';
+  copyBtn.onclick = () => {
+    const lines = [['Year', ...cs.map(c => `${c.f.name} (${c.f.unit})`)].join('\t')];
+    for (const y of sorted) lines.push([y, ...cs.map(c => {
+      const r = c.annual.find(a => a.year === y); return r && r.value !== null ? r.value : '';
+    })].join('\t'));
+    navigator.clipboard.writeText(lines.join('\n')).then(() => flash('Copied — paste into Excel'));
+  };
+  acts.appendChild(copyBtn);
+  bar.appendChild(acts);
+  root.appendChild(bar);
+
+  const scroll = el('div', 'tscroll');
+  const t = el('table', 'grid');
+  const thead = el('thead');
+  const hr = el('tr');
+  const th0 = el('th', 'yr', `Year ${S.sort.col === 'year' ? (S.sort.asc ? '▲' : '▼') : ''}`);
+  th0.onclick = () => { S.sort = { col: 'year', asc: S.sort.col === 'year' ? !S.sort.asc : true }; render(); };
+  hr.appendChild(th0);
+  for (const c of cs) {
+    const th = el('th', null, `${esc(c.f.name)}<u>${esc(c.f.unit)}</u>${S.sort.col === c.id ? (S.sort.asc ? ' ▲' : ' ▼') : ''}`);
+    th.title = `${c.f.note}\n\nSource: ${B_BY_ID[c.f.base].name}`;
+    th.onclick = () => { S.sort = { col: c.id, asc: S.sort.col === c.id ? !S.sort.asc : false }; render(); };
+    hr.appendChild(th);
+  }
+  thead.appendChild(hr); t.appendChild(thead);
+
+  const tb = el('tbody');
+  for (const y of sorted) {
+    const open = S.expanded.has(y);
+    const tr = el('tr', `year${y === nowYear ? ' now' : ''}${open ? ' open' : ''}`);
+    tr.onclick = () => { open ? S.expanded.delete(y) : S.expanded.add(y); render(); };
+    tr.appendChild(el('td', 'yr', `<span class="caret">${open ? '▾' : '▸'}</span>${y}`));
+    for (const c of cs) {
+      const r = c.annual.find(a => a.year === y);
+      const td = el('td', band(r.conf));
+      td.innerHTML = fmt(r.value, c.f) +
+        (r.obs < r.total && r.value !== null ? '<span class="part">·</span>' : '');
+      td.title = r.value === null ? 'No usable observation this year'
+        : `${r.obs} of ${r.total} months observed` +
+          (r.min !== null ? ` · range ${fmt(r.min, c.f)}–${fmt(r.max, c.f)}` : '');
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+
+    if (open) {
+      cs[0].points.forEach((p, idx) => {
+        if (+p.t.slice(0, 4) !== y) return;
+        const mr = el('tr', `mo${idx === S.t ? ' now' : ''}`);
+        mr.title = 'Jump the timeline to this month';
+        mr.onclick = e => { e.stopPropagation(); S.t = idx; render(); drawMap(); drawSpark(); syncUrl(); };
+        mr.appendChild(el('td', 'yr molab', MONTHS[+p.t.slice(5) - 1]));
+        for (const c of cs) {
+          const q = c.points[idx];
+          const td = el('td', band(q.valid));
+          td.innerHTML = q.value === null ? '<span class="gapv" title="No usable observation">—</span>' : fmt(q.value, c.f);
+          mr.appendChild(td);
+        }
+        tb.appendChild(mr);
+      });
+    }
+  }
+  t.appendChild(tb); scroll.appendChild(t); root.appendChild(scroll);
+}
+
+/* ---------- charts ---------- */
+function inferCharts(cs) {
+  const cont = cs.filter(c => c.f.kind === 'continuous');
+  const cat = cs.filter(c => c.f.kind === 'categorical');
+  const specs = [];
+
+  // Never mix units on one axis: °C and mm sharing a y-axis is a lie told
+  // with a straight face.
+  const byUnit = new Map();
+  for (const c of cont) { const u = c.f.unit || 'value'; if (!byUnit.has(u)) byUnit.set(u, []); byUnit.get(u).push(c); }
+  for (const [unit, group] of byUnit)
+    specs.push({ type: 'line', unit, group,
+      title: group.length === 1 ? `${group[0].f.name} over time` : `${group.map(g => g.f.name).join(', ')} over time`,
+      why: `${group.length} factor${group.length > 1 ? 's' : ''} measured in ${unit}` });
+
+  const lc = cont.filter(c => c.f.unit === '%' && c.id.startsWith('lc_'));
+  if (lc.length >= 2)
+    specs.push({ type: 'stack', group: lc, title: 'Land cover composition',
+                 why: 'Shares of one whole read better stacked than overlaid' });
+
+  for (const c of cat)
+    specs.push({ type: 'bar', group: [c], title: `${c.f.name} — years per class`,
+                 why: 'Categorical data cannot be averaged, so this counts instead' });
+
+  if (cont.length >= 2) {
+    let best = null;
+    for (let i = 0; i < cont.length; i++) for (let j = i + 1; j < cont.length; j++) {
+      const r = corr(cont[i], cont[j]);
+      if (Math.abs(r) > 0.6 && (!best || Math.abs(r) > Math.abs(best.r))) best = { a: cont[i], b: cont[j], r };
+    }
+    if (best) specs.push({ type: 'scatter', group: [best.a, best.b], r: best.r,
+      title: `${best.a.f.name} vs ${best.b.f.name}`,
+      why: `Correlated at r = ${best.r.toFixed(2)} across the years shown` });
+  }
+  return specs.slice(0, 4);   // four is the ceiling; more is noise nobody reads
+}
+
+function corr(a, b) {
+  const ma = new Map(a.annual.map(r => [r.year, r.value]));
+  const xs = [], ys = [];
+  for (const r of b.annual) {
+    const v = ma.get(r.year);
+    if (typeof v === 'number' && typeof r.value === 'number') { xs.push(v); ys.push(r.value); }
+  }
+  if (xs.length < 5) return 0;
+  const mx = xs.reduce((s, v) => s + v, 0) / xs.length, my = ys.reduce((s, v) => s + v, 0) / ys.length;
+  let n = 0, da = 0, db = 0;
+  for (let i = 0; i < xs.length; i++) { const x = xs[i] - mx, y = ys[i] - my; n += x * y; da += x * x; db += y * y; }
+  return da && db ? n / Math.sqrt(da * db) : 0;
+}
+
+const CW = 380, CH = 168, ML = 46, MR = 8, MT = 8, MB = 22;
+function svgEl(inner) {
+  return `<svg viewBox="0 0 ${CW} ${CH}" preserveAspectRatio="xMidYMid meet" role="img">${inner}</svg>`;
+}
+function axes(yLo, yHi, xLabels) {
+  const gridCol = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.07)';
+  const txt = cssVar('--ink-3');
+  let s = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = MT + (CH - MT - MB) * (i / 4);
+    const v = yHi - (yHi - yLo) * (i / 4);
+    s += `<line x1="${ML}" y1="${y}" x2="${CW - MR}" y2="${y}" stroke="${gridCol}" stroke-width="1"/>`;
+    s += `<text x="${ML - 6}" y="${y + 3}" text-anchor="end" font-size="9" font-family="ui-monospace,monospace" fill="${txt}">${compact(v)}</text>`;
+  }
+  for (const [frac, label] of xLabels)
+    s += `<text x="${ML + (CW - ML - MR) * frac}" y="${CH - 6}" text-anchor="middle" font-size="9" font-family="ui-monospace,monospace" fill="${txt}">${label}</text>`;
+  return s;
+}
+const xAt = f => ML + (CW - ML - MR) * f;
+const yAt = (v, lo, hi) => MT + (CH - MT - MB) * (1 - (v - lo) / (hi - lo || 1));
+
+function yearTicks() {
+  const out = [];
+  STEPS.forEach((s, i) => {
+    const y = +s.slice(0, 4);
+    if (s.endsWith('-01') && y % 3 === 0) out.push([i / (STEPS.length - 1), String(y)]);
+  });
+  return out;
+}
+
+function chartLine(spec) {
+  const all = spec.group.flatMap(g => g.points.map(p => p.value).filter(v => v !== null));
+  if (all.length < 2) return '';
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+
+  let s = axes(lo, hi, yearTicks());
+  spec.group.forEach((g, gi) => {
+    let d = '', pen = false;
+    g.points.forEach((p, i) => {
+      if (p.value === null) { pen = false; return; }   // gaps stay gaps
+      const x = xAt(i / (STEPS.length - 1)), y = yAt(p.value, lo, hi);
+      d += (pen ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      pen = true;
+    });
+    s += `<path d="${d}" fill="none" stroke="${sColor(gi)}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  });
+  const mx = xAt(S.t / (STEPS.length - 1));
+  s += `<line x1="${mx}" y1="${MT}" x2="${mx}" y2="${CH - MB}" stroke="${cssVar('--accent')}" stroke-width="1.5" opacity=".85"/>`;
+  if (S.compare !== null) {
+    const cx = xAt(S.compare / (STEPS.length - 1));
+    s += `<line x1="${cx}" y1="${MT}" x2="${cx}" y2="${CH - MB}" stroke="${cssVar('--good')}" stroke-width="1.5" stroke-dasharray="3 2" opacity=".9"/>`;
+  }
+  return svgEl(s);
+}
+
+function chartStack(spec) {
+  const years = spec.group[0].annual.map(r => r.year);
+  const totals = years.map((_, i) => spec.group.reduce((a, g) => a + (g.annual[i].value || 0), 0));
+  const hi = Math.max(...totals) * 1.05 || 1;
+  let s = axes(0, hi, years.map((y, i) => [i / (years.length - 1), i % 3 === 0 ? String(y) : '']).filter(t => t[1]));
+  const acc = years.map(() => 0);
+  spec.group.forEach((g, gi) => {
+    let up = '', down = '';
+    years.forEach((_, i) => {
+      const x = xAt(i / (years.length - 1));
+      const base = acc[i], top = base + (g.annual[i].value || 0);
+      up += (i ? 'L' : 'M') + x.toFixed(1) + ' ' + yAt(top, 0, hi).toFixed(1) + ' ';
+      acc[i] = top;
+    });
+    for (let i = years.length - 1; i >= 0; i--) {
+      const x = xAt(i / (years.length - 1));
+      down += 'L' + x.toFixed(1) + ' ' + yAt(acc[i] - (spec.group[gi].annual[i].value || 0), 0, hi).toFixed(1) + ' ';
+    }
+    s += `<path d="${up}${down}Z" fill="${sColor(gi)}" opacity=".8"/>`;
+  });
+  return svgEl(s);
+}
+
+function chartBar(spec) {
+  const g = spec.group[0];
+  const counts = {};
+  for (const r of g.annual) if (typeof r.value === 'string') counts[r.value] = (counts[r.value] || 0) + 1;
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) return '';
+  const hi = Math.max(...rows.map(r => r[1]));
+  const bh = Math.min(20, (CH - MT - MB) / rows.length - 4);
+  const L = 96;
+  let s = '';
+  rows.forEach(([name, n], i) => {
+    const y = MT + i * ((CH - MT - MB) / rows.length);
+    const w = (CW - L - MR) * (n / hi);
+    s += `<rect x="${L}" y="${y}" width="${w.toFixed(1)}" height="${bh}" rx="2" fill="${sColor(1)}" opacity=".85"/>`;
+    s += `<text x="${L - 6}" y="${y + bh / 2 + 3}" text-anchor="end" font-size="9.5" fill="${cssVar('--ink-2')}">${esc(name)}</text>`;
+    s += `<text x="${L + w + 5}" y="${y + bh / 2 + 3}" font-size="9" font-family="ui-monospace,monospace" fill="${cssVar('--ink-3')}">${n}</text>`;
+  });
+  return svgEl(s);
+}
+
+function chartScatter(spec) {
+  const [a, b] = spec.group;
+  const mb = new Map(b.annual.map(r => [r.year, r.value]));
+  const pts = a.annual.filter(r => typeof r.value === 'number' && typeof mb.get(r.year) === 'number')
+    .map(r => [r.value, mb.get(r.year)]);
+  if (pts.length < 3) return '';
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const xlo = Math.min(...xs), xhi = Math.max(...xs), ylo = Math.min(...ys), yhi = Math.max(...ys);
+  let s = axes(ylo, yhi, [[0, compact(xlo)], [1, compact(xhi)]]);
+  for (const [x, y] of pts)
+    s += `<circle cx="${xAt((x - xlo) / (xhi - xlo || 1)).toFixed(1)}" cy="${yAt(y, ylo, yhi).toFixed(1)}" r="3.2" fill="${sColor(0)}" opacity=".85"/>`;
+  // Least-squares fit, drawn only because the correlation cleared the bar.
+  const n = pts.length, sx = xs.reduce((p, c) => p + c, 0), sy = ys.reduce((p, c) => p + c, 0);
+  const sxy = pts.reduce((p, [x, y]) => p + x * y, 0), sxx = xs.reduce((p, x) => p + x * x, 0);
+  const m = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), c0 = (sy - m * sx) / n;
+  s += `<line x1="${xAt(0)}" y1="${yAt(m * xlo + c0, ylo, yhi).toFixed(1)}" x2="${xAt(1)}" y2="${yAt(m * xhi + c0, ylo, yhi).toFixed(1)}" stroke="${cssVar('--good')}" stroke-width="1.3" opacity=".65"/>`;
+  return svgEl(s);
+}
+
+function renderCharts(root) {
+  const cs = cols();
+  const stack = el('div', 'stack');
+  if (S.compare !== null) stack.appendChild(compareCard(cs));
+
+  for (const spec of inferCharts(cs)) {
+    const card = el('div', 'card');
+    card.innerHTML = `<h3>${esc(spec.title)}</h3><div class="why">${esc(spec.why)}</div>`;
+    const body =
+      spec.type === 'line' ? chartLine(spec) :
+      spec.type === 'stack' ? chartStack(spec) :
+      spec.type === 'bar' ? chartBar(spec) : chartScatter(spec);
+    card.insertAdjacentHTML('beforeend', body);
+    if (spec.group.length > 1 && spec.type !== 'scatter') {
+      card.insertAdjacentHTML('beforeend',
+        `<div class="legend">${spec.group.map((g, i) =>
+          `<span><i style="background:${sColor(i)}"></i>${esc(g.f.name)}</span>`).join('')}</div>`);
+    }
+    if (spec.type === 'line') {
+      const svg = card.querySelector('svg');
+      svg.style.cursor = 'crosshair';
+      svg.onclick = ev => {
+        const r = svg.getBoundingClientRect();
+        const frac = ((ev.clientX - r.left) / r.width * CW - ML) / (CW - ML - MR);
+        S.t = Math.max(0, Math.min(STEPS.length - 1, Math.round(frac * (STEPS.length - 1))));
+        render(); drawMap(); drawSpark(); syncUrl();
+      };
+    }
+    stack.appendChild(card);
+  }
+  root.appendChild(stack);
+}
+
+function compareCard(cs) {
+  const [lo, hi] = S.t <= S.compare ? [S.t, S.compare] : [S.compare, S.t];
+  const card = el('div', 'card cmp');
+  const months = (+STEPS[hi].slice(0, 4) - +STEPS[lo].slice(0, 4)) * 12 +
+                 (+STEPS[hi].slice(5) - +STEPS[lo].slice(5));
+  card.innerHTML = `<div class="cmp-head">
+      <div><h3>Change · ${labelStep(STEPS[lo])} → ${labelStep(STEPS[hi])}</h3>
+      <div class="why">${months} months apart</div></div></div>`;
+  const clear = el('button', 'btn', 'Clear');
+  clear.onclick = () => { S.compare = null; render(); drawSpark(); syncUrl(); };
+  card.querySelector('.cmp-head').appendChild(clear);
+
+  const t = el('table', 'cmp');
+  t.innerHTML = `<thead><tr><th>Factor</th><th>${labelStep(STEPS[lo])}</th><th>${labelStep(STEPS[hi])}</th><th>Change</th></tr></thead>`;
+  const tb = el('tbody');
+  for (const c of cs) {
+    const a = c.points[lo].value, b = c.points[hi].value;
+    const tr = el('tr');
+    let cell;
+    if (a === null || b === null) cell = `<td class="gapv" title="No usable observation at one end">—</td>`;
+    else if (typeof a === 'string') {
+      cell = a !== b ? `<td class="chg">changed</td>` : `<td class="same">no change</td>`;
+    } else {
+      const d = b - a, pct = a !== 0 ? d / Math.abs(a) * 100 : null;
+      const dir = d > 0 ? 'up' : d < 0 ? 'down' : 'flat';
+      cell = `<td class="${dir}">${d > 0 ? '+' : ''}${fmt(d, c.f)}` +
+        (pct !== null && Math.abs(pct) < 1000 ? ` <span class="pct">${d > 0 ? '+' : ''}${pct.toFixed(0)}%</span>` : '') + `</td>`;
+    }
+    tr.innerHTML = `<td>${esc(c.f.name)}</td><td>${fmt(a, c.f)}</td><td>${fmt(b, c.f)}</td>${cell}`;
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb); card.appendChild(t);
+  card.insertAdjacentHTML('beforeend',
+    `<div class="note">Comparing two single months carries their weather with it. For a trend, read the chart rather than the endpoints.</div>`);
+  return card;
+}
+
+/* ---------- sources ---------- */
+function renderSources(root) {
+  const stack = el('div', 'stack');
+  const byBase = new Map();
+  for (const c of cols()) {
+    if (!byBase.has(c.f.base)) byBase.set(c.f.base, []);
+    byBase.get(c.f.base).push(c);
+  }
+  for (const [baseId, list] of byBase) {
+    const b = B_BY_ID[baseId];
+    const card = el('div', 'src');
+    card.innerHTML = `<h3>${esc(b.name)}</h3>
+      <dl>
+        <dt>Source</dt><dd>${esc(b.source)}</dd>
+        <dt>Licence</dt><dd>${esc(b.licence)}</dd>
+        <dt>Resolution</dt><dd>${b.res ? b.res + ' m' : 'Vector / tabular'}</dd>
+        <dt>Native cadence</dt><dd>${esc(b.native)}</dd>
+        <dt>Stored cadence</dt><dd>${esc(b.cadence)}</dd>
+        <dt>Held by us</dt><dd>${b.stored ? 'Yes — served from our storage' : 'No — queried live'}</dd>
+      </dl>
+      <div class="chips">${list.map(c =>
+        `<span class="chip" title="${esc(c.f.note)}">${esc(c.f.name)}${c.f.derived ? ' <em>ƒ</em>' : ''}</span>`).join('')}</div>
+      <a href="${esc(b.url)}" target="_blank" rel="noreferrer">${esc(b.url.replace(/^https?:\/\//, '').replace(/\/$/, ''))} ↗</a>`;
+    stack.appendChild(card);
+  }
+  root.appendChild(stack);
+}
+
+/* ---------- timeline sparkline ---------- */
+const sparkCv = $('#spark'), sparkCtx = sparkCv.getContext('2d');
+function drawSpark() {
+  const r = sparkCv.getBoundingClientRect();
+  const dpr = devicePixelRatio || 1;
+  sparkCv.width = r.width * dpr; sparkCv.height = r.height * dpr;
+  sparkCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = r.width, h = r.height;
+  sparkCtx.clearRect(0, 0, w, h);
+  if (!w) return;
+
+  const stripH = 5, chartH = h - stripH - 3;
+  sparkCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.07)' : 'rgba(255,255,255,.05)';
+  sparkCtx.lineWidth = 1;
+  STEPS.forEach((s, i) => {
+    if (!s.endsWith('-01')) return;
+    const x = i / (STEPS.length - 1) * w;
+    sparkCtx.beginPath(); sparkCtx.moveTo(x, 0); sparkCtx.lineTo(x, chartH); sparkCtx.stroke();
+  });
+
+  const ser = S.series[S.selected[0]];
+  if (!ser || ser.f.kind === 'categorical') return;
+  const vals = ser.points.map(p => p.value);
+  const present = vals.filter(v => v !== null);
+  if (present.length < 2) return;
+  const lo = Math.min(...present), hi = Math.max(...present), span = hi - lo || 1;
+  const X = i => i / (STEPS.length - 1) * w;
+  const Y = v => chartH - ((v - lo) / span) * (chartH - 6) - 3;
+
+  // Fill under the line, broken at gaps.
+  sparkCtx.fillStyle = isLight() ? 'rgba(162,112,28,.14)' : 'rgba(221,174,92,.13)';
+  let run = -1;
+  for (let i = 0; i <= vals.length; i++) {
+    if (vals[i] !== null && vals[i] !== undefined) { if (run < 0) run = i; continue; }
+    if (run >= 0 && i - run > 1) {
+      sparkCtx.beginPath(); sparkCtx.moveTo(X(run), chartH);
+      for (let k = run; k < i; k++) sparkCtx.lineTo(X(k), Y(vals[k]));
+      sparkCtx.lineTo(X(i - 1), chartH); sparkCtx.closePath(); sparkCtx.fill();
+    }
+    run = -1;
+  }
+
+  sparkCtx.strokeStyle = sColor(0); sparkCtx.lineWidth = 1.5; sparkCtx.lineJoin = 'round';
+  let pen = false; sparkCtx.beginPath();
+  vals.forEach((v, i) => {
+    if (v === null) { pen = false; return; }
+    pen ? sparkCtx.lineTo(X(i), Y(v)) : sparkCtx.moveTo(X(i), Y(v));
+    pen = true;
+  });
+  sparkCtx.stroke();
+
+  if (S.compare !== null) {
+    sparkCtx.strokeStyle = cssVar('--good'); sparkCtx.lineWidth = 1.5;
+    sparkCtx.setLineDash([3, 2]);
+    sparkCtx.beginPath(); sparkCtx.moveTo(X(S.compare), 0); sparkCtx.lineTo(X(S.compare), chartH); sparkCtx.stroke();
+    sparkCtx.setLineDash([]);
+  }
+
+  // Availability strip: how much of the area produced a usable observation.
+  const bw = Math.max(1, w / STEPS.length);
+  ser.points.forEach((p, i) => {
+    sparkCtx.fillStyle = p.value === null
+      ? 'rgba(196,123,114,.6)'
+      : `rgba(127,179,163,${0.18 + 0.62 * p.valid})`;
+    sparkCtx.fillRect(X(i) - bw / 2, chartH + 3, bw, stripH);
+  });
+}
+/* =====================================================================
+   Site Scanner — wiring
+   ===================================================================== */
+
+function flash(msg, isErr) {
+  const old = document.querySelector('.flash');
+  if (old) old.remove();
+  const n = el('div', 'flash' + (isErr ? ' err' : ''), esc(msg));
+  document.querySelector('.actions').appendChild(n);
+  setTimeout(() => n.remove(), 2600);
+}
+
+function render() {
+  const body = $('#panelBody');
+  body.innerHTML = '';
+  $('#facCount').textContent = S.selected.length;
+  $('#panelTitle').textContent = S.aoi ? 'Site report' : 'No area drawn';
+  $('#panelArea').textContent = S.aoi ? fmtArea(S.areaHa) : '';
+  for (const b of ['saveBtn', 'shareBtn', 'exportBtn']) $('#' + b).disabled = !S.aoi;
+  $('#clearBtn').disabled = !S.aoi;
+  $('#undoBtn').disabled = !S.past.length;
+  $('#redoBtn').disabled = !S.future.length;
+  for (const t of document.querySelectorAll('.tab'))
+    t.setAttribute('aria-selected', String(t.dataset.tab === S.tab));
+
+  if (!S.aoi) {
+    body.appendChild(el('div', 'empty-state', `
+      <p>Draw a rectangle, circle or freehand shape on England.</p>
+      <p class="sub">The attribute table and charts generate themselves — no extra steps.</p>
+      <div class="meta">${DATA.summary.factor_count} factors · ${STEPS.length} monthly steps<br>
+        ${DATA.summary.stored_base_count} stored datasets · ${DATA.summary.derived_factor_count} derived</div>`));
+  } else if (S.tab === 'table') renderTable(body);
+  else if (S.tab === 'charts') renderCharts(body);
+  else renderSources(body);
+
+  renderReadout();
+}
+
+function renderReadout() {
+  $('#roStep').textContent = labelStep(STEPS[S.t]);
+  $('#range').value = S.t;
+  const ser = S.series[S.selected[0]];
+  const roVal = $('#roVal'), roFac = $('#roFac');
+  if (!ser) { roVal.textContent = ''; roVal.className = 'val'; roFac.textContent = ''; return; }
+  const p = ser.points[S.t];
+  if (p.value === null) { roVal.textContent = 'No data'; roVal.className = 'val gap'; }
+  else {
+    roVal.className = 'val';
+    roVal.innerHTML = `${compact(p.value)} ${esc(ser.f.unit)}` +
+      (p.valid < 0.4 ? ' <span class="lo" title="Few usable pixels this month">low</span>' : '');
+  }
+  if (S.compare !== null) {
+    roFac.innerHTML = `<button class="vs" title="Clear the comparison point">vs ${labelStep(STEPS[S.compare])} ×</button>`;
+    roFac.querySelector('.vs').onclick = () => { S.compare = null; render(); drawSpark(); syncUrl(); };
+  } else roFac.textContent = ser.f.name;
+}
+
+/* ---------- factor browser ---------- */
+let browserNode = null, query = '', collapsed = new Set();
+function toggleBrowser(open) {
+  if (browserNode) { browserNode.remove(); browserNode = null; }
+  $('#browserBtn').setAttribute('aria-expanded', String(!!open));
+  if (!open) return;
+  const n = el('div', 'browser');
+  n.innerHTML = `<header>
+      <input type="search" placeholder="Search ${DATA.summary.factor_count} factors…" value="${esc(query)}" aria-label="Search factors">
+      <button class="x" aria-label="Close">×</button>
+    </header>
+    <div class="meta">${DATA.summary.factor_count} factors · ${DATA.summary.stored_base_count} stored datasets · ${DATA.summary.derived_factor_count} derived${S.selected.length >= MAX_FACTORS ? ' · <span style="color:var(--warn)">12 selected, remove one to add another</span>' : ''}</div>
+    <div class="list"></div>`;
+  n.querySelector('.x').onclick = () => toggleBrowser(false);
+  const input = n.querySelector('input');
+  input.oninput = e => { query = e.target.value; const at = e.target.selectionStart; toggleBrowser(true); const i2 = browserNode.querySelector('input'); i2.focus(); i2.setSelectionRange(at, at); };
+
+  const list = n.querySelector('.list');
+  const q = query.trim().toLowerCase();
+  const matched = q ? FACTORS.filter(f => (f.name + ' ' + f.group + ' ' + f.note + ' ' + f.unit).toLowerCase().includes(q)) : FACTORS;
+  const groups = {};
+  for (const f of matched) (groups[f.group] ||= []).push(f);
+
+  if (!Object.keys(groups).length) list.appendChild(el('div', 'menu', `<div class="empty">Nothing matches “${esc(query)}”.</div>`));
+
+  for (const [g, fs] of Object.entries(groups)) {
+    const head = el('button', 'grp', `<span class="caret">${collapsed.has(g) ? '▸' : '▾'}</span>${esc(g)}<em>${fs.length}</em>`);
+    head.onclick = () => { collapsed.has(g) ? collapsed.delete(g) : collapsed.add(g); toggleBrowser(true); };
+    list.appendChild(head);
+    if (collapsed.has(g)) continue;
+    for (const f of fs) {
+      const on = S.selected.includes(f.id);
+      const blocked = !on && S.selected.length >= MAX_FACTORS;
+      const b = el('button', 'fac',
+        `<i>${on ? '✓' : ''}</i><s>${esc(f.name)}</s>` +
+        (f.derived ? '<span class="d" title="Derived on read — not stored separately">ƒ</span>' : '') +
+        (f.kind === 'categorical' ? '<span class="k" title="Categorical — never averaged">cat</span>' : '') +
+        `<u>${esc(f.unit)}</u>`);
+      b.setAttribute('aria-pressed', String(on));
+      b.disabled = blocked;
+      b.title = `${f.note}\nSource: ${B_BY_ID[f.base].name}\nCadence: ${f.cadence}` +
+        (f.derived ? '\nDerived — computed from the base, not stored separately' : '');
+      b.onclick = () => {
+        if (on) { if (S.selected.length === 1) return; S.selected = S.selected.filter(x => x !== f.id); }
+        else S.selected = [...S.selected, f.id];
+        if (S.aoi) recompute();
+        toggleBrowser(true); render(); drawMap(); drawSpark(); syncUrl();
+      };
+      list.appendChild(b);
+    }
+  }
+  $('#app').appendChild(n);
+  browserNode = n;
+  if (!q) input.focus();
+}
+
+/* ---------- templates ---------- */
+function openTemplates() {
+  const scrim = el('div', 'scrim');
+  scrim.onclick = e => { if (e.target === scrim) scrim.remove(); };
+  const sheet = el('div', 'sheet');
+  sheet.innerHTML = `<div class="sheet-head">
+      <div><h2>Start from a question</h2>
+      <p>Each one picks the right factors for you. ${S.aoi ? 'Your drawn shape stays as it is.' : 'Then draw a shape on the map.'}</p></div>
+      <button class="x" aria-label="Close">×</button>
+    </div><div class="tpl-grid"></div>`;
+  sheet.querySelector('.x').onclick = () => scrim.remove();
+  const grid = sheet.querySelector('.tpl-grid');
+  for (const t of TEMPLATES) {
+    const b = el('button', 'tpl',
+      `<b>${esc(t.name)}</b><p>${esc(t.blurb)}</p><div class="chips">` +
+      t.factors.map(f => `<span class="chip">${esc(F_BY_ID[f].name)}</span>`).join('') + '</div>');
+    b.onclick = () => {
+      S.selected = t.factors.slice(0, MAX_FACTORS);
+      if (S.aoi) recompute();
+      scrim.remove();
+      setTool(t.tool);
+      render(); drawMap(); drawSpark(); syncUrl();
+    };
+    grid.appendChild(b);
+  }
+  scrim.appendChild(sheet);
+  document.body.appendChild(scrim);
+  const onEsc = e => { if (e.key === 'Escape') { scrim.remove(); window.removeEventListener('keydown', onEsc); } };
+  window.addEventListener('keydown', onEsc);
+}
+
+/* ---------- menus ---------- */
+function closeMenus() {
+  for (const m of document.querySelectorAll('.menu')) m.remove();
+  for (const b of ['sitesBtn', 'exportBtn']) $('#' + b).setAttribute('aria-expanded', 'false');
+  S.menu = null;
+}
+function openMenu(btn, items) {
+  const wasOpen = S.menu === btn.id;
+  closeMenus();
+  if (wasOpen) return;
+  const m = el('div', 'menu');
+  if (!items.length) m.appendChild(el('div', 'empty', 'Nothing saved yet.'));
+  for (const it of items) {
+    if (it.row) { m.appendChild(it.row); continue; }
+    const b = el('button', null, esc(it.label));
+    b.onclick = () => { closeMenus(); it.run(); };
+    m.appendChild(b);
+  }
+  btn.parentElement.appendChild(m);
+  btn.setAttribute('aria-expanded', 'true');
+  S.menu = btn.id;
+}
+
+/* ---------- exports ---------- */
+function dl(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const csvEsc = v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+
+function exportAnnual() {
+  const cs = cols();
+  const lines = [
+    `# Site Scanner — demo export, ${new Date().toISOString().slice(0, 10)}`,
+    `# Area: ${S.areaHa.toFixed(1)} ha`,
+    `# Figures are generated for this demo, not observed`,
+    ['Year', ...cs.map(c => `${c.f.name} (${c.f.unit})`)].map(csvEsc).join(','),
+  ];
+  for (const r0 of cs[0].annual)
+    lines.push([r0.year, ...cs.map(c => {
+      const r = c.annual.find(a => a.year === r0.year);
+      return r && r.value !== null ? r.value : '';
+    })].map(csvEsc).join(','));
+  dl(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }), 'site-scanner-annual.csv');
+  flash('Downloaded');
+}
+function exportMonthly() {
+  const cs = cols();
+  const head = ['Month', ...cs.flatMap(c => [`${c.f.name} (${c.f.unit})`, `${c.f.name} valid fraction`])];
+  const lines = [head.map(csvEsc).join(',')];
+  STEPS.forEach((t, i) => {
+    lines.push([t, ...cs.flatMap(c => [c.points[i].value ?? '', c.points[i].valid])].map(csvEsc).join(','));
+  });
+  dl(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }), 'site-scanner-monthly.csv');
+  flash('Downloaded');
+}
+function exportGeoJson() {
+  const props = { name: 'Site Scanner AOI', area_ha: +S.areaHa.toFixed(2), demo: true, exported: new Date().toISOString() };
+  for (const c of cols()) {
+    props[c.id] = Object.fromEntries(c.annual.map(r => [r.year, r.value]));
+    props[c.id + '__meta'] = { name: c.f.name, unit: c.f.unit, source: B_BY_ID[c.f.base].name, licence: B_BY_ID[c.f.base].licence };
+  }
+  const fc = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: props,
+    geometry: { type: 'Polygon', coordinates: [S.aoi] } }] };
+  dl(new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' }), 'site-scanner-aoi.geojson');
+  flash('Downloaded');
+}
+function printReport() {
+  const cs = cols();
+  const w = window.open('', '_blank');
+  if (!w) { flash('Allow pop-ups to print', true); return; }
+  const rows = cs[0].annual.map(r0 => `<tr><th>${r0.year}</th>` +
+    cs.map(c => `<td>${fmt(c.annual.find(a => a.year === r0.year).value, c.f)}</td>`).join('') + '</tr>').join('');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Site Scanner report</title>
+<style>body{font:12px/1.5 -apple-system,system-ui,sans-serif;margin:32px;color:#111}
+h1{font-size:18px;margin:0 0 4px}.sub{color:#666;margin-bottom:20px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid #ddd;padding:5px 8px;text-align:right}
+th:first-child,td:first-child{text-align:left}thead th{border-bottom:2px solid #333;font-size:11px}
+.src{margin-top:24px;font-size:10px;color:#666}@media print{body{margin:12mm}}</style>
+<h1>Site Scanner — site report</h1>
+<div class="sub">${S.areaHa.toFixed(1)} ha · centred ${S.centroid[1].toFixed(4)}, ${S.centroid[0].toFixed(4)}
+ · ${new Date().toLocaleDateString('en-GB')} · <b>demo data, not observed</b></div>
+<table><thead><tr><th>Year</th>${cs.map(c => `<th>${esc(c.f.name)}<br><span style="font-weight:400;color:#888">${esc(c.f.unit)}</span></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+<div class="src"><b>Sources.</b> ${[...new Set(cs.map(c => `${B_BY_ID[c.f.base].name} (${B_BY_ID[c.f.base].licence})`))].join(' · ')}</div>`);
+  w.document.close(); w.focus();
+  setTimeout(() => w.print(), 350);
+}
+
+/* ---------- saved sites ---------- */
+const SAVED_KEY = 'site-scanner.demo.saved';
+function loadSavedSites() { try { S.saved = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { S.saved = []; } }
+function persistSaved() { try { localStorage.setItem(SAVED_KEY, JSON.stringify(S.saved)); } catch {} }
+
+function sitesMenu() {
+  return S.saved.map(s => {
+    const row = el('div', 'row');
+    const load = el('button', null, `${esc(s.name)}<span>${fmtArea(s.area)}</span>`);
+    load.onclick = () => { closeMenus(); setAoi(s.ring); };
+    const del = el('button', 'del', '×');
+    del.title = 'Delete';
+    del.onclick = e => { e.stopPropagation(); S.saved = S.saved.filter(x => x.id !== s.id); persistSaved(); openMenu($('#sitesBtn'), []); openMenu($('#sitesBtn'), sitesMenu()); };
+    row.append(load, del);
+    return { row };
+  });
+}
+
+/* ---------- events ---------- */
+$('#t-rect').onclick = () => setTool('rect');
+$('#t-circle').onclick = () => setTool('circle');
+$('#t-free').onclick = () => setTool('free');
+$('#clearBtn').onclick = () => setAoi(null);
+$('#undoBtn').onclick = () => {
+  if (!S.past.length) return;
+  S.future.unshift(S.aoi);
+  const prev = S.past.pop();
+  prev ? setAoi(prev, { skipHistory: true }) : setAoi(null, { skipHistory: true });
+};
+$('#redoBtn').onclick = () => {
+  if (!S.future.length) return;
+  S.past.push(S.aoi);
+  const next = S.future.shift();
+  next ? setAoi(next, { skipHistory: true }) : setAoi(null, { skipHistory: true });
+};
+$('#browserBtn').onclick = () => toggleBrowser(!browserNode);
+$('#tplBtn').onclick = openTemplates;
+$('#saveBtn').onclick = () => {
+  const name = prompt('Name this site', 'Untitled site');
+  if (name === null) return;
+  S.saved.unshift({ id: String(Date.now()), name: name.trim() || 'Untitled site', ring: S.aoi, area: S.areaHa });
+  S.saved = S.saved.slice(0, 50);
+  persistSaved(); flash('Saved');
+};
+$('#sitesBtn').onclick = () => openMenu($('#sitesBtn'), sitesMenu());
+$('#shareBtn').onclick = () => {
+  syncUrl();
+  navigator.clipboard.writeText(location.href)
+    .then(() => flash('Link copied — it restores this exact view'))
+    .catch(() => flash('Copy the address bar to share this view'));
+};
+$('#exportBtn').onclick = () => openMenu($('#exportBtn'), [
+  { label: 'CSV — one row per year', run: exportAnnual },
+  { label: 'CSV — every month, with confidence', run: exportMonthly },
+  { label: 'GeoJSON — shape plus data', run: exportGeoJson },
+  { label: 'Printable report / PDF', run: printReport },
+]);
+document.addEventListener('click', e => {
+  if (S.menu && !e.target.closest('.menu') && !e.target.closest('.btn')) closeMenus();
+});
+for (const t of document.querySelectorAll('.tab'))
+  t.onclick = () => { S.tab = t.dataset.tab; render(); };
+
+const range = $('#range');
+range.addEventListener('input', e => { S.t = +e.target.value; render(); drawMap(); drawSpark(); syncUrl(); });
+range.addEventListener('pointerdown', e => {
+  // Shift-click pins a second position rather than moving the head, which
+  // keeps comparison one gesture away instead of a mode.
+  if (!e.shiftKey) return;
+  e.preventDefault();
+  const r = range.getBoundingClientRect();
+  S.compare = Math.max(0, Math.min(STEPS.length - 1, Math.round((e.clientX - r.left) / r.width * (STEPS.length - 1))));
+  S.tab = 'charts';
+  render(); drawSpark(); syncUrl();
+});
+
+let raf = 0, acc = 0, last = 0;
+function tick(now) {
+  acc += now - last; last = now;
+  if (acc >= 70) { const step = Math.floor(acc / 70); acc -= step * 70; S.t = (S.t + step) % STEPS.length; render(); drawMap(); drawSpark(); }
+  raf = requestAnimationFrame(tick);
+}
+$('#playBtn').onclick = () => {
+  S.playing = !S.playing;
+  $('#playBtn').innerHTML = S.playing
+    ? '<svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx=".8"/><rect x="9.3" y="2.5" width="3.2" height="11" rx=".8"/></svg>'
+    : '<svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M4.5 2.5l9 5.5-9 5.5z"/></svg>';
+  $('#playBtn').setAttribute('aria-label', S.playing ? 'Pause playback' : 'Play through time');
+  if (S.playing) { last = performance.now(); acc = 0; raf = requestAnimationFrame(tick); }
+  else { cancelAnimationFrame(raf); syncUrl(); }
+};
+
+window.addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  const move = d => { S.t = Math.max(0, Math.min(STEPS.length - 1, S.t + d)); render(); drawMap(); drawSpark(); syncUrl(); e.preventDefault(); };
+  if (e.key === 'ArrowLeft') move(-1);
+  else if (e.key === 'ArrowRight') move(1);
+  else if (e.key === 'PageDown') move(-12);
+  else if (e.key === 'PageUp') move(12);
+  else if (e.key === 'Home') { S.t = 0; render(); drawMap(); drawSpark(); e.preventDefault(); }
+  else if (e.key === 'End') { S.t = STEPS.length - 1; render(); drawMap(); drawSpark(); e.preventDefault(); }
+  else if (e.key === ' ') { $('#playBtn').click(); e.preventDefault(); }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    (e.shiftKey ? $('#redoBtn') : $('#undoBtn')).click();
+  } else if (e.key === 'Escape') { closeMenus(); if (browserNode) toggleBrowser(false); }
+});
+
+/* Drag a GeoJSON boundary anywhere onto the window. Most serious users already
+   have their shape in a file; making them re-trace it is exactly the friction
+   this product exists to remove. */
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', async e => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  try {
+    const json = JSON.parse(await file.text());
+    const ring = findRing(json);
+    if (!ring) throw new Error('No polygon in that file.');
+    setAoi(ring);
+    flash(`Loaded ${file.name}`);
+  } catch (err) {
+    flash(err.message || 'Could not read that file.', true);
+  }
+});
+function findRing(n) {
+  if (!n || typeof n !== 'object') return null;
+  if (n.type === 'Polygon') return n.coordinates[0];
+  if (n.type === 'MultiPolygon') return n.coordinates.reduce((a, b) => (b[0]?.length ?? 0) > (a[0]?.length ?? 0) ? b : a)[0];
+  if (n.type === 'Feature') return findRing(n.geometry);
+  if (n.type === 'FeatureCollection') { for (const f of n.features || []) { const r = findRing(f); if (r) return r; } }
+  return n.geometry ? findRing(n.geometry) : null;
+}
+
+/* Repaint on theme change — the canvases read CSS custom properties, so a
+   theme flip must be redrawn rather than restyled. */
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawMap(); drawSpark(); render(); });
+new MutationObserver(() => { drawMap(); drawSpark(); render(); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+window.addEventListener('resize', sizeMap);
+
+/* ---------- boot ---------- */
+(function init() {
+  const yrs = $('#years');
+  STEPS.forEach((s, i) => {
+    const y = +s.slice(0, 4);
+    if (s.endsWith('-01') && y % 3 === 0) {
+      const n = el('span', null, String(y));
+      n.style.left = (i / (STEPS.length - 1) * 100) + '%';
+      yrs.appendChild(n);
+    }
+  });
+  loadSavedSites();
+  sizeMap();
+  if (!hydrate()) {
+    // Open on a worked example rather than a blank map — a first-time visitor
+    // should see the product working before being asked to do anything.
+    // Roughly 900 ha of farmland north-east of Coventry — a real working
+    // scale, not a county.
+    const ring = circleRing([-1.470, 52.620], [-1.442, 52.620]);
+    setAoi(ring, { skipHistory: true });
+    S.past = [];
+  }
+  render(); drawMap(); drawSpark();
+})();
+</script>
