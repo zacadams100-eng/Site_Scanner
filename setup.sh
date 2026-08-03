@@ -11,14 +11,25 @@
 # file on disk and puts the contents into an environment variable. The key file
 # itself must never be committed.
 
-# Where your Earth Engine service account key lives. Override before sourcing
-# if yours is somewhere else:
+# Where your Earth Engine service account key lives. Nothing is hardcoded —
+# this repo is public, and while a filename is not a credential there is no
+# reason to publish one. Override if your key is somewhere else:
 #     EE_KEY_FILE=~/keys/other-key.json source setup.sh
-: "${EE_KEY_FILE:=$HOME/ee-backend/sitescanner-504112-bf0c51189278.json}"
+if [ -z "$EE_KEY_FILE" ]; then
+  # Take the first .json in ~/ee-backend. Globbing rather than naming means
+  # this keeps working when you rotate the key and the filename changes.
+  for _candidate in "$HOME"/ee-backend/*.json; do
+    [ -f "$_candidate" ] && EE_KEY_FILE="$_candidate" && break
+  done
+fi
 
-# Your Google Cloud project ID — must be the project the key belongs to, and
-# the one registered with Earth Engine.
-: "${EE_PROJECT:=sitescanner-504112}"
+# The Google Cloud project the key belongs to, which must also be the one
+# registered with Earth Engine. Cloud Shell already knows this, so ask gcloud
+# rather than storing it.
+if [ -z "$EE_PROJECT" ] && command -v gcloud >/dev/null 2>&1; then
+  EE_PROJECT="$(gcloud config get-value project 2>/dev/null)"
+  [ "$EE_PROJECT" = "(unset)" ] && EE_PROJECT=""
+fi
 
 _repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -40,10 +51,24 @@ else
 fi
 
 # --- Credentials -----------------------------------------------------------
+if [ -z "$EE_KEY_FILE" ]; then
+  echo "✗ No service account key found in ~/ee-backend/"
+  echo "  Look for it with:  ls ~/ee-backend/*.json"
+  echo "  Then re-run:       EE_KEY_FILE=/full/path/to/key.json source ./setup.sh"
+  return 1
+fi
+
 if [ ! -f "$EE_KEY_FILE" ]; then
   echo "✗ No service account key at: $EE_KEY_FILE"
-  echo "  Find yours with:  ls ~/ee-backend/*.json"
-  echo "  Then re-run:      EE_KEY_FILE=/full/path/to/key.json source setup.sh"
+  echo "  Look for it with:  ls ~/ee-backend/*.json"
+  echo "  Then re-run:       EE_KEY_FILE=/full/path/to/key.json source ./setup.sh"
+  return 1
+fi
+
+if [ -z "$EE_PROJECT" ]; then
+  echo "✗ Could not work out your Google Cloud project ID."
+  echo "  In Cloud Shell:  gcloud config set project YOUR-PROJECT-ID"
+  echo "  Or set it here:  EE_PROJECT=your-project-id source ./setup.sh"
   return 1
 fi
 
