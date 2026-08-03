@@ -397,6 +397,32 @@ floating controls; the data panel is dense and spreadsheet-like. Simplicity
 lives in the *canvas*, information density lives in the *panel*. Trying to make
 both the same is what forces the compromise everyone hates.
 
+### The gallery is the front door
+
+Borrowed from Procreate, and the part worth borrowing is not the grid — it is
+that you land on *your work*, not on an empty canvas with a file menu. Opening
+a card restores the whole working state (boundary, factors, position in time),
+so a site is a place you return to rather than a thing you rebuild.
+
+Three consequences follow from that, and each is load-bearing:
+
+- **A project stores more than a boundary.** The pre-gallery `SavedAoi` kept
+  only geometry, so reopening one silently dropped your factor selection.
+  Anything the gallery promises to restore has to actually be stored.
+- **Save updates the open project.** Otherwise a session of saves leaves a
+  gallery of near-identical cards and the home screen becomes the mess it was
+  meant to replace.
+- **The gallery does not gate anything.** A first-run user with nothing saved
+  goes straight to the canvas — an empty gallery is a door into an empty room —
+  and a permalink always opens the view it describes, because a shared link is
+  usually somebody else's and answering it with *your* projects is the wrong
+  answer to "someone sent me this".
+
+Thumbnails are the site's own outline, drawn from stored geometry over a faint
+graticule. No tiles and no screenshots: a gallery of forty renders instantly
+and offline, and sites are told apart the way a map reader tells them apart
+anyway — by shape.
+
 ---
 
 ## 7. Conflicts between simplicity and functionality

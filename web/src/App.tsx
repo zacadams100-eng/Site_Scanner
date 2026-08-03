@@ -11,6 +11,7 @@ import Toolbar from './components/Toolbar'
 import Templates from './components/Templates'
 import Compare from './components/Compare'
 import BrandMark from './components/BrandMark'
+import Gallery from './components/Gallery'
 import { formatArea } from './lib/format'
 import type { DrawMode } from './types'
 
@@ -259,6 +260,7 @@ export default function App() {
       </aside>
 
       <Timeline />
+      <Gallery />
       <Templates />
     </div>
   )

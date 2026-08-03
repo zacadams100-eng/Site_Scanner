@@ -120,6 +120,9 @@
   --z-chrome: 20;
   --z-float: 30;
   --z-pop: 40;
+  /* A full-screen takeover. Above every in-app layer, below modals — the
+     templates dialog opens *from* the gallery and has to land on top of it. */
+  --z-screen: 45;
   --z-modal: 50;
 
   /* ---- Spacing: 4px rhythm ---- */
@@ -888,6 +891,161 @@ button:disabled { cursor: not-allowed; }
    report is fine, but implying it is uniformly one or the other is not. */
 .th-name .live { color: var(--sky); margin-right: 4px; font-size: 8px; vertical-align: middle; }
 
+/* ---------- Layer 4.5: the gallery ----------
+   A screen, not a panel: it covers the app rather than floating over it, so
+   it sits on --ink-1 — below the surfaces it replaces. Coming *back* to the
+   map should feel like stepping forward into the work. */
+.gallery {
+  position: fixed; inset: 0; z-index: var(--z-screen);
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(46, 61, 81, .55), transparent 60%),
+    var(--ink-1);
+  overflow-y: auto;
+}
+
+.gallery-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s4); flex-wrap: wrap;
+  padding: var(--s5) var(--s6) var(--s4);
+}
+/* The lockup is the page's title here, so it drops the plate it wears when
+   floating over the map — there is nothing beneath it to separate from. */
+.gallery-brand {
+  background: none; border: none; box-shadow: none; padding: 0;
+}
+.gallery-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+
+.g-btn {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  padding: 9px var(--s4); border-radius: var(--r-sm);
+  border: 1px solid var(--line-2); background: var(--ink-3); color: var(--text-2);
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: var(--e2), var(--lift);
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+}
+.g-btn:hover { background: var(--ink-4); color: var(--text); border-color: var(--line-3); }
+.g-btn-primary {
+  background: var(--flame); border-color: var(--flame); color: #1b0d05;
+}
+.g-btn-primary:hover { background: var(--flame-lift); border-color: var(--flame-lift); color: #1b0d05; }
+
+.gallery-bar {
+  padding: 0 var(--s6) var(--s3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s5);
+}
+
+.gallery-grid {
+  list-style: none; margin: 0; padding: 0 var(--s6) var(--s6);
+  display: grid; gap: var(--s5);
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+
+.g-card { display: flex; flex-direction: column; gap: var(--s2); }
+
+/* The thumbnail is the card. Everything else is a caption. */
+.g-thumb {
+  position: relative; display: block; width: 100%; padding: 0;
+  aspect-ratio: 26 / 15; overflow: hidden;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background:
+    linear-gradient(160deg, var(--ink-3), var(--ink-2) 62%);
+  box-shadow: var(--e2), var(--lift);
+  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease),
+              border-color var(--t) var(--ease);
+}
+.g-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e3), var(--lift);
+  border-color: var(--line-3);
+}
+.g-thumb:active { transform: translateY(0); }
+.g-thumb svg { display: block; width: 100%; height: 100%; }
+
+/* `currentColor` drives the pattern stroke, so the grid's weight is set here
+   rather than threaded through the component. */
+.g-thumb-grid { color: rgba(198, 216, 242, .06); }
+.g-thumb:hover .g-thumb-grid { color: rgba(198, 216, 242, .09); }
+
+.g-thumb-shape {
+  fill: rgba(210, 97, 43, .18);
+  stroke: var(--flame-lift);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.g-card.is-current .g-thumb { border-color: rgba(210, 97, 43, .55); }
+.g-open-tag {
+  position: absolute; top: var(--s2); right: var(--s2);
+  font-family: var(--font-display);
+  font-size: 8.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--r-full);
+  background: var(--flame); color: #1b0d05;
+}
+
+.g-meta { display: flex; align-items: flex-start; gap: var(--s2); }
+.g-meta-text { flex: 1; min-width: 0; }
+
+.g-name {
+  display: block; width: 100%; padding: 0; border: none; background: none;
+  text-align: left; color: var(--text); font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color var(--t-fast) var(--ease);
+}
+.g-name:hover { color: var(--flame-lift); }
+
+.g-rename {
+  width: 100%; padding: 3px 7px; margin: -4px 0 0 -8px;
+  border-radius: var(--r-xs); border: 1px solid var(--flame);
+  background: var(--ink-0); color: var(--text);
+  font: inherit; font-size: 13px; font-weight: 600; outline: none;
+}
+
+.g-sub {
+  margin-top: 2px; font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.g-menu-wrap { position: relative; flex: none; }
+.g-more {
+  width: 28px; height: 26px; display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: var(--r-xs);
+  background: transparent; color: var(--text-3);
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.g-more:hover, .g-more.is-open { color: var(--text); background: rgba(233, 240, 252, .07); }
+/* Right-aligned: a card at the grid's right edge would otherwise push its menu
+   off-screen. */
+.g-menu { left: auto; right: 0; min-width: 176px; }
+.g-danger { color: var(--rose) !important; }
+.g-danger:hover { background: rgba(207, 127, 141, .14) !important; }
+
+.gallery-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--s4);
+  padding: var(--s6); text-align: center; color: var(--text-2);
+}
+.gallery-empty .placeholder-frame { max-width: 380px; }
+.gallery-empty p { margin: 0 0 var(--s2); }
+
+@media (max-width: 860px) {
+  .gallery-head { padding: var(--s4) var(--s4) var(--s3); }
+  .gallery-bar { padding: 0 var(--s4) var(--s3); margin-bottom: var(--s4); }
+  .gallery-grid {
+    padding: 0 var(--s4) var(--s5); gap: var(--s4);
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+  /* The lockup keeps its subtitle here — unlike the topbar, this screen has
+     the room, and it is the page's masthead. */
+  .gallery .brand-sub { display: block; }
+}
+
 /* ---------- Narrow screens ----------
    The layer ramp survives the reflow; only the geometry changes. */
 @media (max-width: 1180px) {
@@ -907,5 +1065,22 @@ button:disabled { cursor: not-allowed; }
   .timeline { padding: var(--s2) var(--s4) var(--s3); gap: var(--s3); }
   .brand-sub, .brand-scope { display: none; }
   .topbar { height: 56px; padding: 0 var(--s3); }
-  .tool-rail { left: var(--s2); padding: var(--s1); }
+
+  /* The rail centres on the viewport at full width, which is right when the
+     map *is* the viewport. Here the data panel takes the bottom half, so a
+     centred rail lands on top of the panel's tabs. Anchor it under the topbar
+     instead and let it run down the map, and lay it out horizontally so it
+     never reaches the panel however short the screen is. */
+  .tool-rail {
+    left: var(--s3); right: var(--s3); top: 64px;
+    transform: none;
+    flex-direction: row; justify-content: flex-start;
+    gap: var(--s1); padding: var(--s1);
+    width: max-content;
+  }
+  .tool { width: 38px; height: 38px; }
+  .tool-sep, .tool-clear {
+    margin-top: 0; margin-left: var(--s1); padding-top: 0; padding-left: 1px;
+    border-top: none; border-left: 1px solid var(--line);
+  }
 }

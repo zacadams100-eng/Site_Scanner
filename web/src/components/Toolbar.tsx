@@ -5,7 +5,6 @@ import {
   printReport, readAoiFile,
 } from '../lib/exports'
 import { shareUrl } from '../lib/permalink'
-import { formatArea } from '../lib/format'
 import type { Series } from '../types'
 
 /**
@@ -20,14 +19,14 @@ export default function Toolbar() {
   const aoi = useStore((s) => s.aoi)
   const data = useStore((s) => s.data)
   const selected = useStore((s) => s.selected)
-  const saved = useStore((s) => s.saved)
-  const saveAoi = useStore((s) => s.saveAoi)
-  const loadSavedAoi = useStore((s) => s.loadSaved)
-  const deleteSaved = useStore((s) => s.deleteSaved)
+  const projects = useStore((s) => s.projects)
+  const currentProjectId = useStore((s) => s.currentProjectId)
+  const saveProject = useStore((s) => s.saveProject)
+  const setGalleryOpen = useStore((s) => s.setGalleryOpen)
   const setAoi = useStore((s) => s.setAoi)
   const setTemplatesOpen = useStore((s) => s.setTemplatesOpen)
 
-  const [menu, setMenu] = useState<'none' | 'export' | 'saved'>('none')
+  const [menu, setMenu] = useState<'none' | 'export'>('none')
   const [flash, setFlash] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -80,36 +79,22 @@ export default function Toolbar() {
         onChange={(e) => { void onUpload(e.target.files?.[0]); e.target.value = '' }}
       />
 
+      {/* Updates the open project when there is one, so repeated saves during
+          a session leave one card in the gallery rather than a pile. Only a
+          project without a name yet has to ask for one. */}
       <button className="tb" disabled={!aoi}
               onClick={() => {
+                if (currentProjectId) { saveProject(); say('Saved'); return }
                 const name = prompt('Name this site', 'Untitled site')
-                if (name !== null) { saveAoi(name); say('Saved') }
+                if (name !== null) { saveProject(name); say('Saved to your sites') }
               }}
-              title="Keep this shape for later">Save</button>
+              title={currentProjectId ? 'Update this site' : 'Keep this site for later'}>
+        Save
+      </button>
 
-      <div className="tb-wrap">
-        <button className={`tb${menu === 'saved' ? ' is-open' : ''}`}
-                onClick={() => setMenu(menu === 'saved' ? 'none' : 'saved')}
-                title="Your saved sites">
-          Sites {saved.length > 0 && <span className="tb-count">{saved.length}</span>}
-        </button>
-        {menu === 'saved' && (
-          <div className="tb-menu">
-            {saved.length === 0 && <div className="tb-empty">Nothing saved yet.</div>}
-            {saved.map((s) => (
-              <div key={s.id} className="tb-saved">
-                <button className="tb-saved-load"
-                        onClick={() => { loadSavedAoi(s.id); setMenu('none') }}>
-                  <span className="tb-saved-name">{s.name}</span>
-                  <span className="tb-saved-meta">{formatArea(s.area_ha)}</span>
-                </button>
-                <button className="tb-saved-del" title="Delete"
-                        onClick={() => deleteSaved(s.id)}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <button className="tb" onClick={() => setGalleryOpen(true)} title="All your sites">
+        Sites {projects.length > 0 && <span className="tb-count">{projects.length}</span>}
+      </button>
 
       <button className="tb" disabled={!aoi} onClick={onShare}
               title="Copy a link that restores this exact view">Share</button>

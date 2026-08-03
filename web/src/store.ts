@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import type { Catalog, Cell, DrawMode, Factor, SeriesResponse } from './types'
 import { fetchCells, fetchSeries } from './api'
 import { decodeState, writeUrl, type Template } from './lib/permalink'
+import {
+  copyName, loadProjects, persistProjects, sortProjects, type Project,
+} from './lib/projects'
 
 /**
  * One store, and one rule that matters more than the rest:
@@ -15,15 +18,6 @@ import { decodeState, writeUrl, type Template } from './lib/permalink'
 
 const DEFAULT_FACTORS = ['ndvi', 'lc_tree_pct', 'precip_total', 'lst_day']
 const MAX_FACTORS = 12
-const SAVED_KEY = 'site-scanner.saved-aois'
-
-export interface SavedAoi {
-  id: string
-  name: string
-  geometry: GeoJSON.Polygon
-  area_ha: number
-  savedAt: number
-}
 
 interface State {
   catalog: Catalog | null
@@ -37,7 +31,15 @@ interface State {
   // breaks its own metaphor within about ten seconds of use.
   past: (GeoJSON.Polygon | null)[]
   future: (GeoJSON.Polygon | null)[]
-  saved: SavedAoi[]
+
+  projects: Project[]
+  /**
+   * The project currently open, if any. This is what makes Save mean "update"
+   * rather than "add another": without it, saving twice leaves two cards in
+   * the gallery that look identical and diverge from then on.
+   */
+  currentProjectId: string | null
+  galleryOpen: boolean
 
   selected: string[]
   data: SeriesResponse | null
@@ -62,9 +64,13 @@ interface State {
   setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean }) => void
   undo: () => void
   redo: () => void
-  saveAoi: (name: string) => void
-  loadSaved: (id: string) => void
-  deleteSaved: (id: string) => void
+  saveProject: (name?: string) => void
+  openProject: (id: string) => void
+  renameProject: (id: string, name: string) => void
+  duplicateProject: (id: string) => void
+  deleteProject: (id: string) => void
+  newProject: () => void
+  setGalleryOpen: (o: boolean) => void
   toggleFactor: (id: string) => void
   setSelected: (ids: string[]) => void
   applyTemplate: (t: Template) => void
@@ -104,21 +110,17 @@ function settleTime(data: SeriesResponse, selected: string[], current: number): 
   return current
 }
 
-function loadSaved(): SavedAoi[] {
-  try {
-    return JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
+/**
+ * Whether the app was opened on a shared link.
+ *
+ * A permalink carries a specific view and is usually someone else's — landing
+ * on a gallery of *your* projects instead would be the wrong answer to
+ * "someone sent me this". Read once at module load, before any hash rewriting
+ * happens.
+ */
+const OPENED_WITH_LINK = !!decodeState(location.hash).aoi
 
-function persistSaved(list: SavedAoi[]): void {
-  try {
-    localStorage.setItem(SAVED_KEY, JSON.stringify(list))
-  } catch {
-    /* storage full or blocked — saving is a convenience, not a guarantee */
-  }
-}
+const INITIAL_PROJECTS = loadProjects(DEFAULT_FACTORS)
 
 export const useStore = create<State>((set, get) => ({
   catalog: null,
@@ -129,7 +131,12 @@ export const useStore = create<State>((set, get) => ({
   cells: [],
   past: [],
   future: [],
-  saved: loadSaved(),
+  projects: INITIAL_PROJECTS,
+  currentProjectId: null,
+  // Open on the gallery when there is something to choose between, exactly as
+  // Procreate does. A first-run user with nothing saved gets the canvas
+  // instead — an empty gallery is a door into an empty room.
+  galleryOpen: !OPENED_WITH_LINK && INITIAL_PROJECTS.length > 0,
   selected: DEFAULT_FACTORS,
   data: null,
   loading: false,
@@ -187,31 +194,108 @@ export const useStore = create<State>((set, get) => ({
     else set({ data: null, cells: [] })
   },
 
-  saveAoi: (name) => {
-    const { aoi, data, saved } = get()
+  /**
+   * Save the working state. Updates the open project when there is one, and
+   * only creates a card when there is not — so a session of repeated saves
+   * leaves one project, not twelve.
+   */
+  saveProject: (name) => {
+    const { aoi, data, projects, currentProjectId, selected, timeIndex } = get()
     if (!aoi) return
-    const entry: SavedAoi = {
-      id: String(Date.now()),
-      name: name.trim() || 'Untitled site',
+    const now = Date.now()
+    const existing = currentProjectId
+      ? projects.find((p) => p.id === currentProjectId)
+      : undefined
+
+    const entry: Project = {
+      id: existing?.id ?? `p${now}`,
+      name: name?.trim() || existing?.name || 'Untitled site',
       geometry: aoi,
-      area_ha: data?.area_ha ?? 0,
-      savedAt: Date.now(),
+      area_ha: data?.area_ha ?? existing?.area_ha ?? 0,
+      factors: selected,
+      timeIndex,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
     }
-    const next = [entry, ...saved].slice(0, 50)
-    persistSaved(next)
-    set({ saved: next })
+
+    const next = sortProjects([entry, ...projects.filter((p) => p.id !== entry.id)])
+    persistProjects(next)
+    set({ projects: next, currentProjectId: entry.id })
   },
 
-  loadSaved: (id) => {
-    const entry = get().saved.find((s) => s.id === id)
-    if (entry) get().setAoi(entry.geometry)
+  /**
+   * Restore a whole project, not just its outline: factors first so the
+   * refresh `setAoi` triggers already asks for the right columns, then the
+   * time position once the data lands.
+   */
+  openProject: (id) => {
+    const entry = get().projects.find((p) => p.id === id)
+    if (!entry) return
+    set({
+      selected: entry.factors.slice(0, MAX_FACTORS),
+      currentProjectId: entry.id,
+      galleryOpen: false,
+      compareIndex: null,
+      // A project is a starting point, not a step in the current edit history.
+      past: [],
+      future: [],
+    })
+    if (entry.timeIndex !== null) set({ timeIndex: entry.timeIndex })
+    get().setAoi(entry.geometry, { skipHistory: true })
   },
 
-  deleteSaved: (id) => {
-    const next = get().saved.filter((s) => s.id !== id)
-    persistSaved(next)
-    set({ saved: next })
+  renameProject: (id, name) => {
+    const clean = name.trim()
+    if (!clean) return
+    const next = get().projects.map((p) =>
+      p.id === id ? { ...p, name: clean, updatedAt: Date.now() } : p)
+    persistProjects(next)
+    set({ projects: sortProjects(next) })
   },
+
+  duplicateProject: (id) => {
+    const { projects } = get()
+    const src = projects.find((p) => p.id === id)
+    if (!src) return
+    const now = Date.now()
+    const copy: Project = {
+      ...src,
+      id: `p${now}`,
+      name: copyName(src.name, projects.map((p) => p.name)),
+      createdAt: now,
+      updatedAt: now,
+    }
+    const next = sortProjects([copy, ...projects])
+    persistProjects(next)
+    set({ projects: next })
+  },
+
+  deleteProject: (id) => {
+    const next = get().projects.filter((p) => p.id !== id)
+    persistProjects(next)
+    set({
+      projects: next,
+      // Deleting the open project leaves the canvas as-is but unhitched, so
+      // the next Save creates a fresh card rather than resurrecting the one
+      // just deleted.
+      currentProjectId: get().currentProjectId === id ? null : get().currentProjectId,
+    })
+  },
+
+  /** A blank canvas: no shape, no project, default factors. */
+  newProject: () => {
+    set({
+      currentProjectId: null,
+      galleryOpen: false,
+      selected: DEFAULT_FACTORS,
+      compareIndex: null,
+      past: [],
+      future: [],
+    })
+    get().setAoi(null, { skipHistory: true })
+  },
+
+  setGalleryOpen: (o) => set({ galleryOpen: o }),
 
   toggleFactor: (id) => {
     const { selected } = get()
@@ -236,7 +320,15 @@ export const useStore = create<State>((set, get) => ({
   },
 
   applyTemplate: (t) => {
-    set({ selected: t.factors.slice(0, MAX_FACTORS), templatesOpen: false, drawMode: t.tool })
+    set({
+      selected: t.factors.slice(0, MAX_FACTORS),
+      templatesOpen: false,
+      drawMode: t.tool,
+      // Templates are reachable from the gallery, where picking one is a way
+      // of starting a new project — so it has to put you on the canvas with
+      // the tool already in hand.
+      galleryOpen: false,
+    })
     if (get().aoi) void get().refresh()
   },
 
