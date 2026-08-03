@@ -5,6 +5,7 @@ import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
+import { PALETTE } from '../lib/palette'
 
 /**
  * The map is the canvas, not a widget in a frame — full bleed, with panels
@@ -42,7 +43,7 @@ maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
 const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } }],
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': PALETTE.ink0 } }],
 }
 
 const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -97,7 +98,7 @@ export default function MapCanvas() {
         id: 'cells-fill',
         type: 'fill',
         source: 'cells',
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.72 },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.78 },
       })
 
       map.addSource('aoi', { type: 'geojson', data: EMPTY })
@@ -105,13 +106,15 @@ export default function MapCanvas() {
         id: 'aoi-fill',
         type: 'fill',
         source: 'aoi',
-        paint: { 'fill-color': '#ff7a5c', 'fill-opacity': 0.06 },
+        paint: { 'fill-color': PALETTE.flame, 'fill-opacity': 0.08 },
       })
       map.addLayer({
         id: 'aoi-line',
         type: 'line',
         source: 'aoi',
-        paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
+        // The lifted flame, not the base one: the boundary has to hold against
+        // whatever tiles land beneath it, and #d2612b loses to dark terrain.
+        paint: { 'line-color': PALETTE.flameLift, 'line-width': 2.5 },
       })
 
       map.addSource('draft', { type: 'geojson', data: EMPTY })
@@ -119,13 +122,15 @@ export default function MapCanvas() {
         id: 'draft-fill',
         type: 'fill',
         source: 'draft',
-        paint: { 'fill-color': '#e05f42', 'fill-opacity': 0.1 },
+        paint: { 'fill-color': PALETTE.flame, 'fill-opacity': 0.1 },
       })
       map.addLayer({
         id: 'draft-line',
         type: 'line',
         source: 'draft',
-        paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        // A shade down from the committed boundary, and dashed: in progress
+        // should never look as settled as done.
+        paint: { 'line-color': PALETTE.flame, 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
 
       // The basemap goes on last and sits beneath everything of ours, so a
@@ -142,8 +147,15 @@ export default function MapCanvas() {
           type: 'raster',
           source: 'osm',
           // Desaturated and dimmed so data layers read as the foreground. The
-          // basemap is context, not content.
-          paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
+          // basemap is context, not content. Rotated a little toward the
+          // ground's blue as well, so OSM's greens and beiges stop fighting
+          // the palette and settle into it.
+          paint: {
+            'raster-opacity': 0.46,
+            'raster-saturation': -0.78,
+            'raster-brightness-max': 0.82,
+            'raster-hue-rotate': 8,
+          },
         }, 'cells-fill')
       }
 

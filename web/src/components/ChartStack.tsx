@@ -3,6 +3,7 @@ import * as Plot from '@observablehq/plot'
 import { useStore } from '../store'
 import { inferCharts, type ChartSpec } from '../lib/charts'
 import { seriesColor, stepToDate } from '../lib/format'
+import { PALETTE } from '../lib/palette'
 import type { Series } from '../types'
 
 /**
@@ -57,7 +58,7 @@ function ChartCard({ spec, all }: { spec: ChartSpec; all: Series[] }) {
     // A vertical rule marking the timeline's position, on every time-based
     // chart. It is what ties the charts to the map and the scrubber.
     const timeMarker = currentDate
-      ? [Plot.ruleX([currentDate], { stroke: '#ff7a5c', strokeWidth: 1.5, strokeOpacity: 0.8 })]
+      ? [Plot.ruleX([currentDate], { stroke: PALETTE.flameLift, strokeWidth: 1.5, strokeOpacity: 0.8 })]
       : []
 
     const base = {
@@ -67,7 +68,7 @@ function ChartCard({ spec, all }: { spec: ChartSpec; all: Series[] }) {
       marginRight: 14,
       marginTop: 12,
       marginBottom: 28,
-      style: { background: 'transparent', color: '#94a3b8', fontSize: '10px' },
+      style: { background: 'transparent', color: PALETTE.text3, fontSize: '10px' },
       grid: true,
     }
 
@@ -91,7 +92,7 @@ function ChartCard({ spec, all }: { spec: ChartSpec; all: Series[] }) {
           // point is absent, which is why nulls are filtered rather than zeroed.
           Plot.lineY(rows, { x: 'date', y: 'value', stroke: 'name', strokeWidth: 1.6, curve: 'linear' }),
           ...timeMarker,
-          Plot.ruleY([0], { stroke: '#2b3a52', strokeOpacity: 0.4 }),
+          Plot.ruleY([0], { stroke: PALETTE.ink4, strokeOpacity: 0.55 }),
         ],
       })
     } else if (spec.type === 'stacked') {
@@ -135,7 +136,7 @@ function ChartCard({ spec, all }: { spec: ChartSpec; all: Series[] }) {
         y: { label: `${b.meta.name} (${b.unit})` },
         marks: [
           Plot.dot(rows, { x: 'x', y: 'y', fill: seriesColor(0), r: 3.5, fillOpacity: 0.85 }),
-          Plot.linearRegressionY(rows, { x: 'x', y: 'y', stroke: '#6fc3d4', strokeOpacity: 0.6 }),
+          Plot.linearRegressionY(rows, { x: 'x', y: 'y', stroke: PALETTE.sky, strokeOpacity: 0.6 }),
         ],
       })
     }

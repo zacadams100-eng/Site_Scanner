@@ -360,14 +360,37 @@ This is a real risk and the answer is **restraint, not decoration**:
 | --- | --- |
 | Cartoon illustrations, mascots | Real map imagery, real data |
 | Bright primaries, rainbow palettes | One accent, disciplined neutrals |
-| Everything rounded, everything shadowed | Sparing radius, one elevation level |
+| Shadows everywhere, or depth faked with saturation | A stated layer ramp, shadow only confirming it |
 | Emoji as section markers | Typographic hierarchy |
-| Bouncy animations | Fast, short transitions (150–200 ms) |
+| Bouncy animations | Fast, short transitions (110–260 ms) |
 
 Specific choices already made in `web/src/index.css` that support this:
-navy-biased neutrals rather than default grey; a single coral accent with
-semantic colour held separate from it; tabular numerals in every data table;
-and generous whitespace on the analytical half.
+slate-blue neutrals rather than default grey; warm bone text on cool ground,
+taken from the logo's wordmark; a single burnt-orange accent — the logo's frog
+— with semantic colour held separate from it; tabular numerals in every data
+table; and generous whitespace on the analytical half.
+
+### The layer ramp
+
+Depth is carried by lightness, not by shadow. Six surfaces sit roughly 4 L\*
+apart and get lighter as they come forward, so the stack is readable with
+shadows disabled entirely:
+
+| Token | Role | Used by |
+| --- | --- | --- |
+| `--ink-0` | ground | the map |
+| `--ink-1` | sunk | inputs, the timeline track, expanded month rows |
+| `--ink-2` | surface | the data panel, the timeline bar |
+| `--ink-3` | raised | cards, sticky table headers, panel head |
+| `--ink-4` | floating | tool rail, popovers, menus |
+| `--ink-5` | overlay | modals |
+
+Elevation (`--e1`…`--e4`), the z-index scale (`--z-map`…`--z-modal`) and the
+ramp move together: a surface on `--ink-4` takes `--e3` and `--z-float`.
+Mixing them is the bug the scale exists to prevent — and one rule comes with
+it, since a z-index creates a stacking context and caps every descendant: a
+container hosting a popover that escapes its bounds must itself sit at
+`--z-pop`.
 
 **The split that makes both possible:** the map is touch-friendly with large
 floating controls; the data panel is dense and spreadsheet-like. Simplicity

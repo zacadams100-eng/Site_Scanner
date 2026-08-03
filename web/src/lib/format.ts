@@ -1,4 +1,5 @@
 import type { AnnualRow, Factor } from '../types'
+import { RAMP, SERIES_COLORS } from './palette'
 
 /**
  * Whether a year was built from fewer months than it should have been.
@@ -107,20 +108,11 @@ export function rampPosition(v: number, factor: Factor): number {
 }
 
 /**
- * A single sequential ramp, dark to accent. Deliberately one ramp rather than
+ * A single sequential ramp for every factor. Deliberately one ramp rather than
  * per-factor palettes: with 118 factors, bespoke colour schemes become
- * impossible to keep coherent, and a consistent ramp means users learn to read
- * "darker = less" once.
+ * impossible to keep coherent, and one ramp means users learn to read
+ * "lighter = more" once. See lib/palette.ts for the stops.
  */
-const RAMP: [number, number, number][] = [
-  [16, 26, 42],
-  [28, 62, 78],
-  [58, 104, 94],
-  [124, 146, 102],
-  [198, 164, 112],
-  [255, 166, 131],
-]
-
 export function rampColor(t: number, alpha = 1): string {
   const x = Math.max(0, Math.min(0.999, t)) * (RAMP.length - 1)
   const i = Math.floor(x)
@@ -132,14 +124,6 @@ export function rampColor(t: number, alpha = 1): string {
 }
 
 /** Stable colour per series, for multi-line charts and legends. */
-// Coral leads so the primary series matches the accent and the scrubber; the
-// rest fan out in hue and stay distinguishable against navy.
-const SERIES_COLORS = [
-  '#ff7a5c', '#6fc3d4', '#b9c48f', '#8f9fd4',
-  '#d99ec4', '#e3b072', '#7fb8a0', '#c4877a',
-  '#9db4d9', '#cfa6d4', '#a8c47f', '#d4a06f',
-]
-
 export function seriesColor(i: number): string {
   return SERIES_COLORS[i % SERIES_COLORS.length]
 }

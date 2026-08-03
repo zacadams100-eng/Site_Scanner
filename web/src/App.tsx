@@ -10,6 +10,7 @@ import Provenance from './components/Provenance'
 import Toolbar from './components/Toolbar'
 import Templates from './components/Templates'
 import Compare from './components/Compare'
+import BrandMark from './components/BrandMark'
 import { formatArea } from './lib/format'
 import type { DrawMode } from './types'
 
@@ -111,6 +112,10 @@ export default function App() {
     <div className="app">
       <MapCanvas />
 
+      {/* Ground wash. Basemap tiles are whatever they are; this guarantees the
+          floating chrome always has a darkened surface under it. */}
+      <div className="wash" />
+
       {/* Tool rail — floats over the canvas rather than sitting in a frame */}
       <div className="tool-rail">
         {TOOLS.map((t) => (
@@ -156,30 +161,35 @@ export default function App() {
 
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" />
-          <span className="brand-name">Site Scanner</span>
+          <span className="brand-mark"><BrandMark /></span>
+          <span className="brand-text">
+            <span className="brand-name">Site Scanner</span>
+            <span className="brand-sub">GIS for land management</span>
+          </span>
           {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
         </div>
         <div className="topbar-right">
-          {isMock && (
-            <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
-              mock data
-            </span>
-          )}
-          {data && data.real_factors && data.real_factors.length > 0 && (
-            <span className="badge badge-live"
-                  title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
-              {data.real_factors.length} live
-            </span>
-          )}
-          {data && (
-            <span className={`badge badge-${data.precision}`}
-                  title={data.precision === 'approx'
-                    ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
-                    : 'Exact — computed from source pixels'}>
-              {data.precision}
-            </span>
-          )}
+          <div className="badges">
+            {isMock && (
+              <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
+                mock data
+              </span>
+            )}
+            {data && data.real_factors && data.real_factors.length > 0 && (
+              <span className="badge badge-live"
+                    title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
+                {data.real_factors.length} live
+              </span>
+            )}
+            {data && (
+              <span className={`badge badge-${data.precision}`}
+                    title={data.precision === 'approx'
+                      ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
+                      : 'Exact — computed from source pixels'}>
+                {data.precision}
+              </span>
+            )}
+          </div>
           <FactorBrowser />
         </div>
       </header>
@@ -214,10 +224,12 @@ export default function App() {
 
           {!catalogError && !aoi && (
             <div className="placeholder">
-              <p>Draw a rectangle, circle or freehand shape on the map.</p>
-              <p className="placeholder-sub">
-                The attribute table and charts generate themselves — no extra steps.
-              </p>
+              <div className="placeholder-frame">
+                <p>Draw a rectangle, circle or freehand shape on the map.</p>
+                <p className="placeholder-sub">
+                  The attribute table and charts generate themselves — no extra steps.
+                </p>
+              </div>
               {catalog && (
                 <p className="placeholder-meta">
                   {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly

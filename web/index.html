@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>web</title>
+    <meta name="theme-color" content="#1d2836" />
+    <meta name="description" content="Site Scanner — GIS for land management. Draw a site, read its history." />
+    <title>Site Scanner — GIS for land management</title>
+
+    <!--
+      Saira carries every tracked-caps label in the interface; it is the nearest
+      thing to the wordmark's wide geometric caps. It is served from our own
+      origin (see public/fonts and the @font-face rules in index.css) rather
+      than a font CDN — one fewer third party, no render-blocking request to a
+      host we do not control, and the brand voice survives a restricted
+      network. Preloaded because it is used above the fold, in the brand plate.
+    -->
+    <link
+      rel="preload"
+      href="/fonts/saira-latin-var.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
   </head>
   <body>
     <div id="root"></div>
