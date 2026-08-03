@@ -285,8 +285,31 @@ def tile_landcover(req: TileRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Mirrors app.py: reduceRegion over a county times out rather than returning
+# anything useful, so an oversized area is refused with a plain-English reason
+# instead of an opaque failure.
+MAX_AREA_HA = 250_000.0
+
+
 @app.post("/api/stats")
 def stats(req: StatsRequest):
+    # A malformed geometry keeps its existing contract (500), so only the size
+    # check is new and it must not reshape any other failure.
+    try:
+        area_ha = geometry_area_m2(req.geometry) / 10_000.0
+    except Exception:
+        area_ha = 0.0
+    if area_ha > MAX_AREA_HA:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"That area is {area_ha:,.0f} ha, above the {MAX_AREA_HA:,.0f} ha "
+                "limit for a live query. Earth Engine would time out rather than "
+                "return anything useful. Draw a smaller shape — a field or a farm, "
+                "not a county."
+            ),
+        )
+
     try:
         return make_stats(req.year, req.geometry)
     except Exception as e:

@@ -270,3 +270,32 @@ def test_both_backends_expose_the_same_new_routes():
     from routes_catalog import router
     paths = {r.path for r in router.routes}
     assert {"/api/catalog", "/api/series", "/api/cells"} <= paths
+
+
+# --------------------------------------------------------------------------
+# /api/stats size guard — the failure the handoff flagged
+# --------------------------------------------------------------------------
+def test_stats_refuses_a_county_sized_area_with_a_readable_reason(client):
+    """reduceRegion at scale=10 over a county exceeds maxPixels or times out,
+    and Earth Engine reports that as an opaque failure the user reads as "the
+    app is broken". Refusing it with a plain-English reason is both honest and
+    cheaper than the quota it saves."""
+    huge = {"type": "Polygon", "coordinates": [[
+        [-4.0, 50.5], [1.0, 50.5], [1.0, 54.5], [-4.0, 54.5], [-4.0, 50.5]]]}
+    r = client.post("/api/stats", json={"year": 2024, "geometry": huge})
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert "ha" in detail and "smaller" in detail
+
+
+def test_stats_still_accepts_a_field(client):
+    r = client.post("/api/stats", json={"year": 2024, "geometry": GUILDFORD})
+    assert r.status_code == 200
+    assert "ndvi_mean" in r.json()
+
+
+def test_stats_malformed_geometry_keeps_its_500(client):
+    """The size guard must not reshape any other failure — a malformed body is
+    still the 500 both backends have always returned."""
+    r = client.post("/api/stats", json={"year": 2024, "geometry": {"type": "Polygon"}})
+    assert r.status_code == 500

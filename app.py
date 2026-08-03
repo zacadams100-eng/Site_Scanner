@@ -29,6 +29,14 @@ from typing import List, Optional
 
 from summary import SummaryRequest, generate_summary
 from cache import build_cache, cache_key
+from geometry import geometry_area_m2
+
+# reduceRegion at scale=10 over a whole county blows past maxPixels or simply
+# times out, and Earth Engine reports that as an opaque failure the user reads
+# as "the app is broken". Refusing oversized areas with a plain-English message
+# is both honest and much cheaper than the quota it saves. Matches the limit
+# routes_catalog.py applies to /api/series and /api/cells.
+MAX_AREA_HA = 250_000.0
 
 # ---------------------------------------------------------------------------
 # Earth Engine auth — uses a service account, NOT a personal Google login.
@@ -251,6 +259,24 @@ def tile_landcover(req: TileRequest):
 def stats(req: StatsRequest):
     """Server-side aggregation — the browser only ever receives a handful
     of numbers here, never raw imagery or pixel data."""
+    # A malformed geometry keeps its existing contract (a 500 from the
+    # ee.Geometry call below, mirrored by the mock) — only the size check is
+    # new, and it has to not change the shape of any other failure.
+    try:
+        area_ha = geometry_area_m2(req.geometry) / 10_000.0
+    except Exception:
+        area_ha = 0.0
+    if area_ha > MAX_AREA_HA:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"That area is {area_ha:,.0f} ha, above the {MAX_AREA_HA:,.0f} ha "
+                "limit for a live query. Earth Engine would time out rather than "
+                "return anything useful. Draw a smaller shape — a field or a farm, "
+                "not a county."
+            ),
+        )
+
     try:
         key = cache_key("stats", req.year, req.geometry)
         cached = STATS_CACHE.get(key)
