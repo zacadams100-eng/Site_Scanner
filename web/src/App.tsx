@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useStore } from './store'
-import { fetchCatalog } from './api'
+import { fetchCatalog, STANDALONE } from './api'
 import MapCanvas from './components/MapCanvas'
 import Timeline from './components/Timeline'
 import AttributeTable from './components/AttributeTable'
@@ -54,6 +54,17 @@ export default function App() {
   const setAoiFromDrop = useStore((s) => s.setAoi)
 
   useEffect(() => {
+    // A standalone build has no server to ask, and everything it shows is
+    // generated — so it says so up front rather than sniffing a header that
+    // will never arrive.
+    if (STANDALONE) {
+      setMock(true)
+      fetchCatalog()
+        .then(setCatalog)
+        .catch((e) => setCatalogError(e?.message ?? 'Could not load the catalogue'))
+      return
+    }
+
     fetch('/api/catalog')
       .then(async (r) => {
         if (!r.ok) throw new Error(`Catalogue unavailable (${r.status})`)
@@ -231,6 +242,19 @@ export default function App() {
                   The attribute table and charts generate themselves — no extra steps.
                 </p>
               </div>
+
+              {/* Someone opening a standalone link cold has no way to know the
+                  numbers are invented or why the map has no basemap. Say both
+                  before they draw anything, not after. */}
+              {STANDALONE && (
+                <p className="placeholder-demo">
+                  This is a self-contained demo — the whole app in one file, with
+                  no server. Every figure is generated, deterministically, from
+                  the shape you draw: plausible for England, but not an
+                  observation of anywhere. There's no basemap because the page is
+                  sandboxed from external tile hosts.
+                </p>
+              )}
               {catalog && (
                 <p className="placeholder-meta">
                   {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly

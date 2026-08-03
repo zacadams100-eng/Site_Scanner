@@ -512,6 +512,14 @@ button:disabled { cursor: not-allowed; }
 }
 .placeholder p { margin: 0 0 var(--s2); }
 .placeholder-sub { font-size: 12px; color: var(--text-3); }
+.placeholder-demo {
+  max-width: 340px; margin: 0 auto !important;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-sm);
+  background: rgba(217, 165, 102, .09);
+  border: 1px solid rgba(217, 165, 102, .28);
+  font-size: 12px; line-height: 1.55; color: var(--sand); text-align: left;
+}
 .placeholder-meta {
   margin-top: var(--s5) !important; font-size: 11px; color: var(--text-3);
   padding-top: var(--s3); border-top: 1px solid var(--line);
@@ -890,6 +898,25 @@ button:disabled { cursor: not-allowed; }
    it per column matters more than a single page-level badge: a half-real
    report is fine, but implying it is uniformly one or the other is not. */
 .th-name .live { color: var(--sky); margin-right: 4px; font-size: 8px; vertical-align: middle; }
+
+/* Shown only when a sandbox refuses the map's worker. Sits on the map's own
+   ground rather than floating over it, because it is standing in for the map. */
+.map-blocked {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100% - 48px));
+  padding: var(--s4) var(--s5) var(--s5);
+  background: var(--ink-3); border: 1px solid var(--line-2);
+  border-radius: var(--r-md); box-shadow: var(--e3), var(--lift);
+  z-index: var(--z-wash);
+  text-align: center; font-size: 13px; color: var(--text-2);
+  /* It says drawing still works, so it must not be the thing that stops it —
+     the drag has to pass straight through to the map beneath. */
+  pointer-events: none;
+}
+.map-blocked p { margin: 0 0 var(--s2); line-height: 1.55; }
+.map-blocked strong { color: var(--text); }
+.map-blocked-fix { color: var(--text-3); font-size: 12px; margin-bottom: 0 !important; }
 
 /* ---------- Layer 4.5: the gallery ----------
    A screen, not a panel: it covers the app rather than floating over it, so

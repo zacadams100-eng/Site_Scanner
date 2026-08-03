@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Output of `npm run build:standalone` — a 2 MB generated artefact, rebuilt
+# from source whenever it is needed.
+dist-standalone
 *.local
 
 # Editor directories and files
