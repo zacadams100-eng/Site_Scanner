@@ -80,12 +80,12 @@ export function rampPosition(v: number, factor: Factor): number {
  * "darker = less" once.
  */
 const RAMP: [number, number, number][] = [
-  [26, 32, 34],
-  [42, 66, 58],
-  [74, 106, 74],
-  [138, 154, 84],
-  [206, 176, 92],
-  [237, 206, 138],
+  [16, 26, 42],
+  [28, 62, 78],
+  [58, 104, 94],
+  [124, 146, 102],
+  [198, 164, 112],
+  [255, 166, 131],
 ]
 
 export function rampColor(t: number, alpha = 1): string {
@@ -99,10 +99,12 @@ export function rampColor(t: number, alpha = 1): string {
 }
 
 /** Stable colour per series, for multi-line charts and legends. */
+// Coral leads so the primary series matches the accent and the scrubber; the
+// rest fan out in hue and stay distinguishable against navy.
 const SERIES_COLORS = [
-  '#DDAE5C', '#7FB3A3', '#C98A6B', '#8FA5C4',
-  '#B48EAD', '#9BB068', '#D4A0A0', '#6FA8B8',
-  '#C4923F', '#88A398', '#B9846B', '#7D8FB3',
+  '#ff7a5c', '#6fc3d4', '#b9c48f', '#8f9fd4',
+  '#d99ec4', '#e3b072', '#7fb8a0', '#c4877a',
+  '#9db4d9', '#cfa6d4', '#a8c47f', '#d4a06f',
 ]
 
 export function seriesColor(i: number): string {

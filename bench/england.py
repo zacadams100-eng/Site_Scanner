@@ -1,8 +1,16 @@
-"""A simplified England outline, ~50 vertices.
+"""
+Simplified UK and Ireland coastlines.
 
 Used to generate the H3 cell set for benchmarking, and by the demo build to
-give the map geographic context without a tile server. Accurate enough for
-cell counting and for drawing; not a substitute for OS Boundary-Line.
+give the map geographic context without a tile server.
+
+England is the one that matters analytically — it is the coverage area, and
+`ENGLAND_OUTLINE` is what the benchmark tiles. The rest are drawn for context
+only, so a user can see where their shape sits in the country and that
+Scotland, Wales and Ireland are outside coverage.
+
+Accuracy: ~50 vertices per landmass, good enough for drawing, framing and cell
+counting. Not a substitute for OS Boundary-Line.
 """
 
 ENGLAND_OUTLINE = [
@@ -20,6 +28,68 @@ ENGLAND_OUTLINE = [
     (-2.75, 52.95), (-3.10, 53.25), (-3.05, 53.45), (-2.95, 53.75),
     (-3.05, 54.10), (-3.35, 54.25), (-3.60, 54.50), (-3.30, 54.80),
     (-3.05, 54.95),
+]
+
+# Shares its eastern edge with England's western border, so the two abut
+# cleanly rather than leaving a visible seam down the middle of the map.
+WALES_OUTLINE = [
+    (-3.05, 53.42), (-3.55, 53.33), (-4.10, 53.30), (-4.40, 53.42),
+    (-4.68, 53.31), (-4.35, 53.13), (-4.20, 52.92), (-4.75, 52.80),
+    (-4.45, 52.72), (-4.08, 52.55), (-4.06, 52.20), (-4.45, 52.12),
+    (-4.85, 52.05), (-5.25, 51.88), (-5.10, 51.71), (-4.70, 51.73),
+    (-4.38, 51.73), (-4.32, 51.55), (-3.98, 51.60), (-3.55, 51.40),
+    (-3.18, 51.40), (-2.99, 51.55), (-2.65, 51.62), (-2.70, 51.85),
+    (-3.10, 52.10), (-3.15, 52.55), (-2.75, 52.95), (-3.10, 53.25),
+    (-3.05, 53.42),
+]
+
+SCOTLAND_OUTLINE = [
+    (-2.03, 55.80), (-2.60, 56.05), (-3.15, 56.10), (-2.60, 56.22),
+    (-2.80, 56.45), (-3.10, 56.48), (-2.45, 56.72), (-2.10, 57.15),
+    (-1.78, 57.48), (-2.05, 57.70), (-2.90, 57.70), (-3.60, 57.65),
+    (-4.20, 57.70), (-3.80, 57.87), (-3.35, 58.00), (-3.05, 58.45),
+    (-3.35, 58.65), (-4.30, 58.55), (-4.85, 58.58), (-5.20, 58.30),
+    (-5.00, 58.05), (-5.35, 57.85), (-5.60, 57.55), (-5.80, 57.35),
+    (-5.65, 57.10), (-5.85, 56.85), (-6.20, 56.70), (-5.70, 56.45),
+    (-5.45, 56.15), (-5.70, 55.90), (-5.65, 55.55), (-5.35, 55.30),
+    (-5.20, 55.60), (-5.05, 55.85), (-4.85, 55.98), (-4.60, 55.70),
+    (-4.90, 55.35), (-5.00, 54.95), (-4.85, 54.65), (-4.35, 54.80),
+    (-3.95, 54.78), (-3.60, 54.88), (-3.05, 54.95), (-2.55, 55.15),
+    (-2.20, 55.45), (-2.03, 55.80),
+]
+
+NORTHERN_IRELAND_OUTLINE = [
+    (-5.45, 54.50), (-5.55, 54.68), (-5.72, 54.85), (-5.90, 55.05),
+    (-6.05, 55.20), (-6.65, 55.20), (-7.05, 55.05), (-7.25, 55.05),
+    (-7.55, 54.75), (-7.85, 54.55), (-8.15, 54.45), (-7.85, 54.20),
+    (-7.30, 54.15), (-6.85, 54.35), (-6.65, 54.20), (-6.25, 54.10),
+    (-6.05, 54.05), (-5.55, 54.25), (-5.45, 54.50),
+]
+
+IRELAND_OUTLINE = [
+    (-6.25, 54.10), (-6.10, 53.60), (-6.00, 53.20), (-6.10, 52.80),
+    (-6.35, 52.20), (-7.00, 52.15), (-7.60, 51.95), (-8.30, 51.70),
+    (-9.10, 51.55), (-9.80, 51.60), (-10.20, 51.85), (-9.90, 52.15),
+    (-9.40, 52.55), (-9.75, 52.80), (-9.90, 53.15), (-10.10, 53.45),
+    (-9.60, 53.65), (-9.90, 54.00), (-10.00, 54.25), (-9.20, 54.30),
+    (-8.80, 54.30), (-8.60, 54.65), (-8.80, 54.95), (-8.35, 55.15),
+    (-7.75, 55.25), (-7.45, 55.30), (-7.25, 55.05), (-7.55, 54.75),
+    (-7.85, 54.55), (-8.15, 54.45), (-7.85, 54.20), (-7.30, 54.15),
+    (-6.85, 54.35), (-6.65, 54.20), (-6.25, 54.10),
+]
+
+ISLE_OF_MAN_OUTLINE = [
+    (-4.42, 54.06), (-4.32, 54.20), (-4.38, 54.34), (-4.62, 54.42),
+    (-4.78, 54.32), (-4.70, 54.15), (-4.55, 54.05), (-4.42, 54.06),
+]
+
+# Everything except England: drawn for context, never interactive.
+CONTEXT_OUTLINES = [
+    ("Scotland", SCOTLAND_OUTLINE),
+    ("Wales", WALES_OUTLINE),
+    ("Northern Ireland", NORTHERN_IRELAND_OUTLINE),
+    ("Ireland", IRELAND_OUTLINE),
+    ("Isle of Man", ISLE_OF_MAN_OUTLINE),
 ]
 
 ENGLAND_GEOJSON = {

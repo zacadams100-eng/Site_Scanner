@@ -26,7 +26,7 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
     },
   },
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#12161a' } },
+    { id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } },
     {
       id: 'osm',
       type: 'raster',
@@ -96,13 +96,13 @@ export default function MapCanvas() {
         id: 'aoi-fill',
         type: 'fill',
         source: 'aoi',
-        paint: { 'fill-color': '#DDAE5C', 'fill-opacity': 0.06 },
+        paint: { 'fill-color': '#ff7a5c', 'fill-opacity': 0.06 },
       })
       map.addLayer({
         id: 'aoi-line',
         type: 'line',
         source: 'aoi',
-        paint: { 'line-color': '#DDAE5C', 'line-width': 2.5 },
+        paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
       })
 
       map.addSource('draft', { type: 'geojson', data: EMPTY })
@@ -110,13 +110,13 @@ export default function MapCanvas() {
         id: 'draft-fill',
         type: 'fill',
         source: 'draft',
-        paint: { 'fill-color': '#C4923F', 'fill-opacity': 0.1 },
+        paint: { 'fill-color': '#e05f42', 'fill-opacity': 0.1 },
       })
       map.addLayer({
         id: 'draft-line',
         type: 'line',
         source: 'draft',
-        paint: { 'line-color': '#C4923F', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
 
       setReady(true)

@@ -12,32 +12,45 @@
   untrustworthy.
 */
 :root {
-  --ground: #0e1113;
-  --surface: #171c20;
-  --raised: #1e242a;
-  --sunken: #0b0e10;
+  /* Ink and coral. Deep navy ground, warm coral accent — the contrast a
+     nautical chart uses, and the reason it reads as a map rather than a
+     dashboard. The neutrals are navy-biased rather than pure grey, so nothing
+     on the page looks like it was left at its default. */
+  --ground: #0b1220;
+  --surface: #131c2e;
+  --raised: #1a2438;
+  --sunken: #070c16;
   --line: rgba(255,255,255,.09);
-  --line-2: rgba(255,255,255,.16);
+  --line-2: rgba(255,255,255,.17);
 
-  --ink: #e8ecef;
-  --ink-2: #9aa4ab;
-  --ink-3: #6b757c;
+  --ink: #e6ecf5;
+  --ink-2: #94a3b8;
+  --ink-3: #64748b;
 
-  --accent: #ddae5c;
-  --accent-2: #c4923f;
-  --accent-soft: rgba(221,174,92,.16);
+  --accent: #ff7a5c;
+  --accent-2: #e05f42;
+  --accent-soft: rgba(255,122,92,.15);
 
-  --good: #7fb3a3;
-  --warn: #d2a35a;
-  --bad: #c47b72;
+  /* Semantic colour, deliberately not the accent. Coral means "here, now,
+     yours"; these three mean what the data is doing. */
+  --good: #6fc3d4;
+  --warn: #e3b072;
+  --bad:  #e0687f;
+  /* Absence is not badness. A month with no usable observation is a hole in
+     the record, not an error, so gaps read as dim neutral rather than red —
+     which also keeps them from competing with the coral accent. */
+  --absent: #3f4d63;
 
-  --land: #1b2226;
-  --land-line: rgba(221,174,92,.22);
-  --sea: #0b0f12;
+  --sea: #070d18;
+  --land: #16203200;
+  --land-fill: #172234;
+  --land-line: rgba(255,122,92,.34);
+  --outside-fill: #101827;
+  --outside-line: rgba(148,163,184,.22);
 
   --r: 12px;
   --r-sm: 8px;
-  --shadow: 0 10px 34px rgba(0,0,0,.5);
+  --shadow: 0 10px 34px rgba(0,0,0,.55);
 
   --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
@@ -46,37 +59,43 @@
   --timeline: 104px;
 }
 
-/* Light theme is derived, not inverted: the ground lifts to a warm paper, the
-   accent darkens to hold contrast on it, and the land keeps its relationship
-   to the sea rather than flipping. */
+/* Light theme is derived, not inverted: the ground lifts to a cool paper, the
+   coral darkens to hold contrast on it, and land keeps its relationship to
+   sea rather than flipping. */
 @media (prefers-color-scheme: light) {
   :root {
-    --ground: #f2f0ec; --surface: #fbfaf8; --raised: #fff; --sunken: #e8e5e0;
-    --line: rgba(20,26,30,.12); --line-2: rgba(20,26,30,.22);
-    --ink: #191f23; --ink-2: #55606a; --ink-3: #808b94;
-    --accent: #a2701c; --accent-2: #8a5e14; --accent-soft: rgba(162,112,28,.13);
-    --good: #3f7a68; --warn: #96661b; --bad: #a44c42;
-    --land: #e4e0d4; --land-line: rgba(162,112,28,.55); --sea: #d3d8da;
-    --shadow: 0 10px 30px rgba(30,35,40,.14);
+    --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
+    --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
+    --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
+    --accent: #d94f2e; --accent-2: #b03d21; --accent-soft: rgba(217,79,46,.12);
+    --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
+    --sea: #cfdae6; --land-fill: #e4e9f0;
+    --land-line: rgba(217,79,46,.5);
+    --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
+    --shadow: 0 10px 30px rgba(15,23,42,.13);
   }
 }
 :root[data-theme="dark"] {
-  --ground: #0e1113; --surface: #171c20; --raised: #1e242a; --sunken: #0b0e10;
-  --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.16);
-  --ink: #e8ecef; --ink-2: #9aa4ab; --ink-3: #6b757c;
-  --accent: #ddae5c; --accent-2: #c4923f; --accent-soft: rgba(221,174,92,.16);
-  --good: #7fb3a3; --warn: #d2a35a; --bad: #c47b72;
-  --land: #1c2429; --land-line: rgba(221,174,92,.3); --sea: #0a0d10;
-  --shadow: 0 10px 34px rgba(0,0,0,.5);
+  --ground: #0b1220; --surface: #131c2e; --raised: #1a2438; --sunken: #070c16;
+  --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.17);
+  --ink: #e6ecf5; --ink-2: #94a3b8; --ink-3: #64748b;
+  --accent: #ff7a5c; --accent-2: #e05f42; --accent-soft: rgba(255,122,92,.15);
+  --good: #6fc3d4; --warn: #e3b072; --bad: #e0687f; --absent: #3f4d63;
+  --sea: #070d18; --land-fill: #172234;
+  --land-line: rgba(255,122,92,.34);
+  --outside-fill: #101827; --outside-line: rgba(148,163,184,.22);
+  --shadow: 0 10px 34px rgba(0,0,0,.55);
 }
 :root[data-theme="light"] {
-  --ground: #f2f0ec; --surface: #fbfaf8; --raised: #fff; --sunken: #e8e5e0;
-  --line: rgba(20,26,30,.12); --line-2: rgba(20,26,30,.22);
-  --ink: #191f23; --ink-2: #55606a; --ink-3: #808b94;
-  --accent: #a2701c; --accent-2: #8a5e14; --accent-soft: rgba(162,112,28,.13);
-  --good: #3f7a68; --warn: #96661b; --bad: #a44c42;
-  --land: #e4e0d4; --land-line: rgba(162,112,28,.55); --sea: #d3d8da;
-  --shadow: 0 10px 30px rgba(30,35,40,.14);
+  --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
+  --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
+  --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
+  --accent: #d94f2e; --accent-2: #b03d21; --accent-soft: rgba(217,79,46,.12);
+  --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
+  --sea: #cfdae6; --land-fill: #e4e9f0;
+  --land-line: rgba(217,79,46,.5);
+  --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
+  --shadow: 0 10px 30px rgba(15,23,42,.13);
 }
 
 * { box-sizing: border-box; }
@@ -266,7 +285,7 @@ td.molab { padding-left: 22px !important; color: var(--ink-3); font-weight: 400 
    pixels must not look as solid as one from thousands. */
 .c-fair { color: var(--ink-2); }
 .c-poor { color: var(--ink-3); font-style: italic; }
-.gapv { color: var(--ink-3); opacity: .5; }
+.gapv { color: var(--absent); }
 .part { color: var(--warn); opacity: .75; margin-left: 2px; }
 
 /* ---- cards, charts ---- */
@@ -328,7 +347,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
 .readout { width: 152px; flex: none; min-width: 0; }
 .readout .step { font: 600 14px/1.3 var(--mono); letter-spacing: -.01em; }
 .readout .val { font: 12px/1.4 var(--mono); color: var(--accent); display: flex; align-items: center; gap: 5px; }
-.readout .val.gap { color: var(--bad); font-style: italic; }
+.readout .val.gap { color: var(--absent); font-style: italic; }
 .readout .lo { font: 9px/1.5 var(--mono); padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); font-style: normal; }
 .readout .who { font-size: 10.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .readout .vs {
@@ -472,6 +491,12 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
     <button class="tool" id="redoBtn" aria-label="Redo" title="Redo (Cmd+Shift+Z)" disabled>
       <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l3.5 3.5L13 12"/><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4"/></svg>
     </button>
+    <button class="tool sep" id="fitBtn" aria-label="Fit the whole UK" title="Zoom out to the whole UK">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7.5V3.5h4M17 7.5V3.5h-4M3 12.5v4h4M17 12.5v4h-4"/>
+        <circle cx="10" cy="10" r="2.2"/>
+      </svg>
+    </button>
     <button class="tool danger" id="clearBtn" aria-label="Clear" title="Remove the drawn shape" disabled>
       <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
     </button>
@@ -516,7 +541,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
   </div>
 </div>
 <script>
-const DATA={"factors":[["ndvi","NDVI (vegetation vigour)","sentinel2_sr","Vegetation","index",0,0,-0.2,0.95,1,"Normalised difference of NIR and red. The workhorse greenness index."],["evi","EVI (enhanced vegetation)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Less prone to saturation than NDVI over dense canopy."],["savi","SAVI (soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Corrects for soil brightness on sparse cover."],["msavi","MSAVI (modified soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Self-adjusting soil correction; good on bare ground."],["gndvi","GNDVI (green NDVI)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Green-band variant, more sensitive to chlorophyll."],["ndmi","NDMI (moisture)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.6,1,"Canopy water content from NIR and SWIR."],["nbr","NBR (burn ratio)","sentinel2_sr","Vegetation","index",0,0,-0.6,0.9,1,"Fire severity and post-burn recovery."],["chlorophyll_index","Chlorophyll index","sentinel2_sr","Vegetation","index",0,0,0.0,8.0,1,"Red-edge chlorophyll proxy; early stress signal."],["leaf_area_index","Leaf area index","sentinel2_sr","Vegetation","m\u00b2/m\u00b2",0,0,0.0,7.0,1,"Modelled canopy leaf area per unit ground."],["greenness","Tasselled-cap greenness","sentinel2_sr","Vegetation","index",0,0,-0.2,0.6,1,"Canopy vigour component of the tasselled-cap transform."],["wetness","Tasselled-cap wetness","sentinel2_sr","Vegetation","index",0,0,-0.4,0.3,1,"Surface moisture component."],["brightness","Tasselled-cap brightness","sentinel2_sr","Vegetation","index",0,0,0.0,0.7,1,"Bare-soil and albedo component."],["bare_soil_index","Bare soil index","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Exposed soil fraction proxy."],["ndbi","NDBI (built-up index)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Spectral built-up signal from SWIR and NIR."],["ndwi","NDWI (open water)","sentinel2_sr","Vegetation","index",0,0,-0.8,0.8,1,"Open-water delineation from green and NIR."],["lc_tree_pct","Tree cover","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share of the area classed as tree cover."],["lc_shrub_pct","Shrubland","esa_worldcover","Land cover","%",0,1,0.0,60.0,1,"Share classed as shrubland."],["lc_grass_pct","Grassland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as grassland."],["lc_crop_pct","Cropland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as cropland."],["lc_built_pct","Built-up","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as built-up."],["lc_bare_pct","Bare / sparse","esa_worldcover","Land cover","%",0,1,0.0,40.0,1,"Share classed as bare or sparsely vegetated."],["lc_water_pct","Open water","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as permanent water."],["lc_wetland_pct","Wetland","esa_worldcover","Land cover","%",0,1,0.0,50.0,1,"Share classed as herbaceous wetland."],["lc_dominant","Dominant land cover","esa_worldcover","Land cover","class",1,1,null,null,1,"Most common class by area. Never averaged."],["lc_diversity","Land cover diversity","esa_worldcover","Land cover","Shannon H",0,1,0.0,2.2,1,"Shannon entropy across classes \u2014 habitat mosaic proxy."],["lc_fragmentation","Habitat fragmentation","esa_worldcover","Land cover","edge m/ha",0,1,0.0,400.0,1,"Edge density between cover patches."],["lc_change_rate","Land cover change rate","esa_worldcover","Land cover","%/yr",0,1,0.0,12.0,1,"Share of area changing class year on year."],["elevation_mean","Elevation (mean)","lidar_dtm","Terrain","m",0,2,-5.0,950.0,0,"Mean height above ordnance datum."],["elevation_min","Elevation (min)","lidar_dtm","Terrain","m",0,2,-5.0,900.0,1,"Lowest point in the area."],["elevation_max","Elevation (max)","lidar_dtm","Terrain","m",0,2,0.0,980.0,1,"Highest point in the area."],["elevation_range","Relief (max \u2212 min)","lidar_dtm","Terrain","m",0,2,0.0,600.0,1,"Vertical range across the area."],["slope_mean","Slope (mean)","lidar_dtm","Terrain","\u00b0",0,2,0.0,45.0,1,"Mean gradient \u2014 buildability and erosion risk."],["slope_max","Slope (max)","lidar_dtm","Terrain","\u00b0",0,2,0.0,70.0,1,"Steepest gradient present."],["aspect_dominant","Dominant aspect","lidar_dtm","Terrain","class",1,2,null,null,1,"Prevailing slope direction. Circular \u2014 never averaged."],["ruggedness","Terrain ruggedness (TRI)","lidar_dtm","Terrain","index",0,2,0.0,60.0,1,"Mean elevation difference between neighbouring cells."],["tpi","Topographic position","lidar_dtm","Terrain","index",0,2,-30.0,30.0,1,"Ridge (positive) to valley (negative) position."],["curvature","Profile curvature","lidar_dtm","Terrain","1/100 m",0,2,-5.0,5.0,1,"Convex or concave surface form; drives runoff."],["flow_accumulation","Flow accumulation","lidar_dtm","Terrain","cells",0,2,0.0,100000.0,1,"Upslope contributing area \u2014 where water collects."],["hand","Height above drainage","lidar_dtm","Terrain","m",0,2,0.0,120.0,1,"Elevation above nearest watercourse. Strong flood predictor."],["solar_aspect_score","Solar aspect score","lidar_dtm","Terrain","0\u20131",0,2,0.0,1.0,1,"South-facing, low-shade favourability for solar."],["lst_day","Land surface temp (day)","modis_lst","Temperature","\u00b0C",0,0,-5.0,42.0,0,"Daytime skin temperature."],["lst_night","Land surface temp (night)","modis_lst","Temperature","\u00b0C",0,0,-10.0,22.0,0,"Night-time skin temperature."],["lst_diurnal_range","Diurnal temp range","modis_lst","Temperature","\u00b0C",0,0,0.0,25.0,1,"Day minus night \u2014 thermal inertia proxy."],["heat_anomaly","Urban heat anomaly","modis_lst","Temperature","\u00b0C",0,0,-4.0,9.0,1,"Excess over the surrounding rural baseline."],["air_temp_mean","Air temperature (mean)","era5_land","Temperature","\u00b0C",0,0,-4.0,24.0,0,"2 m air temperature."],["air_temp_max","Air temperature (max)","era5_land","Temperature","\u00b0C",0,0,0.0,38.0,1,"Monthly maximum 2 m air temperature."],["air_temp_min","Air temperature (min)","era5_land","Temperature","\u00b0C",0,0,-12.0,16.0,1,"Monthly minimum 2 m air temperature."],["growing_degree_days","Growing degree days","era5_land","Temperature","\u00b0C\u00b7day",0,0,0.0,420.0,1,"Accumulated warmth above 5 \u00b0C \u2014 crop development."],["frost_days","Frost days","era5_land","Temperature","days",0,0,0.0,28.0,1,"Days with minimum below 0 \u00b0C."],["precip_total","Precipitation total","haduk_precip","Water","mm",0,0,0.0,320.0,0,"Monthly rainfall total."],["precip_anomaly","Rainfall anomaly","haduk_precip","Water","%",0,0,-100.0,200.0,1,"Departure from the 1991\u20132020 monthly normal."],["dry_days","Dry days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days below 1 mm."],["wet_days","Wet days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days at or above 1 mm."],["max_daily_precip","Heaviest daily rainfall","haduk_precip","Water","mm",0,0,0.0,110.0,1,"Wettest single day \u2014 surface-water flood driver."],["spi_3month","Drought index (SPI-3)","haduk_precip","Water","\u03c3",0,0,-3.0,3.0,1,"Standardised precipitation over three months."],["soil_moisture","Soil moisture","era5_land","Water","m\u00b3/m\u00b3",0,0,0.05,0.5,0,"Volumetric water in the top soil layer."],["evapotranspiration","Evapotranspiration","era5_land","Water","mm",0,0,0.0,140.0,0,"Water returned to atmosphere by soil and plants."],["humidity","Relative humidity","era5_land","Water","%",0,0,55.0,98.0,1,"Mean monthly relative humidity."],["water_occurrence","Surface water occurrence","jrc_surface_water","Flood & water","%",0,1,0.0,100.0,0,"Share of observations showing water present."],["water_seasonality","Water seasonality","jrc_surface_water","Flood & water","months",0,1,0.0,12.0,0,"Months per year with water present."],["water_change","Surface water change","jrc_surface_water","Flood & water","%",0,1,-60.0,60.0,1,"Gain or loss against the long-term baseline."],["flood_zone2_pct","Flood Zone 2 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-1000-year fluvial extent."],["flood_zone3_pct","Flood Zone 3 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-100-year fluvial extent."],["surface_water_risk","Surface water flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"EA risk of flooding from surface water."],["reservoir_risk","Reservoir flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"Extent of reservoir inundation scenarios."],["distance_to_water","Distance to watercourse","os_open","Flood & water","m",0,2,0.0,6000.0,1,"Straight-line distance to the nearest river or stream."],["built_pct","Built-up surface","ghsl_built","Built environment","%",0,3,0.0,100.0,0,"Impervious built surface share."],["built_volume","Built volume","ghsl_built","Built environment","m\u00b3/ha",0,3,0.0,90000.0,0,"Total built volume per hectare."],["built_change_rate","Built-up change rate","ghsl_built","Built environment","%/yr",0,3,-2.0,12.0,1,"Rate of built surface growth."],["impervious_pct","Impervious surface","ghsl_built","Built environment","%",0,3,0.0,100.0,1,"Sealed ground \u2014 runoff and heat driver."],["building_density","Building density","os_open","Built environment","bldg/ha",0,2,0.0,60.0,1,"Building footprints per hectare."],["road_density","Road density","os_open","Built environment","km/km\u00b2",0,2,0.0,22.0,1,"Total road length per unit area."],["distance_a_road","Distance to A road","os_open","Built environment","m",0,2,0.0,15000.0,1,"Straight-line distance to the nearest A road."],["distance_motorway","Distance to motorway","os_open","Built environment","m",0,2,0.0,60000.0,1,"Straight-line distance to the nearest motorway."],["distance_railway","Distance to railway","os_open","Built environment","m",0,2,0.0,40000.0,1,"Straight-line distance to the nearest railway line."],["population_density","Population density","worldpop","People & economy","people/km\u00b2",0,1,0.0,16000.0,0,"Modelled residential population."],["population_change","Population change","worldpop","People & economy","%/yr",0,1,-5.0,12.0,1,"Year-on-year population growth."],["imd_score","Deprivation score (IMD)","ons_imd","People & economy","score",0,4,0.5,92.0,0,"Overall index of multiple deprivation."],["imd_income_decile","IMD income decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_employment_decile","IMD employment decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_health_decile","IMD health decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_education_decile","IMD education decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["avg_sale_price","Average sale price","land_registry_ppd","People & economy","\u00a3",0,0,60000.0,1400000.0,0,"Mean residential transaction price."],["price_per_m2","Price per m\u00b2","land_registry_ppd","People & economy","\u00a3/m\u00b2",0,0,900.0,14000.0,1,"Sale price normalised by floor area."],["transaction_count","Transaction count","land_registry_ppd","People & economy","sales",0,0,0.0,400.0,0,"Residential sales completed in the month."],["price_change_yoy","Price change (YoY)","land_registry_ppd","People & economy","%",0,0,-25.0,30.0,1,"Year-on-year change in average price."],["soil_ph","Soil pH","soilgrids","Soil & geology","pH",0,2,3.8,8.4,0,"Topsoil acidity or alkalinity."],["soil_organic_carbon","Soil organic carbon","soilgrids","Soil & geology","g/kg",0,2,5.0,180.0,0,"Topsoil carbon content \u2014 fertility and sequestration."],["soil_clay_pct","Clay content","soilgrids","Soil & geology","%",0,2,3.0,60.0,0,"Clay fraction of topsoil."],["soil_sand_pct","Sand content","soilgrids","Soil & geology","%",0,2,3.0,90.0,0,"Sand fraction of topsoil."],["soil_silt_pct","Silt content","soilgrids","Soil & geology","%",0,2,3.0,70.0,0,"Silt fraction of topsoil."],["soil_bulk_density","Soil bulk density","soilgrids","Soil & geology","kg/m\u00b3",0,2,800.0,1700.0,0,"Compaction proxy; affects drainage and rooting."],["soil_water_capacity","Available water capacity","soilgrids","Soil & geology","mm/m",0,2,40.0,220.0,1,"Water the soil can hold for plant use."],["bedrock_class","Bedrock geology","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant bedrock unit. Never averaged."],["superficial_deposits","Superficial deposits","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant drift geology. Never averaged."],["radon_potential","Radon potential","bgs_geology","Soil & geology","%",0,2,0.0,30.0,0,"Share of homes estimated above the action level."],["no2","Nitrogen dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,1.0,70.0,0,"Traffic and combustion pollutant."],["pm25","PM2.5","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,2.0,32.0,0,"Fine particulates; the main health-burden pollutant."],["pm10","PM10","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,4.0,48.0,0,"Coarse particulates."],["o3","Ozone","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,20.0,110.0,0,"Ground-level ozone; peaks in summer."],["so2","Sulphur dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,0.2,14.0,0,"Industrial and shipping emissions."],["sar_vv","SAR backscatter (VV)","sentinel1_sar","Radar","dB",0,0,-25.0,2.0,0,"Co-polarised return; cloud-independent."],["sar_vh","SAR backscatter (VH)","sentinel1_sar","Radar","dB",0,0,-32.0,-5.0,0,"Cross-polarised return; sensitive to canopy volume."],["sar_ratio","SAR VH/VV ratio","sentinel1_sar","Radar","ratio",0,0,0.1,0.9,1,"Structure proxy that works through cloud."],["sar_soil_moisture","SAR soil moisture","sentinel1_sar","Radar","%",0,0,5.0,55.0,1,"Radar-derived near-surface wetness."],["sar_coherence","SAR coherence","sentinel1_sar","Radar","0\u20131",0,0,0.05,0.95,1,"Interferometric stability \u2014 detects ground disturbance."],["sssi_pct","SSSI coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within Sites of Special Scientific Interest."],["aonb_pct","National Landscape (AONB)","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Landscape."],["national_park_pct","National Park","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Park."],["sac_spa_pct","SAC / SPA coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within European-designated habitat sites."],["ancient_woodland_pct","Ancient woodland","natural_england","Designations","%",0,2,0.0,60.0,1,"Share on the ancient woodland inventory."],["green_belt_pct","Green Belt","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within designated Green Belt."],["priority_habitat_pct","Priority habitat","natural_england","Designations","%",0,2,0.0,90.0,1,"Share on the priority habitat inventory."],["nightlight_radiance","Night-time radiance","viirs_nightlights","Night lights","nW/cm\u00b2/sr",0,0,0.0,120.0,0,"Artificial light emission \u2014 activity and sprawl proxy."],["nightlight_change","Night-time light change","viirs_nightlights","Night lights","%/yr",0,0,-30.0,40.0,1,"Growth or decline in emitted light."],["solar_ghi","Global horizontal irradiance","pvgis","Solar","kWh/m\u00b2/yr",0,2,750.0,1250.0,0,"Total annual solar resource."],["solar_pv_potential","PV generation potential","pvgis","Solar","kWh/kWp/yr",0,2,700.0,1150.0,1,"Expected yield from an optimally tilted array."],["sunshine_hours","Sunshine hours","pvgis","Solar","hours",0,2,1150.0,1900.0,0,"Mean annual bright sunshine duration."]],"bases":[["sentinel2_sr","Sentinel-2 Surface Reflectance","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","5 days","monthly",10,1],["sentinel1_sar","Sentinel-1 SAR (C-band)","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","6 days","monthly",10,1],["esa_worldcover","ESA WorldCover Land Cover","ESA","CC BY 4.0","https://esa-worldcover.org/","annual","annual",10,1],["lidar_dtm","Environment Agency LIDAR Composite DTM","Environment Agency","OGL v3","https://environment.data.gov.uk/","static","static",2,1],["modis_lst","MODIS Land Surface Temperature","NASA LP DAAC","Public domain","https://lpdaac.usgs.gov/products/mod11a2v061/","8 days","monthly",1000,1],["era5_land","ERA5-Land Reanalysis","ECMWF / Copernicus C3S","Copernicus licence","https://cds.climate.copernicus.eu/","hourly","monthly",9000,1],["haduk_precip","HadUK-Grid Precipitation","Met Office","OGL v3","https://www.metoffice.gov.uk/research/climate/maps-and-data/data/haduk-grid/","daily","monthly",1000,1],["jrc_surface_water","JRC Global Surface Water","EC Joint Research Centre","Open","https://global-surface-water.appspot.com/","annual","annual",30,1],["ea_flood_zones","EA Flood Map for Planning","Environment Agency","OGL v3","https://environment.data.gov.uk/","quarterly","static",5,1],["ghsl_built","GHSL Built-Up Surface","EC Joint Research Centre","CC BY 4.0","https://ghsl.jrc.ec.europa.eu/","5 years","5 years",100,1],["os_open","OS OpenData (Roads, Rivers, Buildings)","Ordnance Survey","OGL v3","https://osdatahub.os.uk/downloads/open","biannual","static",10,1],["worldpop","WorldPop Population Density","WorldPop / Univ. Southampton","CC BY 4.0","https://www.worldpop.org/","annual","annual",100,1],["ons_imd","Indices of Multiple Deprivation","ONS / MHCLG","OGL v3","https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019","~4 years","periodic",null,1],["land_registry_ppd","HM Land Registry Price Paid Data","HM Land Registry","OGL v3","https://landregistry.data.gov.uk/","monthly","monthly",null,0],["soilgrids","SoilGrids 250m","ISRIC World Soil Information","CC BY 4.0","https://soilgrids.org/","static","static",250,1],["bgs_geology","BGS Geology & Radon","British Geological Survey","BGS Open Licence","https://www.bgs.ac.uk/","static","static",50,1],["copernicus_air","CAMS European Air Quality","Copernicus Atmosphere Monitoring Service","Copernicus licence","https://ads.atmosphere.copernicus.eu/","hourly","monthly",10000,1],["natural_england","Natural England Designated Sites","Natural England","OGL v3","https://naturalengland-defra.opendata.arcgis.com/","monthly","static",null,1],["viirs_nightlights","VIIRS Nighttime Lights","NOAA / Colorado School of Mines","Public domain","https://eogdata.mines.edu/products/vnl/","monthly","monthly",500,1],["pvgis","PVGIS Solar Irradiation","EC Joint Research Centre","Open","https://re.jrc.ec.europa.eu/pvg_tools/","static","static",5000,0]],"groups":["Vegetation","Land cover","Terrain","Temperature","Water","Flood & water","Built environment","People & economy","Soil & geology","Air quality","Radar","Designations","Night lights","Solar"],"classes":{"lc_dominant":["Tree cover","Shrubland","Grassland","Cropland","Built-up","Bare / sparse","Open water","Herbaceous wetland"],"aspect_dominant":["North","North-east","East","South-east","South","South-west","West","North-west"],"bedrock_class":["Chalk","Clay","Limestone","Sandstone","Mudstone","Granite","Gravel","Slate"],"superficial_deposits":["Alluvium","River terrace","Glacial till","Head","Sand and gravel","Peat","None recorded"]},"outline":[[-3.05,54.95],[-2.55,55.15],[-2.2,55.45],[-2.03,55.8],[-1.6,55.6],[-1.52,55.05],[-1.35,54.75],[-0.78,54.55],[-0.4,54.28],[-0.1,54.12],[-0.2,53.7],[0.15,53.6],[0.35,53.2],[0.35,52.9],[0.55,52.95],[1.35,52.92],[1.75,52.75],[1.6,52.3],[1.3,51.95],[1.05,51.78],[0.95,51.6],[1.42,51.38],[1.1,51.05],[0.6,50.85],[0.3,50.78],[-0.3,50.78],[-0.95,50.8],[-1.45,50.6],[-1.95,50.7],[-2.45,50.6],[-3.05,50.7],[-3.55,50.45],[-4.2,50.35],[-5.05,50.1],[-5.72,50.05],[-5.55,50.45],[-4.55,50.6],[-4.2,51.0],[-3.55,51.22],[-3.0,51.32],[-2.65,51.6],[-2.7,51.85],[-3.1,52.1],[-3.15,52.55],[-2.75,52.95],[-3.1,53.25],[-3.05,53.45],[-2.95,53.75],[-3.05,54.1],[-3.35,54.25],[-3.6,54.5],[-3.3,54.8],[-3.05,54.95]],"summary":{"factor_count":118,"base_count":20,"stored_base_count":18,"monthly_base_count":7,"derived_factor_count":80,"group_count":14}};
+const DATA={"factors":[["ndvi","NDVI (vegetation vigour)","sentinel2_sr","Vegetation","index",0,0,-0.2,0.95,1,"Normalised difference of NIR and red. The workhorse greenness index."],["evi","EVI (enhanced vegetation)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Less prone to saturation than NDVI over dense canopy."],["savi","SAVI (soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Corrects for soil brightness on sparse cover."],["msavi","MSAVI (modified soil-adjusted)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.9,1,"Self-adjusting soil correction; good on bare ground."],["gndvi","GNDVI (green NDVI)","sentinel2_sr","Vegetation","index",0,0,-0.1,0.85,1,"Green-band variant, more sensitive to chlorophyll."],["ndmi","NDMI (moisture)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.6,1,"Canopy water content from NIR and SWIR."],["nbr","NBR (burn ratio)","sentinel2_sr","Vegetation","index",0,0,-0.6,0.9,1,"Fire severity and post-burn recovery."],["chlorophyll_index","Chlorophyll index","sentinel2_sr","Vegetation","index",0,0,0.0,8.0,1,"Red-edge chlorophyll proxy; early stress signal."],["leaf_area_index","Leaf area index","sentinel2_sr","Vegetation","m\u00b2/m\u00b2",0,0,0.0,7.0,1,"Modelled canopy leaf area per unit ground."],["greenness","Tasselled-cap greenness","sentinel2_sr","Vegetation","index",0,0,-0.2,0.6,1,"Canopy vigour component of the tasselled-cap transform."],["wetness","Tasselled-cap wetness","sentinel2_sr","Vegetation","index",0,0,-0.4,0.3,1,"Surface moisture component."],["brightness","Tasselled-cap brightness","sentinel2_sr","Vegetation","index",0,0,0.0,0.7,1,"Bare-soil and albedo component."],["bare_soil_index","Bare soil index","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Exposed soil fraction proxy."],["ndbi","NDBI (built-up index)","sentinel2_sr","Vegetation","index",0,0,-0.5,0.5,1,"Spectral built-up signal from SWIR and NIR."],["ndwi","NDWI (open water)","sentinel2_sr","Vegetation","index",0,0,-0.8,0.8,1,"Open-water delineation from green and NIR."],["lc_tree_pct","Tree cover","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share of the area classed as tree cover."],["lc_shrub_pct","Shrubland","esa_worldcover","Land cover","%",0,1,0.0,60.0,1,"Share classed as shrubland."],["lc_grass_pct","Grassland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as grassland."],["lc_crop_pct","Cropland","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as cropland."],["lc_built_pct","Built-up","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as built-up."],["lc_bare_pct","Bare / sparse","esa_worldcover","Land cover","%",0,1,0.0,40.0,1,"Share classed as bare or sparsely vegetated."],["lc_water_pct","Open water","esa_worldcover","Land cover","%",0,1,0.0,100.0,1,"Share classed as permanent water."],["lc_wetland_pct","Wetland","esa_worldcover","Land cover","%",0,1,0.0,50.0,1,"Share classed as herbaceous wetland."],["lc_dominant","Dominant land cover","esa_worldcover","Land cover","class",1,1,null,null,1,"Most common class by area. Never averaged."],["lc_diversity","Land cover diversity","esa_worldcover","Land cover","Shannon H",0,1,0.0,2.2,1,"Shannon entropy across classes \u2014 habitat mosaic proxy."],["lc_fragmentation","Habitat fragmentation","esa_worldcover","Land cover","edge m/ha",0,1,0.0,400.0,1,"Edge density between cover patches."],["lc_change_rate","Land cover change rate","esa_worldcover","Land cover","%/yr",0,1,0.0,12.0,1,"Share of area changing class year on year."],["elevation_mean","Elevation (mean)","lidar_dtm","Terrain","m",0,2,-5.0,950.0,0,"Mean height above ordnance datum."],["elevation_min","Elevation (min)","lidar_dtm","Terrain","m",0,2,-5.0,900.0,1,"Lowest point in the area."],["elevation_max","Elevation (max)","lidar_dtm","Terrain","m",0,2,0.0,980.0,1,"Highest point in the area."],["elevation_range","Relief (max \u2212 min)","lidar_dtm","Terrain","m",0,2,0.0,600.0,1,"Vertical range across the area."],["slope_mean","Slope (mean)","lidar_dtm","Terrain","\u00b0",0,2,0.0,45.0,1,"Mean gradient \u2014 buildability and erosion risk."],["slope_max","Slope (max)","lidar_dtm","Terrain","\u00b0",0,2,0.0,70.0,1,"Steepest gradient present."],["aspect_dominant","Dominant aspect","lidar_dtm","Terrain","class",1,2,null,null,1,"Prevailing slope direction. Circular \u2014 never averaged."],["ruggedness","Terrain ruggedness (TRI)","lidar_dtm","Terrain","index",0,2,0.0,60.0,1,"Mean elevation difference between neighbouring cells."],["tpi","Topographic position","lidar_dtm","Terrain","index",0,2,-30.0,30.0,1,"Ridge (positive) to valley (negative) position."],["curvature","Profile curvature","lidar_dtm","Terrain","1/100 m",0,2,-5.0,5.0,1,"Convex or concave surface form; drives runoff."],["flow_accumulation","Flow accumulation","lidar_dtm","Terrain","cells",0,2,0.0,100000.0,1,"Upslope contributing area \u2014 where water collects."],["hand","Height above drainage","lidar_dtm","Terrain","m",0,2,0.0,120.0,1,"Elevation above nearest watercourse. Strong flood predictor."],["solar_aspect_score","Solar aspect score","lidar_dtm","Terrain","0\u20131",0,2,0.0,1.0,1,"South-facing, low-shade favourability for solar."],["lst_day","Land surface temp (day)","modis_lst","Temperature","\u00b0C",0,0,-5.0,42.0,0,"Daytime skin temperature."],["lst_night","Land surface temp (night)","modis_lst","Temperature","\u00b0C",0,0,-10.0,22.0,0,"Night-time skin temperature."],["lst_diurnal_range","Diurnal temp range","modis_lst","Temperature","\u00b0C",0,0,0.0,25.0,1,"Day minus night \u2014 thermal inertia proxy."],["heat_anomaly","Urban heat anomaly","modis_lst","Temperature","\u00b0C",0,0,-4.0,9.0,1,"Excess over the surrounding rural baseline."],["air_temp_mean","Air temperature (mean)","era5_land","Temperature","\u00b0C",0,0,-4.0,24.0,0,"2 m air temperature."],["air_temp_max","Air temperature (max)","era5_land","Temperature","\u00b0C",0,0,0.0,38.0,1,"Monthly maximum 2 m air temperature."],["air_temp_min","Air temperature (min)","era5_land","Temperature","\u00b0C",0,0,-12.0,16.0,1,"Monthly minimum 2 m air temperature."],["growing_degree_days","Growing degree days","era5_land","Temperature","\u00b0C\u00b7day",0,0,0.0,420.0,1,"Accumulated warmth above 5 \u00b0C \u2014 crop development."],["frost_days","Frost days","era5_land","Temperature","days",0,0,0.0,28.0,1,"Days with minimum below 0 \u00b0C."],["precip_total","Precipitation total","haduk_precip","Water","mm",0,0,0.0,320.0,0,"Monthly rainfall total."],["precip_anomaly","Rainfall anomaly","haduk_precip","Water","%",0,0,-100.0,200.0,1,"Departure from the 1991\u20132020 monthly normal."],["dry_days","Dry days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days below 1 mm."],["wet_days","Wet days","haduk_precip","Water","days",0,0,0.0,31.0,1,"Days at or above 1 mm."],["max_daily_precip","Heaviest daily rainfall","haduk_precip","Water","mm",0,0,0.0,110.0,1,"Wettest single day \u2014 surface-water flood driver."],["spi_3month","Drought index (SPI-3)","haduk_precip","Water","\u03c3",0,0,-3.0,3.0,1,"Standardised precipitation over three months."],["soil_moisture","Soil moisture","era5_land","Water","m\u00b3/m\u00b3",0,0,0.05,0.5,0,"Volumetric water in the top soil layer."],["evapotranspiration","Evapotranspiration","era5_land","Water","mm",0,0,0.0,140.0,0,"Water returned to atmosphere by soil and plants."],["humidity","Relative humidity","era5_land","Water","%",0,0,55.0,98.0,1,"Mean monthly relative humidity."],["water_occurrence","Surface water occurrence","jrc_surface_water","Flood & water","%",0,1,0.0,100.0,0,"Share of observations showing water present."],["water_seasonality","Water seasonality","jrc_surface_water","Flood & water","months",0,1,0.0,12.0,0,"Months per year with water present."],["water_change","Surface water change","jrc_surface_water","Flood & water","%",0,1,-60.0,60.0,1,"Gain or loss against the long-term baseline."],["flood_zone2_pct","Flood Zone 2 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-1000-year fluvial extent."],["flood_zone3_pct","Flood Zone 3 coverage","ea_flood_zones","Flood & water","%",0,2,0.0,100.0,1,"Share in the 1-in-100-year fluvial extent."],["surface_water_risk","Surface water flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"EA risk of flooding from surface water."],["reservoir_risk","Reservoir flood risk","ea_flood_zones","Flood & water","0\u20131",0,2,0.0,1.0,1,"Extent of reservoir inundation scenarios."],["distance_to_water","Distance to watercourse","os_open","Flood & water","m",0,2,0.0,6000.0,1,"Straight-line distance to the nearest river or stream."],["built_pct","Built-up surface","ghsl_built","Built environment","%",0,3,0.0,100.0,0,"Impervious built surface share."],["built_volume","Built volume","ghsl_built","Built environment","m\u00b3/ha",0,3,0.0,90000.0,0,"Total built volume per hectare."],["built_change_rate","Built-up change rate","ghsl_built","Built environment","%/yr",0,3,-2.0,12.0,1,"Rate of built surface growth."],["impervious_pct","Impervious surface","ghsl_built","Built environment","%",0,3,0.0,100.0,1,"Sealed ground \u2014 runoff and heat driver."],["building_density","Building density","os_open","Built environment","bldg/ha",0,2,0.0,60.0,1,"Building footprints per hectare."],["road_density","Road density","os_open","Built environment","km/km\u00b2",0,2,0.0,22.0,1,"Total road length per unit area."],["distance_a_road","Distance to A road","os_open","Built environment","m",0,2,0.0,15000.0,1,"Straight-line distance to the nearest A road."],["distance_motorway","Distance to motorway","os_open","Built environment","m",0,2,0.0,60000.0,1,"Straight-line distance to the nearest motorway."],["distance_railway","Distance to railway","os_open","Built environment","m",0,2,0.0,40000.0,1,"Straight-line distance to the nearest railway line."],["population_density","Population density","worldpop","People & economy","people/km\u00b2",0,1,0.0,16000.0,0,"Modelled residential population."],["population_change","Population change","worldpop","People & economy","%/yr",0,1,-5.0,12.0,1,"Year-on-year population growth."],["imd_score","Deprivation score (IMD)","ons_imd","People & economy","score",0,4,0.5,92.0,0,"Overall index of multiple deprivation."],["imd_income_decile","IMD income decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_employment_decile","IMD employment decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_health_decile","IMD health decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["imd_education_decile","IMD education decile","ons_imd","People & economy","decile",0,4,1.0,10.0,0,"1 = most deprived, 10 = least."],["avg_sale_price","Average sale price","land_registry_ppd","People & economy","\u00a3",0,0,60000.0,1400000.0,0,"Mean residential transaction price."],["price_per_m2","Price per m\u00b2","land_registry_ppd","People & economy","\u00a3/m\u00b2",0,0,900.0,14000.0,1,"Sale price normalised by floor area."],["transaction_count","Transaction count","land_registry_ppd","People & economy","sales",0,0,0.0,400.0,0,"Residential sales completed in the month."],["price_change_yoy","Price change (YoY)","land_registry_ppd","People & economy","%",0,0,-25.0,30.0,1,"Year-on-year change in average price."],["soil_ph","Soil pH","soilgrids","Soil & geology","pH",0,2,3.8,8.4,0,"Topsoil acidity or alkalinity."],["soil_organic_carbon","Soil organic carbon","soilgrids","Soil & geology","g/kg",0,2,5.0,180.0,0,"Topsoil carbon content \u2014 fertility and sequestration."],["soil_clay_pct","Clay content","soilgrids","Soil & geology","%",0,2,3.0,60.0,0,"Clay fraction of topsoil."],["soil_sand_pct","Sand content","soilgrids","Soil & geology","%",0,2,3.0,90.0,0,"Sand fraction of topsoil."],["soil_silt_pct","Silt content","soilgrids","Soil & geology","%",0,2,3.0,70.0,0,"Silt fraction of topsoil."],["soil_bulk_density","Soil bulk density","soilgrids","Soil & geology","kg/m\u00b3",0,2,800.0,1700.0,0,"Compaction proxy; affects drainage and rooting."],["soil_water_capacity","Available water capacity","soilgrids","Soil & geology","mm/m",0,2,40.0,220.0,1,"Water the soil can hold for plant use."],["bedrock_class","Bedrock geology","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant bedrock unit. Never averaged."],["superficial_deposits","Superficial deposits","bgs_geology","Soil & geology","class",1,2,null,null,0,"Dominant drift geology. Never averaged."],["radon_potential","Radon potential","bgs_geology","Soil & geology","%",0,2,0.0,30.0,0,"Share of homes estimated above the action level."],["no2","Nitrogen dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,1.0,70.0,0,"Traffic and combustion pollutant."],["pm25","PM2.5","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,2.0,32.0,0,"Fine particulates; the main health-burden pollutant."],["pm10","PM10","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,4.0,48.0,0,"Coarse particulates."],["o3","Ozone","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,20.0,110.0,0,"Ground-level ozone; peaks in summer."],["so2","Sulphur dioxide","copernicus_air","Air quality","\u00b5g/m\u00b3",0,0,0.2,14.0,0,"Industrial and shipping emissions."],["sar_vv","SAR backscatter (VV)","sentinel1_sar","Radar","dB",0,0,-25.0,2.0,0,"Co-polarised return; cloud-independent."],["sar_vh","SAR backscatter (VH)","sentinel1_sar","Radar","dB",0,0,-32.0,-5.0,0,"Cross-polarised return; sensitive to canopy volume."],["sar_ratio","SAR VH/VV ratio","sentinel1_sar","Radar","ratio",0,0,0.1,0.9,1,"Structure proxy that works through cloud."],["sar_soil_moisture","SAR soil moisture","sentinel1_sar","Radar","%",0,0,5.0,55.0,1,"Radar-derived near-surface wetness."],["sar_coherence","SAR coherence","sentinel1_sar","Radar","0\u20131",0,0,0.05,0.95,1,"Interferometric stability \u2014 detects ground disturbance."],["sssi_pct","SSSI coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within Sites of Special Scientific Interest."],["aonb_pct","National Landscape (AONB)","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Landscape."],["national_park_pct","National Park","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within a National Park."],["sac_spa_pct","SAC / SPA coverage","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within European-designated habitat sites."],["ancient_woodland_pct","Ancient woodland","natural_england","Designations","%",0,2,0.0,60.0,1,"Share on the ancient woodland inventory."],["green_belt_pct","Green Belt","natural_england","Designations","%",0,2,0.0,100.0,1,"Share within designated Green Belt."],["priority_habitat_pct","Priority habitat","natural_england","Designations","%",0,2,0.0,90.0,1,"Share on the priority habitat inventory."],["nightlight_radiance","Night-time radiance","viirs_nightlights","Night lights","nW/cm\u00b2/sr",0,0,0.0,120.0,0,"Artificial light emission \u2014 activity and sprawl proxy."],["nightlight_change","Night-time light change","viirs_nightlights","Night lights","%/yr",0,0,-30.0,40.0,1,"Growth or decline in emitted light."],["solar_ghi","Global horizontal irradiance","pvgis","Solar","kWh/m\u00b2/yr",0,2,750.0,1250.0,0,"Total annual solar resource."],["solar_pv_potential","PV generation potential","pvgis","Solar","kWh/kWp/yr",0,2,700.0,1150.0,1,"Expected yield from an optimally tilted array."],["sunshine_hours","Sunshine hours","pvgis","Solar","hours",0,2,1150.0,1900.0,0,"Mean annual bright sunshine duration."]],"bases":[["sentinel2_sr","Sentinel-2 Surface Reflectance","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","5 days","monthly",10,1],["sentinel1_sar","Sentinel-1 SAR (C-band)","Copernicus / ESA","CC BY-SA 3.0 IGO","https://dataspace.copernicus.eu/","6 days","monthly",10,1],["esa_worldcover","ESA WorldCover Land Cover","ESA","CC BY 4.0","https://esa-worldcover.org/","annual","annual",10,1],["lidar_dtm","Environment Agency LIDAR Composite DTM","Environment Agency","OGL v3","https://environment.data.gov.uk/","static","static",2,1],["modis_lst","MODIS Land Surface Temperature","NASA LP DAAC","Public domain","https://lpdaac.usgs.gov/products/mod11a2v061/","8 days","monthly",1000,1],["era5_land","ERA5-Land Reanalysis","ECMWF / Copernicus C3S","Copernicus licence","https://cds.climate.copernicus.eu/","hourly","monthly",9000,1],["haduk_precip","HadUK-Grid Precipitation","Met Office","OGL v3","https://www.metoffice.gov.uk/research/climate/maps-and-data/data/haduk-grid/","daily","monthly",1000,1],["jrc_surface_water","JRC Global Surface Water","EC Joint Research Centre","Open","https://global-surface-water.appspot.com/","annual","annual",30,1],["ea_flood_zones","EA Flood Map for Planning","Environment Agency","OGL v3","https://environment.data.gov.uk/","quarterly","static",5,1],["ghsl_built","GHSL Built-Up Surface","EC Joint Research Centre","CC BY 4.0","https://ghsl.jrc.ec.europa.eu/","5 years","5 years",100,1],["os_open","OS OpenData (Roads, Rivers, Buildings)","Ordnance Survey","OGL v3","https://osdatahub.os.uk/downloads/open","biannual","static",10,1],["worldpop","WorldPop Population Density","WorldPop / Univ. Southampton","CC BY 4.0","https://www.worldpop.org/","annual","annual",100,1],["ons_imd","Indices of Multiple Deprivation","ONS / MHCLG","OGL v3","https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019","~4 years","periodic",null,1],["land_registry_ppd","HM Land Registry Price Paid Data","HM Land Registry","OGL v3","https://landregistry.data.gov.uk/","monthly","monthly",null,0],["soilgrids","SoilGrids 250m","ISRIC World Soil Information","CC BY 4.0","https://soilgrids.org/","static","static",250,1],["bgs_geology","BGS Geology & Radon","British Geological Survey","BGS Open Licence","https://www.bgs.ac.uk/","static","static",50,1],["copernicus_air","CAMS European Air Quality","Copernicus Atmosphere Monitoring Service","Copernicus licence","https://ads.atmosphere.copernicus.eu/","hourly","monthly",10000,1],["natural_england","Natural England Designated Sites","Natural England","OGL v3","https://naturalengland-defra.opendata.arcgis.com/","monthly","static",null,1],["viirs_nightlights","VIIRS Nighttime Lights","NOAA / Colorado School of Mines","Public domain","https://eogdata.mines.edu/products/vnl/","monthly","monthly",500,1],["pvgis","PVGIS Solar Irradiation","EC Joint Research Centre","Open","https://re.jrc.ec.europa.eu/pvg_tools/","static","static",5000,0]],"groups":["Vegetation","Land cover","Terrain","Temperature","Water","Flood & water","Built environment","People & economy","Soil & geology","Air quality","Radar","Designations","Night lights","Solar"],"classes":{"lc_dominant":["Tree cover","Shrubland","Grassland","Cropland","Built-up","Bare / sparse","Open water","Herbaceous wetland"],"aspect_dominant":["North","North-east","East","South-east","South","South-west","West","North-west"],"bedrock_class":["Chalk","Clay","Limestone","Sandstone","Mudstone","Granite","Gravel","Slate"],"superficial_deposits":["Alluvium","River terrace","Glacial till","Head","Sand and gravel","Peat","None recorded"]},"outline":[[-3.05,54.95],[-2.55,55.15],[-2.2,55.45],[-2.03,55.8],[-1.6,55.6],[-1.52,55.05],[-1.35,54.75],[-0.78,54.55],[-0.4,54.28],[-0.1,54.12],[-0.2,53.7],[0.15,53.6],[0.35,53.2],[0.35,52.9],[0.55,52.95],[1.35,52.92],[1.75,52.75],[1.6,52.3],[1.3,51.95],[1.05,51.78],[0.95,51.6],[1.42,51.38],[1.1,51.05],[0.6,50.85],[0.3,50.78],[-0.3,50.78],[-0.95,50.8],[-1.45,50.6],[-1.95,50.7],[-2.45,50.6],[-3.05,50.7],[-3.55,50.45],[-4.2,50.35],[-5.05,50.1],[-5.72,50.05],[-5.55,50.45],[-4.55,50.6],[-4.2,51.0],[-3.55,51.22],[-3.0,51.32],[-2.65,51.6],[-2.7,51.85],[-3.1,52.1],[-3.15,52.55],[-2.75,52.95],[-3.1,53.25],[-3.05,53.45],[-2.95,53.75],[-3.05,54.1],[-3.35,54.25],[-3.6,54.5],[-3.3,54.8],[-3.05,54.95]],"context":[["Scotland",[[-2.03,55.8],[-2.6,56.05],[-3.15,56.1],[-2.6,56.22],[-2.8,56.45],[-3.1,56.48],[-2.45,56.72],[-2.1,57.15],[-1.78,57.48],[-2.05,57.7],[-2.9,57.7],[-3.6,57.65],[-4.2,57.7],[-3.8,57.87],[-3.35,58.0],[-3.05,58.45],[-3.35,58.65],[-4.3,58.55],[-4.85,58.58],[-5.2,58.3],[-5.0,58.05],[-5.35,57.85],[-5.6,57.55],[-5.8,57.35],[-5.65,57.1],[-5.85,56.85],[-6.2,56.7],[-5.7,56.45],[-5.45,56.15],[-5.7,55.9],[-5.65,55.55],[-5.35,55.3],[-5.2,55.6],[-5.05,55.85],[-4.85,55.98],[-4.6,55.7],[-4.9,55.35],[-5.0,54.95],[-4.85,54.65],[-4.35,54.8],[-3.95,54.78],[-3.6,54.88],[-3.05,54.95],[-2.55,55.15],[-2.2,55.45],[-2.03,55.8]]],["Wales",[[-3.05,53.42],[-3.55,53.33],[-4.1,53.3],[-4.4,53.42],[-4.68,53.31],[-4.35,53.13],[-4.2,52.92],[-4.75,52.8],[-4.45,52.72],[-4.08,52.55],[-4.06,52.2],[-4.45,52.12],[-4.85,52.05],[-5.25,51.88],[-5.1,51.71],[-4.7,51.73],[-4.38,51.73],[-4.32,51.55],[-3.98,51.6],[-3.55,51.4],[-3.18,51.4],[-2.99,51.55],[-2.65,51.62],[-2.7,51.85],[-3.1,52.1],[-3.15,52.55],[-2.75,52.95],[-3.1,53.25],[-3.05,53.42]]],["Northern Ireland",[[-5.45,54.5],[-5.55,54.68],[-5.72,54.85],[-5.9,55.05],[-6.05,55.2],[-6.65,55.2],[-7.05,55.05],[-7.25,55.05],[-7.55,54.75],[-7.85,54.55],[-8.15,54.45],[-7.85,54.2],[-7.3,54.15],[-6.85,54.35],[-6.65,54.2],[-6.25,54.1],[-6.05,54.05],[-5.55,54.25],[-5.45,54.5]]],["Ireland",[[-6.25,54.1],[-6.1,53.6],[-6.0,53.2],[-6.1,52.8],[-6.35,52.2],[-7.0,52.15],[-7.6,51.95],[-8.3,51.7],[-9.1,51.55],[-9.8,51.6],[-10.2,51.85],[-9.9,52.15],[-9.4,52.55],[-9.75,52.8],[-9.9,53.15],[-10.1,53.45],[-9.6,53.65],[-9.9,54.0],[-10.0,54.25],[-9.2,54.3],[-8.8,54.3],[-8.6,54.65],[-8.8,54.95],[-8.35,55.15],[-7.75,55.25],[-7.45,55.3],[-7.25,55.05],[-7.55,54.75],[-7.85,54.55],[-8.15,54.45],[-7.85,54.2],[-7.3,54.15],[-6.85,54.35],[-6.65,54.2],[-6.25,54.1]]],["Isle of Man",[[-4.42,54.06],[-4.32,54.2],[-4.38,54.34],[-4.62,54.42],[-4.78,54.32],[-4.7,54.15],[-4.55,54.05],[-4.42,54.06]]]],"summary":{"factor_count":118,"base_count":20,"stored_base_count":18,"monthly_base_count":7,"derived_factor_count":80,"group_count":14}};
 /* =====================================================================
    Site Scanner — demo engine
 
@@ -855,14 +880,17 @@ const VIEW = { w: 0, h: 0, scale: 1, cx: 0, cy: 0 };
 const LAT0 = 53.0;
 const KX = Math.cos(LAT0 * Math.PI / 180);
 
-let viewInit = false;
+let viewInit = false;   // cleared by the fit-to-UK control
 function fitView(w, h) {
   VIEW.w = w; VIEW.h = h;
   if (viewInit) return;            // resizing must not throw away the user's zoom
-  const xs = DATA.outline.map(p => p[0] * KX), ys = DATA.outline.map(p => p[1]);
+  // Frame the whole UK on first paint, so the opening view answers "where is
+  // this" before anything else.
+  const all = [DATA.outline, ...DATA.context.map(c => c[1])].flat();
+  const xs = all.map(p => p[0] * KX), ys = all.map(p => p[1]);
   const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
   const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
-  VIEW.scale = Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.9;
+  VIEW.scale = Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.92;
   VIEW.cx = (x0 + x1) / 2; VIEW.cy = (y0 + y1) / 2;
   viewInit = true;
 }
@@ -905,8 +933,11 @@ const toLngLat = (px, py) => [
 
 /* ---------- colour ---------- */
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const RAMP_DARK = [[26,32,34],[42,66,58],[74,106,74],[138,154,84],[206,176,92],[237,206,138]];
-const RAMP_LIGHT = [[228,224,214],[186,196,170],[150,170,120],[196,176,96],[162,112,28],[110,74,16]];
+/* Low reads as deep navy (it recedes into the sea), high reads as warm coral
+   (it advances, and ties to the accent). The middle passes through teal and
+   green so vegetation values still look like vegetation. */
+const RAMP_DARK  = [[16,26,42],[28,62,78],[58,104,94],[124,146,102],[198,164,112],[255,166,131]];
+const RAMP_LIGHT = [[214,223,233],[160,192,200],[136,174,150],[186,175,128],[214,138,106],[176,84,58]];
 function isLight() {
   const t = document.documentElement.getAttribute('data-theme');
   if (t) return t === 'light';
@@ -920,8 +951,18 @@ function ramp(t, alpha = 1) {
   const c = a.map((v, k) => Math.round(v + (b[k] - v) * fr));
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
-const SERIES_COLORS = ['#DDAE5C','#7FB3A3','#C98A6B','#8FA5C4','#B48EAD','#9BB068','#D4A0A0','#6FA8B8','#C4923F','#88A398','#B9846B','#7D8FB3'];
+/* Coral leads so the primary series matches the accent and the scrubber; the
+   rest fan out in hue and stay distinguishable against navy. */
+const SERIES_COLORS = ['#ff7a5c','#6fc3d4','#b9c48f','#8f9fd4','#d99ec4','#e3b072','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
 const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
+
+/** A hex token at a given alpha. Lets the canvas honour the theme's accent
+ *  instead of repeating literal colours that then drift out of step. */
+function color(hex, alpha) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
 
 /* ---------- formatting ---------- */
 function fmt(v, f) {
@@ -984,12 +1025,39 @@ function drawMap() {
     mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, h); mapCtx.stroke();
   }
 
-  // England
-  mapCtx.beginPath();
-  DATA.outline.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
-  mapCtx.closePath();
-  mapCtx.fillStyle = cssVar('--land'); mapCtx.fill();
-  mapCtx.strokeStyle = cssVar('--land-line'); mapCtx.lineWidth = 1.2; mapCtx.stroke();
+  // Landmasses. Everything outside England is drawn first and dimmed — it is
+  // context, not coverage, and the difference has to be visible at a glance so
+  // nobody draws a shape over Wales and wonders why it is refused.
+  const landPath = (ring) => {
+    mapCtx.beginPath();
+    ring.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
+    mapCtx.closePath();
+  };
+
+  mapCtx.fillStyle = cssVar('--outside-fill');
+  mapCtx.strokeStyle = cssVar('--outside-line');
+  mapCtx.lineWidth = 1;
+  for (const [, ring] of DATA.context) { landPath(ring); mapCtx.fill(); mapCtx.stroke(); }
+
+  landPath(DATA.outline);
+  mapCtx.fillStyle = cssVar('--land-fill'); mapCtx.fill();
+  mapCtx.strokeStyle = cssVar('--land-line'); mapCtx.lineWidth = 1.4; mapCtx.stroke();
+
+  // Name the context landmasses, but only when zoomed out far enough that the
+  // labels are answering "where am I" rather than cluttering a field view.
+  if (VIEW.scale < 700) {
+    mapCtx.font = `500 10px ${cssVar('--ui') || 'system-ui'}`;
+    mapCtx.fillStyle = cssVar('--ink-3');
+    mapCtx.textAlign = 'center';
+    for (const [name, ring] of DATA.context) {
+      const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+      const [cx, cy] = toPx([(Math.min(...xs) + Math.max(...xs)) / 2,
+                             (Math.min(...ys) + Math.max(...ys)) / 2]);
+      if (cx < -40 || cx > w + 40 || cy < -20 || cy > h + 20) continue;
+      mapCtx.fillText(name, cx, cy);
+    }
+    mapCtx.textAlign = 'start';
+  }
 
   // Cell grid, coloured at the current timestep. The cells and their offsets
   // were computed once when the shape was drawn, so scrubbing repaints from
@@ -1021,8 +1089,33 @@ function drawMap() {
     mapCtx.strokeStyle = stroke; mapCtx.lineWidth = 2; mapCtx.stroke();
     mapCtx.setLineDash([]);
   };
-  if (S.aoi) outline(S.aoi, cssVar('--accent'), 'rgba(221,174,92,.06)');
-  if (draft) outline(draft, cssVar('--accent-2'), 'rgba(196,146,63,.10)', [5, 4]);
+  if (S.aoi) {
+    outline(S.aoi, cssVar('--accent'), color(cssVar('--accent'), .07));
+
+    // At national zoom a field is three pixels across and effectively
+    // invisible. Ring it so "where am I putting this" is answerable without
+    // zooming in and back out again.
+    const px = S.aoi.map(toPx);
+    const xs = px.map(p => p[0]), ys = px.map(p => p[1]);
+    const wpx = Math.max(...xs) - Math.min(...xs);
+    const hpx = Math.max(...ys) - Math.min(...ys);
+    if (Math.max(wpx, hpx) < 16) {
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      mapCtx.strokeStyle = cssVar('--accent');
+      mapCtx.lineWidth = 1.4;
+      mapCtx.beginPath(); mapCtx.arc(cx, cy, 11, 0, 2 * Math.PI); mapCtx.stroke();
+      mapCtx.globalAlpha = .55;
+      for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+        mapCtx.beginPath();
+        mapCtx.moveTo(cx + dx * 14, cy + dy * 14);
+        mapCtx.lineTo(cx + dx * 19, cy + dy * 19);
+        mapCtx.stroke();
+      }
+      mapCtx.globalAlpha = 1;
+    }
+  }
+  if (draft) outline(draft, cssVar('--accent-2'), color(cssVar('--accent-2'), .12), [5, 4]);
 
   // Scale bar, recomputed for the current projection.
   const kmPerPx = 111.32 * KX / VIEW.scale;
@@ -1889,6 +1982,7 @@ $('#t-rect').onclick = () => setTool('rect');
 $('#t-circle').onclick = () => setTool('circle');
 $('#t-free').onclick = () => setTool('free');
 $('#clearBtn').onclick = () => setAoi(null);
+$('#fitBtn').onclick = () => { viewInit = false; fitView(VIEW.w, VIEW.h); drawMap(); };
 $('#undoBtn').onclick = () => {
   if (!S.past.length) return;
   S.future.unshift(S.aoi);
@@ -2028,7 +2122,9 @@ window.addEventListener('resize', sizeMap);
     // Roughly 900 ha of farmland north-east of Coventry — a real working
     // scale, not a county.
     const ring = circleRing([-1.470, 52.620], [-1.442, 52.620]);
-    setAoi(ring, { skipHistory: true });
+    // frame:false — open on the whole country with the example marked on it,
+    // rather than dropping the user into a field with no context.
+    setAoi(ring, { skipHistory: true, frame: false });
     S.past = [];
   }
   render(); drawMap(); drawSpark();

@@ -255,6 +255,7 @@ $('#t-rect').onclick = () => setTool('rect');
 $('#t-circle').onclick = () => setTool('circle');
 $('#t-free').onclick = () => setTool('free');
 $('#clearBtn').onclick = () => setAoi(null);
+$('#fitBtn').onclick = () => { viewInit = false; fitView(VIEW.w, VIEW.h); drawMap(); };
 $('#undoBtn').onclick = () => {
   if (!S.past.length) return;
   S.future.unshift(S.aoi);
@@ -394,7 +395,9 @@ window.addEventListener('resize', sizeMap);
     // Roughly 900 ha of farmland north-east of Coventry — a real working
     // scale, not a county.
     const ring = circleRing([-1.470, 52.620], [-1.442, 52.620]);
-    setAoi(ring, { skipHistory: true });
+    // frame:false — open on the whole country with the example marked on it,
+    // rather than dropping the user into a field with no context.
+    setAoi(ring, { skipHistory: true, frame: false });
     S.past = [];
   }
   render(); drawMap(); drawSpark();

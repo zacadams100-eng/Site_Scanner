@@ -114,7 +114,7 @@ export default function Timeline() {
     const y = (v: number) => chartH - ((v - lo) / span) * (chartH - 6) - 3
 
     // Fill under the line, broken at gaps.
-    ctx.fillStyle = 'rgba(221,174,92,0.13)'
+    ctx.fillStyle = 'rgba(255,122,92,0.14)'
     let runStart = -1
     for (let i = 0; i <= values.length; i++) {
       const v = values[i]
@@ -146,7 +146,7 @@ export default function Timeline() {
     // The comparison marker, when a second position is pinned.
     if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
       const cx = x(compareIndex)
-      ctx.strokeStyle = 'rgba(127,179,163,0.9)'
+      ctx.strokeStyle = 'rgba(111,195,212,0.9)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([3, 2])
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
@@ -159,8 +159,8 @@ export default function Timeline() {
       const bw = Math.max(1, w / steps.length)
       const f = p.valid_fraction
       ctx.fillStyle = p.value === null
-        ? 'rgba(190,90,80,0.55)'
-        : `rgba(127,179,163,${0.18 + 0.62 * f})`
+        ? 'rgba(63,77,99,0.85)'
+        : `rgba(111,195,212,${0.18 + 0.62 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
   }, [primarySeries, steps, compareIndex])

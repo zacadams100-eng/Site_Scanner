@@ -31,14 +31,17 @@ const VIEW = { w: 0, h: 0, scale: 1, cx: 0, cy: 0 };
 const LAT0 = 53.0;
 const KX = Math.cos(LAT0 * Math.PI / 180);
 
-let viewInit = false;
+let viewInit = false;   // cleared by the fit-to-UK control
 function fitView(w, h) {
   VIEW.w = w; VIEW.h = h;
   if (viewInit) return;            // resizing must not throw away the user's zoom
-  const xs = DATA.outline.map(p => p[0] * KX), ys = DATA.outline.map(p => p[1]);
+  // Frame the whole UK on first paint, so the opening view answers "where is
+  // this" before anything else.
+  const all = [DATA.outline, ...DATA.context.map(c => c[1])].flat();
+  const xs = all.map(p => p[0] * KX), ys = all.map(p => p[1]);
   const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
   const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
-  VIEW.scale = Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.9;
+  VIEW.scale = Math.min(w / (x1 - x0), h / (y1 - y0)) * 0.92;
   VIEW.cx = (x0 + x1) / 2; VIEW.cy = (y0 + y1) / 2;
   viewInit = true;
 }
@@ -81,8 +84,11 @@ const toLngLat = (px, py) => [
 
 /* ---------- colour ---------- */
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const RAMP_DARK = [[26,32,34],[42,66,58],[74,106,74],[138,154,84],[206,176,92],[237,206,138]];
-const RAMP_LIGHT = [[228,224,214],[186,196,170],[150,170,120],[196,176,96],[162,112,28],[110,74,16]];
+/* Low reads as deep navy (it recedes into the sea), high reads as warm coral
+   (it advances, and ties to the accent). The middle passes through teal and
+   green so vegetation values still look like vegetation. */
+const RAMP_DARK  = [[16,26,42],[28,62,78],[58,104,94],[124,146,102],[198,164,112],[255,166,131]];
+const RAMP_LIGHT = [[214,223,233],[160,192,200],[136,174,150],[186,175,128],[214,138,106],[176,84,58]];
 function isLight() {
   const t = document.documentElement.getAttribute('data-theme');
   if (t) return t === 'light';
@@ -96,8 +102,18 @@ function ramp(t, alpha = 1) {
   const c = a.map((v, k) => Math.round(v + (b[k] - v) * fr));
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 }
-const SERIES_COLORS = ['#DDAE5C','#7FB3A3','#C98A6B','#8FA5C4','#B48EAD','#9BB068','#D4A0A0','#6FA8B8','#C4923F','#88A398','#B9846B','#7D8FB3'];
+/* Coral leads so the primary series matches the accent and the scrubber; the
+   rest fan out in hue and stay distinguishable against navy. */
+const SERIES_COLORS = ['#ff7a5c','#6fc3d4','#b9c48f','#8f9fd4','#d99ec4','#e3b072','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
 const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
+
+/** A hex token at a given alpha. Lets the canvas honour the theme's accent
+ *  instead of repeating literal colours that then drift out of step. */
+function color(hex, alpha) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
 
 /* ---------- formatting ---------- */
 function fmt(v, f) {
@@ -160,12 +176,39 @@ function drawMap() {
     mapCtx.beginPath(); mapCtx.moveTo(x, 0); mapCtx.lineTo(x, h); mapCtx.stroke();
   }
 
-  // England
-  mapCtx.beginPath();
-  DATA.outline.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
-  mapCtx.closePath();
-  mapCtx.fillStyle = cssVar('--land'); mapCtx.fill();
-  mapCtx.strokeStyle = cssVar('--land-line'); mapCtx.lineWidth = 1.2; mapCtx.stroke();
+  // Landmasses. Everything outside England is drawn first and dimmed — it is
+  // context, not coverage, and the difference has to be visible at a glance so
+  // nobody draws a shape over Wales and wonders why it is refused.
+  const landPath = (ring) => {
+    mapCtx.beginPath();
+    ring.forEach((p, i) => { const [x, y] = toPx(p); i ? mapCtx.lineTo(x, y) : mapCtx.moveTo(x, y); });
+    mapCtx.closePath();
+  };
+
+  mapCtx.fillStyle = cssVar('--outside-fill');
+  mapCtx.strokeStyle = cssVar('--outside-line');
+  mapCtx.lineWidth = 1;
+  for (const [, ring] of DATA.context) { landPath(ring); mapCtx.fill(); mapCtx.stroke(); }
+
+  landPath(DATA.outline);
+  mapCtx.fillStyle = cssVar('--land-fill'); mapCtx.fill();
+  mapCtx.strokeStyle = cssVar('--land-line'); mapCtx.lineWidth = 1.4; mapCtx.stroke();
+
+  // Name the context landmasses, but only when zoomed out far enough that the
+  // labels are answering "where am I" rather than cluttering a field view.
+  if (VIEW.scale < 700) {
+    mapCtx.font = `500 10px ${cssVar('--ui') || 'system-ui'}`;
+    mapCtx.fillStyle = cssVar('--ink-3');
+    mapCtx.textAlign = 'center';
+    for (const [name, ring] of DATA.context) {
+      const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+      const [cx, cy] = toPx([(Math.min(...xs) + Math.max(...xs)) / 2,
+                             (Math.min(...ys) + Math.max(...ys)) / 2]);
+      if (cx < -40 || cx > w + 40 || cy < -20 || cy > h + 20) continue;
+      mapCtx.fillText(name, cx, cy);
+    }
+    mapCtx.textAlign = 'start';
+  }
 
   // Cell grid, coloured at the current timestep. The cells and their offsets
   // were computed once when the shape was drawn, so scrubbing repaints from
@@ -197,8 +240,33 @@ function drawMap() {
     mapCtx.strokeStyle = stroke; mapCtx.lineWidth = 2; mapCtx.stroke();
     mapCtx.setLineDash([]);
   };
-  if (S.aoi) outline(S.aoi, cssVar('--accent'), 'rgba(221,174,92,.06)');
-  if (draft) outline(draft, cssVar('--accent-2'), 'rgba(196,146,63,.10)', [5, 4]);
+  if (S.aoi) {
+    outline(S.aoi, cssVar('--accent'), color(cssVar('--accent'), .07));
+
+    // At national zoom a field is three pixels across and effectively
+    // invisible. Ring it so "where am I putting this" is answerable without
+    // zooming in and back out again.
+    const px = S.aoi.map(toPx);
+    const xs = px.map(p => p[0]), ys = px.map(p => p[1]);
+    const wpx = Math.max(...xs) - Math.min(...xs);
+    const hpx = Math.max(...ys) - Math.min(...ys);
+    if (Math.max(wpx, hpx) < 16) {
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      mapCtx.strokeStyle = cssVar('--accent');
+      mapCtx.lineWidth = 1.4;
+      mapCtx.beginPath(); mapCtx.arc(cx, cy, 11, 0, 2 * Math.PI); mapCtx.stroke();
+      mapCtx.globalAlpha = .55;
+      for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+        mapCtx.beginPath();
+        mapCtx.moveTo(cx + dx * 14, cy + dy * 14);
+        mapCtx.lineTo(cx + dx * 19, cy + dy * 19);
+        mapCtx.stroke();
+      }
+      mapCtx.globalAlpha = 1;
+    }
+  }
+  if (draft) outline(draft, cssVar('--accent-2'), color(cssVar('--accent-2'), .12), [5, 4]);
 
   // Scale bar, recomputed for the current projection.
   const kmPerPx = 111.32 * KX / VIEW.scale;
