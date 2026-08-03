@@ -1,0 +1,93 @@
+name: CI
+
+# Every pull request, whatever its base — this repo's default branch is not
+# `main`, so filtering by base branch here would silently skip most PRs.
+#
+# Push events are limited to `main` on purpose: a PR branch already gets
+# checked by the `pull_request` event, and adding it here would run everything
+# twice on each push.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A second push supersedes the first. Without this, force-pushing a branch
+# leaves the earlier run burning minutes on a commit nobody will look at.
+# `main` is excluded from cancellation so its history keeps a complete record.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # The two halves are independent and fail for unrelated reasons, so they run
+  # as separate jobs: a red check names the half that broke without anyone
+  # opening the log.
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Ordered cheapest-first so an obvious mistake fails in seconds rather
+      # than after a full bundle.
+      #
+      # oxlint exits 0 on warnings, and there are five long-standing ones
+      # (unused expressions, two exhaustive-deps). This step guards against new
+      # *errors*. Tightening it with `--max-warnings 0` means clearing those
+      # five first, or CI is red the day it lands.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # `build` is `tsc -b && vite build`, so this is the typecheck as well as
+      # the bundle. The prebuild hook copies MapLibre's worker into public/ —
+      # without it the map renders blank in production, silently, which is
+      # exactly the failure worth catching here.
+      - name: Typecheck and build
+        run: npm run build
+
+  api:
+    name: API
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the Dockerfile that builds the deployed image. CI passing
+          # on a version production does not run is worth very little.
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # requirements-dev pulls rasterio, numpy and h3. They are needed at
+      # *collection* time — tests/test_ingest.py imports them at module level,
+      # so a missing wheel stops pytest before it runs anything, rather than
+      # failing one file.
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: pytest
