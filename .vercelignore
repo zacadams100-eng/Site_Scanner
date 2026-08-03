@@ -1,23 +1,38 @@
-# Only site-scanner.html is deployed to Vercel. The backend goes to Cloud Run
-# via the Dockerfile.
+# Vercel builds the React app in web/ and publishes web/dist. Everything
+# Python goes to Cloud Run via the Dockerfile instead.
 #
 # Excluding requirements.txt also stops Vercel's framework detection from
 # treating this as a Python project and trying to build serverless functions.
 
 app.py
-summary.py
 mock_ee_backend.py
+routes_catalog.py
+catalog.py
+series.py
+summary.py
+geometry.py
+cache.py
 requirements.txt
 requirements-dev.txt
 Dockerfile
 .dockerignore
+pytest.ini
 
+bench/
+ingest/
+scripts/
 tests/
 __pycache__/
 *.pyc
 .pytest_cache/
 venv/
 .venv/
+
+# The prototype is kept in the repo for reference but is not deployed.
+site-scanner.html
+
+# demo/ is NOT excluded: vercel.json's buildCommand copies
+# demo/site-scanner-demo.html into the build so it is served at /demo.
 
 service-account-key.json
 *.key.json

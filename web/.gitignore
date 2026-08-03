@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Copied from node_modules by scripts/copy-maplibre-worker.mjs
+public/maplibre/
+public/demo.html

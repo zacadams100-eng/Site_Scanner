@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as turf from '@turf/turf'
+
 import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
 
@@ -15,28 +16,36 @@ import { rampColor, rampPosition } from '../lib/format'
  * sources). The feel is deliberately identical.
  */
 
-const OSM_STYLE: maplibregl.StyleSpecification = {
+/**
+ * The initial style contains no external sources at all — just a background
+ * colour.
+ *
+ * This is deliberate and load-bearing. MapLibre refuses to paint *any* layer
+ * while the style is not fully loaded, and a raster source whose tiles never
+ * arrive keeps the style unloaded indefinitely. Putting the basemap in the
+ * initial style therefore means a slow, blocked or rate-limited tile host
+ * blanks the user's own data — which is not a hypothetical: OSM's tile usage
+ * policy does not cover production traffic, and they do block.
+ *
+ * So the style loads instantly with nothing external in it, our data layers go
+ * on top, and the basemap is added afterwards as pure decoration. If it never
+ * arrives, the map is plain — but the AOI, the cells and every number still
+ * render.
+ */
+// MapLibre computes its worker URL at runtime, which Vite cannot see, so the
+// worker is never emitted and the app silently renders an empty map — see
+// scripts/copy-maplibre-worker.mjs for the full failure mode. The worker and
+// its shared chunk are copied verbatim into public/maplibre/ instead, which
+// preserves the relative import between them.
+maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
+
+const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } },
-    {
-      id: 'osm',
-      type: 'raster',
-      source: 'osm',
-      // Desaturated and dimmed so data layers read as the foreground. The
-      // basemap is context, not content.
-      paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
-    },
-  ],
+  sources: {},
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } }],
 }
+
+const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -69,7 +78,7 @@ export default function MapCanvas() {
     if (!containerRef.current || mapRef.current) return
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: OSM_STYLE,
+      style: BASE_STYLE,
       center: [-0.57, 51.24],
       zoom: 11,
       attributionControl: false,
@@ -119,11 +128,33 @@ export default function MapCanvas() {
         paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
 
+      // The basemap goes on last and sits beneath everything of ours, so a
+      // failure here costs context and nothing else.
+      if (!map.getSource('osm')) {
+        map.addSource('osm', {
+          type: 'raster',
+          tiles: [BASEMAP_TILES],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors',
+        })
+        map.addLayer({
+          id: 'osm',
+          type: 'raster',
+          source: 'osm',
+          // Desaturated and dimmed so data layers read as the foreground. The
+          // basemap is context, not content.
+          paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
+        }, 'cells-fill')
+      }
+
       setReady(true)
     }
 
     map.on('styledata', install)
     map.on('load', install)
+    // The style is inline and has no external sources, so it may already be
+    // loaded by the time the listeners attach.
+    if (map.isStyleLoaded()) install()
     // Tile fetch failures are noisy and not actionable — the data layers are
     // ours and render regardless. Swallow them rather than filling the console.
     map.on('error', (e) => {

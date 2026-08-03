@@ -81,6 +81,29 @@ interface State {
 
 let inflight: AbortController | null = null
 
+/**
+ * Don't land the user on a blank month.
+ *
+ * The default position is the most recent step, but an optical index in an
+ * English December is a legitimate gap — so the first thing a new user would
+ * see is an empty map and "no data", which reads as broken rather than as
+ * honest. If the current step has no value for the primary factor, step back
+ * to the most recent one that does.
+ *
+ * Only ever moves backwards, and only when the current position is empty, so
+ * it never fights a deliberate scrub onto a gap the user is inspecting.
+ */
+function settleTime(data: SeriesResponse, selected: string[], current: number): number {
+  const primary = data.series[selected[0]]
+  if (!primary) return current
+  const at = primary.points[current]
+  if (!at || at.value !== null) return current
+  for (let i = current - 1; i >= 0; i--) {
+    if (primary.points[i]?.value !== null) return i
+  }
+  return current
+}
+
 function loadSaved(): SavedAoi[] {
   try {
     return JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]')
@@ -255,7 +278,7 @@ export const useStore = create<State>((set, get) => ({
         fetchCells(aoi, ctrl.signal),
       ])
       if (ctrl.signal.aborted) return
-      set({ data, cells: cells.cells, loading: false })
+      set({ data, cells: cells.cells, loading: false, timeIndex: settleTime(data, selected, get().timeIndex) })
     } catch (e: any) {
       if (e?.name === 'AbortError') return
       set({ error: e?.message ?? 'Something went wrong', loading: false, data: null })

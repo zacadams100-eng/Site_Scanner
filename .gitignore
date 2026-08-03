@@ -9,3 +9,6 @@ service-account-key.json
 
 # Benchmark / ingest scratch output
 /tmp-cogs/
+
+# Generated into the Vite build by vercel.json buildCommand
+web/public/demo.html
