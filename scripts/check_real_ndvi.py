@@ -6,7 +6,7 @@ something is wrong you find out whether it is Earth Engine or FastAPI without
 guessing.
 
     cd ~/Site_Scanner          # wherever you cloned it
-    source setup.sh            # your existing env script
+    source setup.sh            # installs deps, loads your key — must be `source`
     python3 scripts/check_real_ndvi.py
 
 What success looks like: a table of months with NDVI values, mostly between
@@ -19,8 +19,14 @@ Pass a year to test a shorter window, which is much faster while debugging:
     python3 scripts/check_real_ndvi.py 2024
 """
 
+import pathlib
 import sys
 import time
+
+# This file lives in scripts/, so Python puts scripts/ on the import path
+# rather than the repo root, and `import app` fails. Same fix as
+# ee_smoke_test.py — put the repo root first.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 # A small field near Guildford. Small on purpose: reduceRegion over a county
 # times out, and you want to know the pipeline works before you stress it.

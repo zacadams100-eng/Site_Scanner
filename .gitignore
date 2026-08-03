@@ -3,9 +3,17 @@ __pycache__/
 .pytest_cache/
 venv/
 .venv/
+.env
+
+# Service account keys. Never commit these — anyone with the file can bill
+# your Google Cloud project. The broad patterns are deliberate: real key
+# filenames look like sitescanner-504112-bf0c51189278.json and would slip
+# past a narrower rule.
 service-account-key.json
 *.key.json
-.env
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
+**/ee-backend/
+venv/
 
 # Benchmark / ingest scratch output
 /tmp-cogs/

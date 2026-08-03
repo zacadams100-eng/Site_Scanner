@@ -56,10 +56,41 @@ def cells_for_bounds(bounds: Tuple[float, float, float, float], res: int) -> Lis
     poly = h3.LatLngPoly([
         (south, west), (south, east), (north, east), (north, west), (south, west),
     ])
-    try:
+
+    # h3 >= 4.2 does overlap containment natively.
+    if hasattr(h3, "polygon_to_cells_experimental"):
         return list(h3.polygon_to_cells_experimental(poly, res, contain="overlap"))
-    except AttributeError:            # older h3 builds
-        return list(h3.polygon_to_cells(poly, res))
+
+    # h3 4.1 only offers centre containment, which returns nothing at all for a
+    # box smaller than one cell — the bug BENCHMARK.md caught. Falling through
+    # to it silently would reintroduce that, so build overlap ourselves.
+    #
+    # Seed with the centre-contained cells plus the cells holding each corner
+    # and the middle (so a sub-cell box always yields at least one), then grow
+    # by one ring and keep whatever genuinely touches the box. One ring is
+    # enough: a box can only clip cells adjacent to the ones it contains.
+    seeds = set(h3.polygon_to_cells(poly, res))
+    mid_lat, mid_lng = (south + north) / 2, (west + east) / 2
+    for lat, lng in ((south, west), (south, east), (north, east),
+                     (north, west), (mid_lat, mid_lng)):
+        seeds.add(h3.latlng_to_cell(lat, lng, res))
+
+    candidates = set()
+    for cell in seeds:
+        candidates.update(h3.grid_disk(cell, 1))
+
+    keep = []
+    for cell in candidates:
+        boundary = h3.cell_to_boundary(cell)
+        lats = [p[0] for p in boundary]
+        lngs = [p[1] for p in boundary]
+        # Bounding-box overlap between the cell and the query box. Cheap, and
+        # slightly generous at the corners — erring toward including a cell is
+        # the right way to be wrong here.
+        if (min(lngs) <= east and max(lngs) >= west
+                and min(lats) <= north and max(lats) >= south):
+            keep.append(cell)
+    return keep
 
 
 def _cell_pixel_indices(cell: str, transform, width: int, height: int
