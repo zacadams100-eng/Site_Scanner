@@ -108,6 +108,19 @@ def main() -> int:
         print("⚠ NDVI outside -1..1 — the band maths is wrong somewhere")
         return 1
 
+    # Being inside -1..1 is a weak test: a broken pipeline that averages cloud
+    # into every month lands around 0.4 all year and passes it. English
+    # vegetation swings roughly 0.3 in winter to 0.8 in summer, so a year that
+    # barely moves means the numbers are wrong even though they look tidy.
+    if len(values) >= 6 and (max(values) - min(values)) < 0.15:
+        print("\n⚠ These values are too flat to be real.")
+        print(f"  The whole year spans {max(values) - min(values):.3f}; English")
+        print("  vegetation should span about 0.4 between winter and summer.")
+        print("  Earth Engine is connected, but the numbers are not trustworthy.")
+        print("  Find out which part is wrong:")
+        print("      python3 scripts/diagnose_ndvi.py")
+        return 1
+
     print("\n✓ Real NDVI is working. Wire it up by starting the real backend:")
     print("    uvicorn app:app --reload --port 8000")
     print("  then draw a small shape in the app — the NDVI column gets a dot")
