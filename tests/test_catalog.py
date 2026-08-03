@@ -299,3 +299,89 @@ def test_stats_malformed_geometry_keeps_its_500(client):
     still the 500 both backends have always returned."""
     r = client.post("/api/stats", json={"year": 2024, "geometry": {"type": "Polygon"}})
     assert r.status_code == 500
+
+
+# --------------------------------------------------------------------------
+# Real-data registry — the seam between generated and Earth Engine
+# --------------------------------------------------------------------------
+@pytest.fixture
+def registry():
+    """Gives a clean REAL_SERIES and always restores it, so one test cannot
+    leave real data wired into another."""
+    import routes_catalog
+    routes_catalog.REAL_SERIES.clear()
+    yield routes_catalog.REAL_SERIES
+    routes_catalog.REAL_SERIES.clear()
+
+
+SHORT = {"start": "2024-01", "end": "2024-06"}
+
+
+def _stub(geometry, steps, area_ha):
+    return [{"t": s, "value": 0.5, "valid_fraction": 0.9, "interpolated": False}
+            for s in steps]
+
+
+def test_unregistered_factors_are_labelled_generated(client, registry):
+    r = client.post("/api/series", json={"geometry": GUILDFORD,
+                                         "factor_ids": ["ndvi"], **SHORT})
+    body = r.json()
+    assert body["series"]["ndvi"]["source"] == "generated"
+    assert body["real_factors"] == []
+
+
+def test_a_registered_factor_returns_real_data_and_says_so(client, registry):
+    registry["ndvi"] = _stub
+    body = client.post("/api/series", json={"geometry": GUILDFORD,
+                                            "factor_ids": ["ndvi", "precip_total"],
+                                            **SHORT}).json()
+    assert body["series"]["ndvi"]["source"] == "earth-engine"
+    assert body["series"]["precip_total"]["source"] == "generated"
+    assert body["real_factors"] == ["ndvi"]
+
+
+def test_real_series_still_gets_the_annual_rollup_and_meta(client, registry):
+    """A real factor has to be indistinguishable to the frontend apart from its
+    label — same rollup, same provenance, same point shape."""
+    registry["ndvi"] = _stub
+    s = client.post("/api/series", json={"geometry": GUILDFORD,
+                                         "factor_ids": ["ndvi"], **SHORT}).json()["series"]["ndvi"]
+    assert len(s["points"]) == 6
+    assert s["annual"] and s["annual"][0]["year"] == 2024
+    assert s["meta"]["base_meta"]["licence"]
+    assert s["kind"] == "continuous" and s["unit"] == "index"
+    assert "elapsed_ms" in s
+
+
+def test_a_failing_real_source_falls_back_rather_than_breaking_the_report(client, registry):
+    """One flaky Earth Engine call must not blank a report with eleven other
+    factors in it — and the substitution must be visible, not silent."""
+    def boom(geometry, steps, area_ha):
+        raise RuntimeError("EE quota exceeded")
+
+    registry["ndvi"] = boom
+    r = client.post("/api/series", json={"geometry": GUILDFORD,
+                                         "factor_ids": ["ndvi", "precip_total"], **SHORT})
+    assert r.status_code == 200
+    ndvi = r.json()["series"]["ndvi"]
+    assert ndvi["source"] == "generated"
+    assert "quota" in ndvi["error"]
+    assert ndvi["points"], "fallback must still return a usable series"
+    assert r.json()["real_factors"] == []
+
+
+def test_the_real_source_receives_the_drawn_geometry(client, registry):
+    """The generator only needs a centroid; a real reduceRegion needs the shape
+    itself, so the geometry has to reach the hook intact."""
+    seen = {}
+
+    def capture(geometry, steps, area_ha):
+        seen["geometry"] = geometry
+        seen["area_ha"] = area_ha
+        return _stub(geometry, steps, area_ha)
+
+    registry["ndvi"] = capture
+    client.post("/api/series", json={"geometry": GUILDFORD,
+                                     "factor_ids": ["ndvi"], **SHORT})
+    assert seen["geometry"] == GUILDFORD
+    assert seen["area_ha"] > 0

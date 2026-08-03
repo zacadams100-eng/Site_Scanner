@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+import time
+
 import catalog
 import series as series_mod
 
@@ -83,10 +85,51 @@ def _validate_geometry(geometry: dict) -> tuple:
     return (lng, lat), area_ha
 
 
-def _series_for(factor_id: str, centroid: tuple, area_ha: float,
+# Real data sources, keyed by factor id. Empty by default, which is what keeps
+# this module free of any Earth Engine import and lets mock_ee_backend.py run
+# with no credentials. app.py fills it in at startup via ee_series.install().
+#
+# A factor present here returns real observations; everything else falls back
+# to the generator. Both are labelled in the response, so a half-real
+# catalogue is honest rather than confusing.
+REAL_SERIES: Dict[str, Any] = {}
+
+
+def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
                 steps: List[str]) -> Dict[str, Any]:
-    """The one function that becomes a database query in production."""
-    return series_mod.generate_series(factor_id, centroid, area_ha, steps)
+    """Real data where we have it, generated where we don't.
+
+    A failure in the real path falls back to the generator rather than failing
+    the whole request — one flaky Earth Engine call should not blank a report
+    that has eleven other factors in it. The fallback is recorded in `source`
+    and `error`, never hidden.
+    """
+    fn = REAL_SERIES.get(factor_id)
+    if fn is not None:
+        t0 = time.perf_counter()
+        try:
+            points = fn(geometry, steps, area_ha)
+            f = catalog.FACTOR_BY_ID[factor_id]
+            return {
+                "factor_id": factor_id,
+                "kind": f["kind"],
+                "cadence": f["cadence"],
+                "unit": f["unit"],
+                "points": points,
+                "source": "earth-engine",
+                "elapsed_ms": round((time.perf_counter() - t0) * 1000),
+            }
+        except Exception as e:
+            s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
+            s["source"] = "generated"
+            s["error"] = f"Earth Engine failed, showing demo data: {e}"
+            s["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
+            return s
+
+    s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
+    s["source"] = "generated"
+    s["elapsed_ms"] = 0
+    return s
 
 
 class CellsRequest(BaseModel):
@@ -193,7 +236,7 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
 
     out: Dict[str, Any] = {}
     for fid in req.factor_ids:
-        s = _series_for(fid, centroid, area_ha, steps)
+        s = _series_for(fid, req.geometry, centroid, area_ha, steps)
         s["annual"] = series_mod.annual_rollup(s)
         s["meta"] = catalog.resolve(fid)
         out[fid] = s
@@ -206,6 +249,9 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # the badge flips. Building the field in now means the UI never has to
         # be retrofitted for it.
         "precision": "approx",
+        # Which factors came back real, so the UI can say so per column rather
+        # than implying the whole report is one thing or the other.
+        "real_factors": [k for k, v in out.items() if v.get("source") == "earth-engine"],
         "steps": steps,
         "series": out,
     }

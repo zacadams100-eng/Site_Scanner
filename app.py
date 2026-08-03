@@ -154,6 +154,14 @@ from routes_catalog import router as catalog_router  # noqa: E402
 
 app.include_router(catalog_router)
 
+# Swap the generator for real Earth Engine data where we have an implementation
+# (NDVI today). Anything not registered keeps returning demo data and says so,
+# so the catalogue can go real one factor at a time instead of in one jump.
+import routes_catalog  # noqa: E402
+import ee_series  # noqa: E402
+
+ee_series.install(routes_catalog.REAL_SERIES)
+
 
 @app.get("/")
 def health():

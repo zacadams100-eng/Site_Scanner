@@ -44,6 +44,12 @@ export default function Provenance() {
             <span>Stored cadence</span><span>{base.cadence}</span>
             <span>Held by us</span>
             <span>{base.stored ? 'Yes — served from our storage' : 'No — queried live'}</span>
+            <span>This report</span>
+            <span>
+              {factors.some((f) => f.source === 'earth-engine')
+                ? 'Live Earth Engine observations'
+                : 'Demo data — generated, not observed'}
+            </span>
           </div>
           <div className="prov-factors">
             {factors.map((f) => (

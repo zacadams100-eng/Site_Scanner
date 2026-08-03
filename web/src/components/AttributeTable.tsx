@@ -124,8 +124,16 @@ export default function AttributeTable() {
               </th>
               {cols.map((c) => (
                 <th key={c.factor_id} className="sortable" onClick={() => sortBy(c.factor_id)}
-                    title={`${c.meta.note}\n\nSource: ${c.meta.base_meta.name}`}>
-                  <span className="th-name">{c.meta.name}</span>
+                    title={`${c.meta.note}\n\nSource: ${c.meta.base_meta.name}` +
+                      (c.source === 'earth-engine'
+                        ? `\n\nLive Earth Engine data${c.elapsed_ms ? ` — ${(c.elapsed_ms / 1000).toFixed(1)}s to fetch` : ''}`
+                        : c.error
+                          ? `\n\n${c.error}`
+                          : '\n\nDemo data — not observed')}>
+                  <span className="th-name">
+                    {c.source === 'earth-engine' && <span className="live" title="Live Earth Engine data">●</span>}
+                    {c.meta.name}
+                  </span>
                   <span className="th-unit">{c.unit}</span>
                   {sortCol === c.factor_id && <span className="th-sort">{sortAsc ? '▲' : '▼'}</span>}
                 </th>

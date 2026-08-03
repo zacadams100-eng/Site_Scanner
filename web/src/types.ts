@@ -68,6 +68,14 @@ export interface AnnualRow {
 
 export interface Series {
   factor_id: string
+  /** Where this column's numbers came from. A half-real catalogue is fine —
+   *  pretending it is uniformly one or the other is not. */
+  source?: 'earth-engine' | 'generated'
+  /** Round-trip cost of the real path, so the price of live queries is visible
+   *  rather than guessed at. */
+  elapsed_ms?: number
+  /** Set when the real path failed and the generator stood in. */
+  error?: string
   kind: Kind
   cadence: Cadence
   unit: string
@@ -80,6 +88,7 @@ export interface SeriesResponse {
   area_ha: number
   centroid: { lng: number; lat: number }
   precision: 'approx' | 'exact'
+  real_factors?: string[]
   steps: string[]
   series: Record<string, Series>
 }

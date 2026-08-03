@@ -578,3 +578,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 1px 7px; margin-top: 1px;
 }
 .time-compare:hover { background: rgba(111, 195, 212, 0.22); }
+
+/* A column backed by real observations, next to columns that are not. Marking
+   it per column matters more than a single page-level badge: a half-real
+   report is fine, but implying it is uniformly one or the other is not. */
+.th-name .live { color: var(--good); margin-right: 4px; font-size: 8px; vertical-align: middle; }
+.badge-live { color: var(--good); border-color: rgba(111, 195, 212, 0.45); }

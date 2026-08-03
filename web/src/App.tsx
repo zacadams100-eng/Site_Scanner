@@ -166,6 +166,12 @@ export default function App() {
               mock data
             </span>
           )}
+          {data && data.real_factors && data.real_factors.length > 0 && (
+            <span className="badge badge-live"
+                  title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
+              {data.real_factors.length} live
+            </span>
+          )}
           {data && (
             <span className={`badge badge-${data.precision}`}
                   title={data.precision === 'approx'
