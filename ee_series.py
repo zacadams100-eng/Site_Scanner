@@ -78,19 +78,20 @@ def ndvi_series(geometry: dict, steps: List[str],
 
     geom = ee.Geometry(geometry)
 
-    # How many pixels the area *could* contain, so the fraction Earth Engine
-    # actually returned is meaningful. This is what drives the confidence
-    # shading in the table and the availability strip in the timeline.
-    expected_px = max(1.0, (area_ha * 10_000.0) / (NDVI_SCALE_M ** 2))
+    # The area the AOI *could* cover, so the fraction actually observed is
+    # meaningful. This drives the confidence shading in the table and the
+    # availability strip in the timeline, so it has to be true square metres —
+    # see the note on pixelArea in _ndvi_chunk for why counting pixels is not.
+    total_m2 = max(1.0, area_ha * 10_000.0)
 
     points: List[Dict[str, Any]] = []
     for i in range(0, len(steps), CHUNK_MONTHS):
         chunk = steps[i:i + CHUNK_MONTHS]
-        points.extend(_ndvi_chunk(ee, geom, chunk, expected_px))
+        points.extend(_ndvi_chunk(ee, geom, chunk, total_m2))
     return points
 
 
-def _ndvi_chunk(ee, geom, steps: List[str], expected_px: float) -> List[Dict[str, Any]]:
+def _ndvi_chunk(ee, geom, steps: List[str], total_m2: float) -> List[Dict[str, Any]]:
     """One Earth Engine round trip for a run of months."""
     first = ee.Date(steps[0] + "-01")
 
@@ -107,7 +108,7 @@ def _ndvi_chunk(ee, geom, steps: List[str], expected_px: float) -> List[Dict[str
         ndvi = ee.Image(ee.Algorithms.If(coll.size().gt(0), coll.median(), empty))
 
         stats = ndvi.reduceRegion(
-            reducer=ee.Reducer.mean().combine(ee.Reducer.count(), sharedInputs=True),
+            reducer=ee.Reducer.mean(),
             geometry=geom,
             scale=NDVI_SCALE_M,
             maxPixels=1e9,
@@ -115,10 +116,35 @@ def _ndvi_chunk(ee, geom, steps: List[str], expected_px: float) -> List[Dict[str
             # big AOI raises instead of returning a slightly coarser number.
             bestEffort=True,
         )
+
+        # Coverage has to be measured as area, not as a pixel count.
+        #
+        # reduceRegion works in the image's projection, and a composite built
+        # through ee.Algorithms.If has no native projection, so Earth Engine
+        # falls back to EPSG:4326. There a "10 m" pixel is 10 m tall but
+        # 10/cos(latitude) m wide, which over England inflates the count by
+        # about 1.6x — measured at 1.617 near Guildford and 1.658 in the fens,
+        # against 1.597 and 1.645 predicted. Every month therefore reported
+        # more pixels than the AOI can hold and clamped to 100% coverage,
+        # including cloudy midwinter ones.
+        #
+        # pixelArea() returns true square metres whatever the projection, so
+        # summing it over the unmasked pixels gives a fraction that means what
+        # it says.
+        valid_area = (
+            ee.Image.pixelArea().updateMask(ndvi.mask()).reduceRegion(
+                reducer=ee.Reducer.sum(),
+                geometry=geom,
+                scale=NDVI_SCALE_M,
+                maxPixels=1e9,
+                bestEffort=True,
+            )
+        )
+
         return ee.Feature(None, {
             "t": m_start.format("YYYY-MM"),
-            "mean": stats.get("NDVI_mean"),
-            "count": stats.get("NDVI_count"),
+            "mean": stats.get("NDVI"),
+            "valid_m2": valid_area.get("area"),
             "images": coll.size(),
         })
 
@@ -129,11 +155,11 @@ def _ndvi_chunk(ee, geom, steps: List[str], expected_px: float) -> List[Dict[str
     for row in rows:
         p = row["properties"]
         mean = p.get("mean")
-        count = p.get("count") or 0
-        valid = min(1.0, float(count) / expected_px) if expected_px else 0.0
+        valid_m2 = p.get("valid_m2") or 0.0
+        valid = min(1.0, float(valid_m2) / total_m2) if total_m2 else 0.0
 
         # No imagery, or every pixel masked, is a gap — not a zero.
-        if mean is None or count == 0:
+        if mean is None or valid_m2 <= 0:
             out.append({"t": p["t"], "value": None,
                         "valid_fraction": round(valid, 3), "interpolated": False})
             continue

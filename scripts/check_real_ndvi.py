@@ -28,16 +28,27 @@ import time
 # ee_smoke_test.py — put the repo root first.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-# A small field near Guildford. Small on purpose: reduceRegion over a county
-# times out, and you want to know the pipeline works before you stress it.
+# Intensive arable in the Cambridgeshire fens. Small on purpose: reduceRegion
+# over a county times out, and you want to know the pipeline works before you
+# stress it.
+#
+# This used to be a box near Guildford, which was a bad choice and made the
+# pipeline look broken when it was not. That box mixes housing and roads
+# (NDVI ~0.14 year round) with evergreen and permanent pasture that stays
+# green through a southern English winter (~0.75), in a fixed proportion — so
+# its average sat near 0.42 in every month and showed no seasons at all.
+#
+# Arable is the opposite: bare soil in winter, closed crop canopy in summer,
+# the strongest seasonal swing available in England. If this site is flat,
+# something really is wrong.
 FIELD = {
     "type": "Polygon",
     "coordinates": [[
-        [-0.580, 51.235], [-0.560, 51.235],
-        [-0.560, 51.245], [-0.580, 51.245], [-0.580, 51.235],
+        [0.100, 52.550], [0.120, 52.550],
+        [0.120, 52.570], [0.100, 52.570], [0.100, 52.550],
     ]],
 }
-AREA_HA = 155.0
+AREA_HA = 301.0
 
 
 def main() -> int:
@@ -73,7 +84,7 @@ def main() -> int:
         print(f"✗ Could not load ee_series: {type(e).__name__}: {e}")
         return 1
 
-    print(f"Fetching {len(steps)} months of NDVI for a {AREA_HA:.0f} ha field…")
+    print(f"Fetching {len(steps)} months of NDVI for a {AREA_HA:.0f} ha arable site…")
     print("(this is the slow part — that is the measurement, not a fault)\n")
     t0 = time.perf_counter()
     try:
