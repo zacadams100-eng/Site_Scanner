@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { groupFactors, useStore } from '../store'
+import { useEscape } from '../lib/useEscape'
 
 /**
  * An open catalogue of 118 factors is only an asset if it can be searched.
@@ -19,6 +20,8 @@ export default function FactorBrowser() {
   const setOpen = useStore((s) => s.setBrowserOpen)
   const [q, setQ] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  useEscape(open, () => setOpen(false))
 
   const grouped = useMemo(() => {
     if (!catalog) return {}

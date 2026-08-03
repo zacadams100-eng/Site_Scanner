@@ -5,6 +5,8 @@ import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
+import { PALETTE } from '../lib/palette'
+import { STANDALONE } from '../api'
 
 /**
  * The map is the canvas, not a widget in a frame — full bleed, with panels
@@ -37,12 +39,70 @@ import { rampColor, rampPosition } from '../lib/format'
 // scripts/copy-maplibre-worker.mjs for the full failure mode. The worker and
 // its shared chunk are copied verbatim into public/maplibre/ instead, which
 // preserves the relative import between them.
-maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
+//
+// A single-file build has no `/maplibre/` to fetch from, so the standalone
+// bundler stamps the worker's whole source onto `window.__MAPLIBRE_WORKER__`
+// and we hand MapLibre a blob URL instead. The stamped source is pre-bundled
+// with its shared chunk inlined: a blob has no meaningful base URL, so the
+// relative import the file normally carries would 404 the same way the
+// missing worker did.
+declare global {
+  interface Window { __MAPLIBRE_WORKER__?: string }
+}
+
+const workerSource = typeof window !== 'undefined' ? window.__MAPLIBRE_WORKER__ : undefined
+
+const workerUrl = workerSource
+  ? URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }))
+  : '/maplibre/maplibre-gl-worker.mjs'
+
+maplibregl.setWorkerUrl(workerUrl)
+
+/**
+ * Can this page start a blob worker at all?
+ *
+ * A page served under a CSP without `worker-src blob:` refuses one, and
+ * MapLibre's failure mode is silent: the style parses, our layers are added,
+ * and every GeoJSON source then stays unloaded forever with no error event —
+ * a blank map that reads as a bug in this app rather than a sandbox
+ * restriction. The probe turns that silence into something we can say aloud.
+ *
+ * It has to be a round trip. Chrome does *not* throw from `new Worker()` when
+ * CSP refuses it — it logs the refusal and hands back an object that never
+ * runs — so construction succeeding proves nothing. A worker that reports back
+ * is the only evidence that counts.
+ *
+ * Two lines of its own code rather than MapLibre's 600 kB: this only needs to
+ * answer whether workers run, and parsing the real one to find out would cost
+ * far more than the question is worth.
+ */
+function probeWorker(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let url = ''
+    try {
+      url = URL.createObjectURL(
+        new Blob(['self.postMessage(1)'], { type: 'text/javascript' }),
+      )
+      const w = new Worker(url)
+      const done = (ok: boolean) => {
+        w.terminate()
+        URL.revokeObjectURL(url)
+        resolve(ok)
+      }
+      const timer = setTimeout(() => done(false), 1500)
+      w.onmessage = () => { clearTimeout(timer); done(true) }
+      w.onerror = () => { clearTimeout(timer); done(false) }
+    } catch {
+      if (url) URL.revokeObjectURL(url)
+      resolve(false)
+    }
+  })
+}
 
 const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } }],
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': PALETTE.ink0 } }],
 }
 
 const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -55,6 +115,16 @@ export default function MapCanvas() {
   // React state rather than a ref: when the style becomes ready the AOI and
   // cell effects must re-run, and flipping a ref would not re-render.
   const [ready, setReady] = useState(false)
+  const [workerBlocked, setWorkerBlocked] = useState(false)
+
+  // Only a standalone build runs its worker from a blob, so only it can hit
+  // this. A served build fetches the worker from its own origin.
+  useEffect(() => {
+    if (!workerSource) return
+    let live = true
+    void probeWorker().then((ok) => { if (live && !ok) setWorkerBlocked(true) })
+    return () => { live = false }
+  }, [])
 
   const drawMode = useStore((s) => s.drawMode)
   const setAoi = useStore((s) => s.setAoi)
@@ -97,7 +167,7 @@ export default function MapCanvas() {
         id: 'cells-fill',
         type: 'fill',
         source: 'cells',
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.72 },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.78 },
       })
 
       map.addSource('aoi', { type: 'geojson', data: EMPTY })
@@ -105,13 +175,15 @@ export default function MapCanvas() {
         id: 'aoi-fill',
         type: 'fill',
         source: 'aoi',
-        paint: { 'fill-color': '#ff7a5c', 'fill-opacity': 0.06 },
+        paint: { 'fill-color': PALETTE.flame, 'fill-opacity': 0.08 },
       })
       map.addLayer({
         id: 'aoi-line',
         type: 'line',
         source: 'aoi',
-        paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
+        // The lifted flame, not the base one: the boundary has to hold against
+        // whatever tiles land beneath it, and #d2612b loses to dark terrain.
+        paint: { 'line-color': PALETTE.flameLift, 'line-width': 2.5 },
       })
 
       map.addSource('draft', { type: 'geojson', data: EMPTY })
@@ -119,18 +191,23 @@ export default function MapCanvas() {
         id: 'draft-fill',
         type: 'fill',
         source: 'draft',
-        paint: { 'fill-color': '#e05f42', 'fill-opacity': 0.1 },
+        paint: { 'fill-color': PALETTE.flame, 'fill-opacity': 0.1 },
       })
       map.addLayer({
         id: 'draft-line',
         type: 'line',
         source: 'draft',
-        paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        // A shade down from the committed boundary, and dashed: in progress
+        // should never look as settled as done.
+        paint: { 'line-color': PALETTE.flame, 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
 
       // The basemap goes on last and sits beneath everything of ours, so a
-      // failure here costs context and nothing else.
-      if (!map.getSource('osm')) {
+      // failure here costs context and nothing else. A standalone build skips
+      // it: tile hosts are external, the CSP it is published behind blocks
+      // them outright, and asking anyway buys a console full of red for
+      // exactly the same blank ground.
+      if (!STANDALONE && !map.getSource('osm')) {
         map.addSource('osm', {
           type: 'raster',
           tiles: [BASEMAP_TILES],
@@ -142,8 +219,15 @@ export default function MapCanvas() {
           type: 'raster',
           source: 'osm',
           // Desaturated and dimmed so data layers read as the foreground. The
-          // basemap is context, not content.
-          paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
+          // basemap is context, not content. Rotated a little toward the
+          // ground's blue as well, so OSM's greens and beiges stop fighting
+          // the palette and settle into it.
+          paint: {
+            'raster-opacity': 0.46,
+            'raster-saturation': -0.78,
+            'raster-brightness-max': 0.82,
+            'raster-hue-rotate': 8,
+          },
         }, 'cells-fill')
       }
 
@@ -388,5 +472,23 @@ export default function MapCanvas() {
     src.setData({ type: 'FeatureCollection', features })
   }, [cells, data, selected, timeIndex, catalog, ready])
 
-  return <div ref={containerRef} className="map-canvas" />
+  return (
+    <>
+      <div ref={containerRef} className="map-canvas" />
+      {workerBlocked && (
+        <div className="map-blocked">
+          <p><strong>The map layer can't start here.</strong></p>
+          <p>
+            This page is sandboxed without permission to run a background worker,
+            which is what MapLibre draws through. Everything else works — draw by
+            dragging and the table, charts and timeline still fill in; you just
+            won't see the shape on the map.
+          </p>
+          <p className="map-blocked-fix">
+            Running it locally gives you the map back.
+          </p>
+        </div>
+      )}
+    </>
+  )
 }

@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { TEMPLATES } from '../lib/permalink'
+import { useEscape } from '../lib/useEscape'
 
 /**
  * Guided starting points.
@@ -15,6 +17,16 @@ export default function Templates() {
   const applyTemplate = useStore((s) => s.applyTemplate)
   const catalog = useStore((s) => s.catalog)
   const aoi = useStore((s) => s.aoi)
+  const closeRef = useRef<HTMLButtonElement>(null)
+
+  useEscape(open, () => setOpen(false))
+
+  // Focus moves into the dialog when it opens. Without this a keyboard user
+  // opening it from the toolbar is still focused behind the scrim, and tabs
+  // through the whole map before reaching a card.
+  useEffect(() => {
+    if (open) closeRef.current?.focus()
+  }, [open])
 
   if (!open) return null
 
@@ -23,17 +35,23 @@ export default function Templates() {
 
   return (
     <div className="modal-scrim" onClick={() => setOpen(false)}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templates-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <div>
-            <div className="modal-title">Start from a question</div>
+            <div className="modal-title" id="templates-title">Start from a question</div>
             <div className="modal-sub">
               Each one picks the right factors for you. {aoi
                 ? 'Your drawn shape stays as it is.'
                 : 'Then draw a shape on the map.'}
             </div>
           </div>
-          <button className="browser-close" onClick={() => setOpen(false)} aria-label="Close">×</button>
+          <button ref={closeRef} className="browser-close" onClick={() => setOpen(false)} aria-label="Close">×</button>
         </div>
 
         <div className="template-grid">

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:standalone": "VITE_STANDALONE=1 tsc -b && VITE_STANDALONE=1 vite build && node scripts/build-standalone.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "predev": "node scripts/copy-maplibre-worker.mjs",

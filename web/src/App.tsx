@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useStore } from './store'
-import { fetchCatalog } from './api'
+import { fetchCatalog, STANDALONE } from './api'
 import MapCanvas from './components/MapCanvas'
 import Timeline from './components/Timeline'
 import AttributeTable from './components/AttributeTable'
@@ -10,6 +10,8 @@ import Provenance from './components/Provenance'
 import Toolbar from './components/Toolbar'
 import Templates from './components/Templates'
 import Compare from './components/Compare'
+import BrandMark from './components/BrandMark'
+import Gallery from './components/Gallery'
 import { formatArea } from './lib/format'
 import type { DrawMode } from './types'
 
@@ -52,6 +54,17 @@ export default function App() {
   const setAoiFromDrop = useStore((s) => s.setAoi)
 
   useEffect(() => {
+    // A standalone build has no server to ask, and everything it shows is
+    // generated — so it says so up front rather than sniffing a header that
+    // will never arrive.
+    if (STANDALONE) {
+      setMock(true)
+      fetchCatalog()
+        .then(setCatalog)
+        .catch((e) => setCatalogError(e?.message ?? 'Could not load the catalogue'))
+      return
+    }
+
     fetch('/api/catalog')
       .then(async (r) => {
         if (!r.ok) throw new Error(`Catalogue unavailable (${r.status})`)
@@ -111,6 +124,10 @@ export default function App() {
     <div className="app">
       <MapCanvas />
 
+      {/* Ground wash. Basemap tiles are whatever they are; this guarantees the
+          floating chrome always has a darkened surface under it. */}
+      <div className="wash" />
+
       {/* Tool rail — floats over the canvas rather than sitting in a frame */}
       <div className="tool-rail">
         {TOOLS.map((t) => (
@@ -156,30 +173,35 @@ export default function App() {
 
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" />
-          <span className="brand-name">Site Scanner</span>
+          <span className="brand-mark"><BrandMark /></span>
+          <span className="brand-text">
+            <span className="brand-name">Site Scanner</span>
+            <span className="brand-sub">GIS for land management</span>
+          </span>
           {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
         </div>
         <div className="topbar-right">
-          {isMock && (
-            <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
-              mock data
-            </span>
-          )}
-          {data && data.real_factors && data.real_factors.length > 0 && (
-            <span className="badge badge-live"
-                  title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
-              {data.real_factors.length} live
-            </span>
-          )}
-          {data && (
-            <span className={`badge badge-${data.precision}`}
-                  title={data.precision === 'approx'
-                    ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
-                    : 'Exact — computed from source pixels'}>
-              {data.precision}
-            </span>
-          )}
+          <div className="badges">
+            {isMock && (
+              <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
+                mock data
+              </span>
+            )}
+            {data && data.real_factors && data.real_factors.length > 0 && (
+              <span className="badge badge-live"
+                    title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
+                {data.real_factors.length} live
+              </span>
+            )}
+            {data && (
+              <span className={`badge badge-${data.precision}`}
+                    title={data.precision === 'approx'
+                      ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
+                      : 'Exact — computed from source pixels'}>
+                {data.precision}
+              </span>
+            )}
+          </div>
           <FactorBrowser />
         </div>
       </header>
@@ -214,10 +236,25 @@ export default function App() {
 
           {!catalogError && !aoi && (
             <div className="placeholder">
-              <p>Draw a rectangle, circle or freehand shape on the map.</p>
-              <p className="placeholder-sub">
-                The attribute table and charts generate themselves — no extra steps.
-              </p>
+              <div className="placeholder-frame">
+                <p>Draw a rectangle, circle or freehand shape on the map.</p>
+                <p className="placeholder-sub">
+                  The attribute table and charts generate themselves — no extra steps.
+                </p>
+              </div>
+
+              {/* Someone opening a standalone link cold has no way to know the
+                  numbers are invented or why the map has no basemap. Say both
+                  before they draw anything, not after. */}
+              {STANDALONE && (
+                <p className="placeholder-demo">
+                  This is a self-contained demo — the whole app in one file, with
+                  no server. Every figure is generated, deterministically, from
+                  the shape you draw: plausible for England, but not an
+                  observation of anywhere. There's no basemap because the page is
+                  sandboxed from external tile hosts.
+                </p>
+              )}
               {catalog && (
                 <p className="placeholder-meta">
                   {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly
@@ -247,6 +284,7 @@ export default function App() {
       </aside>
 
       <Timeline />
+      <Gallery />
       <Templates />
     </div>
   )

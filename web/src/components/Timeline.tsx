@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useStore } from '../store'
 import { compact, labelStep, seriesColor } from '../lib/format'
+import { PALETTE } from '../lib/palette'
 
 /**
  * The timeline is not just a control — it is a data display.
@@ -93,7 +94,7 @@ export default function Timeline() {
     const chartH = h - stripH - 3
 
     // Year gridlines, so 180 monthly steps stay legible.
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.strokeStyle = PALETTE.hairline
     ctx.lineWidth = 1
     steps.forEach((s, i) => {
       if (!s.endsWith('-01')) return
@@ -114,7 +115,7 @@ export default function Timeline() {
     const y = (v: number) => chartH - ((v - lo) / span) * (chartH - 6) - 3
 
     // Fill under the line, broken at gaps.
-    ctx.fillStyle = 'rgba(255,122,92,0.14)'
+    ctx.fillStyle = 'rgba(232,138,82,0.16)'
     let runStart = -1
     for (let i = 0; i <= values.length; i++) {
       const v = values[i]
@@ -146,7 +147,7 @@ export default function Timeline() {
     // The comparison marker, when a second position is pinned.
     if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
       const cx = x(compareIndex)
-      ctx.strokeStyle = 'rgba(111,195,212,0.9)'
+      ctx.strokeStyle = 'rgba(127,192,228,0.9)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([3, 2])
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
@@ -159,8 +160,8 @@ export default function Timeline() {
       const bw = Math.max(1, w / steps.length)
       const f = p.valid_fraction
       ctx.fillStyle = p.value === null
-        ? 'rgba(63,77,99,0.85)'
-        : `rgba(111,195,212,${0.18 + 0.62 * f})`
+        ? 'rgba(70,86,109,0.85)'
+        : `rgba(127,192,228,${0.18 + 0.62 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
   }, [primarySeries, steps, compareIndex])

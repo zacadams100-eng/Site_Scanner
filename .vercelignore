@@ -18,6 +18,10 @@ Dockerfile
 .dockerignore
 pytest.ini
 
+# Agent tooling. Vendored design-reasoning data, used when building the UI,
+# never served by it.
+.claude/
+
 bench/
 ingest/
 scripts/
