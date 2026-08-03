@@ -1,5 +1,10 @@
 import type { Factor, Series } from '../types'
-import { formatValue } from './format'
+import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
+
+/** Explains the months-observed columns wherever a file has room to say it. */
+export const PARTIAL_YEAR_NOTE =
+  'A year built from fewer than 12 months is not comparable to a full one — ' +
+  'the "months observed" columns say how many contributed.'
 
 /**
  * Getting data out.
@@ -21,23 +26,39 @@ function download(blob: Blob, filename: string): void {
 
 const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
 
-export function exportAnnualCsv(cols: Series[], area_ha: number): void {
-  const header = ['Year', ...cols.map((c) => `${c.meta.name}${c.unit ? ` (${c.unit})` : ''}`)]
-  const lines = [
-    `# Site Scanner export — ${new Date().toISOString().slice(0, 10)}`,
-    `# Area: ${area_ha.toFixed(1)} ha`,
-    `# Sources: ${[...new Set(cols.map((c) => c.meta.base_meta.name))].join('; ')}`,
-    header.map(esc).join(','),
-  ]
+/** Rows for the annual table, shared by the CSV file and the clipboard so the
+ *  two cannot drift — they were separate copies of the same loop, and only one
+ *  of them would have been remembered when this changed. */
+export function annualRows(cols: Series[]): { header: string[]; rows: string[][] } {
+  const header = ['Year']
+  for (const c of cols) {
+    const name = `${c.meta.name}${c.unit ? ` (${c.unit})` : ''}`
+    header.push(name, coverageHeader(c.meta.name))
+  }
+
   const years = cols[0]?.annual.map((r) => r.year) ?? []
-  for (const y of years) {
+  const rows = years.map((y) => {
     const row = [String(y)]
     for (const c of cols) {
       const r = c.annual.find((a) => a.year === y)
       row.push(r?.value === null || r?.value === undefined ? '' : String(r.value))
+      row.push(coverageValue(r))
     }
-    lines.push(row.map(esc).join(','))
-  }
+    return row
+  })
+  return { header, rows }
+}
+
+export function exportAnnualCsv(cols: Series[], area_ha: number): void {
+  const { header, rows } = annualRows(cols)
+  const lines = [
+    `# Site Scanner export — ${new Date().toISOString().slice(0, 10)}`,
+    `# Area: ${area_ha.toFixed(1)} ha`,
+    `# Sources: ${[...new Set(cols.map((c) => c.meta.base_meta.name))].join('; ')}`,
+    `# ${PARTIAL_YEAR_NOTE}`,
+    header.map(esc).join(','),
+    ...rows.map((r) => r.map(esc).join(',')),
+  ]
   download(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
            'site-scanner-annual.csv')
 }
@@ -74,11 +95,18 @@ export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: num
     props[c.factor_id] = Object.fromEntries(
       c.annual.map((r) => [r.year, r.value]),
     )
+    // Kept as a sibling key rather than folded into the value, so anything
+    // already reading `properties[factor_id][year]` keeps working.
+    props[`${c.factor_id}__months_observed`] = Object.fromEntries(
+      c.annual.map((r) => [r.year, r.value === null ? null : r.months_observed]),
+    )
     props[`${c.factor_id}__meta`] = {
       name: c.meta.name,
       unit: c.unit,
       source: c.meta.base_meta.name,
       licence: c.meta.base_meta.licence,
+      months_in_full_year: c.annual[0]?.months_total ?? 12,
+      note: PARTIAL_YEAR_NOTE,
     }
   }
   const fc: GeoJSON.FeatureCollection = {
@@ -98,7 +126,8 @@ export function exportXml(cols: Series[]): void {
 
   const rows: string[] = []
   rows.push('<Row>' + cell('Year') +
-    cols.map((c) => cell(`${c.meta.name} (${c.unit})`)).join('') + '</Row>')
+    cols.map((c) => cell(`${c.meta.name} (${c.unit})`) +
+                    cell(coverageHeader(c.meta.name))).join('') + '</Row>')
   for (const r0 of cols[0]?.annual ?? []) {
     const cells = [cell(r0.year, 'Number')]
     for (const c of cols) {
@@ -106,6 +135,11 @@ export function exportXml(cols: Series[]): void {
       cells.push(r?.value === null || r?.value === undefined
         ? cell('')
         : cell(r.value, typeof r.value === 'number' ? 'Number' : 'String'))
+      // Excel is the likeliest place for someone to chart this and see a
+      // spike that is really a short year, so the caveat travels as a real
+      // numeric column rather than a note nobody reads.
+      cells.push(r && r.value !== null
+        ? cell(r.months_observed, 'Number') : cell(''))
     }
     rows.push('<Row>' + cells.join('') + '</Row>')
   }
@@ -131,10 +165,15 @@ export function printReport(cols: Series[], area_ha: number,
                             centroid: { lng: number; lat: number }): void {
   const w = window.open('', '_blank')
   if (!w) return
+  let anyPartial = false
   const rows = (cols[0]?.annual ?? []).map((r0) => {
     const cells = cols.map((c) => {
       const r = c.annual.find((a) => a.year === r0.year)
-      return `<td>${formatValue(r?.value ?? null, c.meta as Factor)}</td>`
+      const partial = r ? isPartialYear(r) : false
+      if (partial) anyPartial = true
+      return `<td>${formatValue(r?.value ?? null, c.meta as Factor)}` +
+             `${partial ? `<span class="p" title="${r!.months_observed} of ` +
+                          `${r!.months_total} months">*</span>` : ''}</td>`
     }).join('')
     return `<tr><th>${r0.year}</th>${cells}</tr>`
   }).join('')
@@ -149,6 +188,7 @@ export function printReport(cols: Series[], area_ha: number,
  th:first-child,td:first-child{text-align:left}
  thead th{border-bottom:2px solid #333;font-size:11px}
  .src{margin-top:24px;font-size:10px;color:#666}
+ .p{color:#c2410c;font-weight:600;margin-left:2px}
  @media print{body{margin:12mm}}
 </style>
 <h1>Site Scanner — site report</h1>
@@ -157,6 +197,8 @@ export function printReport(cols: Series[], area_ha: number,
 <table><thead><tr><th>Year</th>${cols.map((c) =>
    `<th>${c.meta.name}<br><span style="font-weight:400;color:#888">${c.unit}</span></th>`).join('')}</tr></thead>
 <tbody>${rows}</tbody></table>
+${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}
+ Hover a marked figure on screen for the exact count.</div>` : ''}
 <div class="src"><strong>Sources.</strong> ${[...new Set(cols.map((c) =>
   `${c.meta.base_meta.name} (${c.meta.base_meta.licence})`))].join(' · ')}</div>`)
   w.document.close()

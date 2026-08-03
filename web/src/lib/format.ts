@@ -1,4 +1,37 @@
-import type { Factor } from '../types'
+import type { AnnualRow, Factor } from '../types'
+
+/**
+ * Whether a year was built from fewer months than it should have been.
+ *
+ * This matters more than it looks. NDVI's first year is 2017, and Sentinel-2
+ * only starts in March — so that row averages ten months and is missing
+ * January and February, the two lowest of the year. It reads as the highest
+ * NDVI on record when it is really just a year with its winter cut off.
+ *
+ * The table has always marked this with a dot. Exports did not, so the caveat
+ * died at the boundary where it matters most: a chart built in Excel from
+ * exported data showed a spike that does not exist. Every export path goes
+ * through here now.
+ */
+export function isPartialYear(r: Pick<AnnualRow, 'months_observed' | 'months_total' | 'value'>): boolean {
+  return r.value !== null && r.months_observed < r.months_total
+}
+
+/** Column header for the coverage that travels beside an exported value. */
+export function coverageHeader(name: string): string {
+  return `${name} months observed`
+}
+
+/**
+ * Months behind an exported value, as a plain integer.
+ *
+ * Deliberately not "10/12": Excel silently reads that as a date and turns the
+ * caveat into 10 December, which is worse than omitting it.
+ */
+export function coverageValue(r?: AnnualRow): string {
+  if (!r || r.value === null) return ''
+  return String(r.months_observed)
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

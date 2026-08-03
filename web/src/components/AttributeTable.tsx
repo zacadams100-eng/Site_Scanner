@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { confidenceBand, formatValue, labelStep } from '../lib/format'
+import { annualRows, exportAnnualCsv } from '../lib/exports'
 import type { Series } from '../types'
 
 /**
@@ -68,40 +69,17 @@ export default function AttributeTable() {
     else { setSortCol(id); setSortAsc(id === 'year') }
   }
 
-  /** TSV, because that is what pastes cleanly into Excel and Google Sheets. */
+  /** TSV, because that is what pastes cleanly into Excel and Google Sheets.
+   *  Shares annualRows with the CSV export: these were two hand-maintained
+   *  copies of the same loop, which is how the partial-year caveat came to be
+   *  missing from both. */
   const copyTsv = () => {
-    const header = ['Year', ...cols.map((c) => `${c.meta.name}${c.unit ? ` (${c.unit})` : ''}`)]
-    const lines = [header.join('\t')]
-    for (const y of years) {
-      const row = [String(y)]
-      for (const c of cols) {
-        const r = c.annual.find((a) => a.year === y)
-        row.push(r?.value === null || r?.value === undefined ? '' : String(r.value))
-      }
-      lines.push(row.join('\t'))
-    }
+    const { header, rows } = annualRows(cols)
+    const lines = [header.join('\t'), ...rows.map((r) => r.join('\t'))]
     void navigator.clipboard.writeText(lines.join('\n'))
   }
 
-  const downloadCsv = () => {
-    const header = ['Year', ...cols.map((c) => `${c.meta.name}${c.unit ? ` (${c.unit})` : ''}`)]
-    const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-    const lines = [header.map(esc).join(',')]
-    for (const y of years) {
-      const row = [String(y)]
-      for (const c of cols) {
-        const r = c.annual.find((a) => a.year === y)
-        row.push(r?.value === null || r?.value === undefined ? '' : String(r.value))
-      }
-      lines.push(row.map(esc).join(','))
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'site-scanner-annual.csv'
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
+  const downloadCsv = () => exportAnnualCsv(cols, data?.area_ha ?? 0)
 
   return (
     <div className="table-wrap">
