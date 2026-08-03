@@ -42,6 +42,16 @@ NDVI_SCALE_M = 10
 # makes a partial failure diagnosable.
 CHUNK_MONTHS = 36
 
+# Sentinel-2 Level-2A surface reflectance begins in March 2017. The catalogue
+# runs from 2011, so 74 of the 180 months an unfiltered request covers predate
+# the satellite entirely.
+#
+# Those months are gaps either way — the rule is never to interpolate — but
+# asking Earth Engine about them costs a round trip to be told nothing, which
+# is roughly 40% of the wait on a full-range request. They are answered
+# directly instead.
+COVERAGE_START = "2017-03"
+
 
 def _masked_ndvi_collection(geom, start, end):
     """Cloud-masked NDVI images for a window, as an ImageCollection."""
@@ -84,9 +94,16 @@ def ndvi_series(geometry: dict, steps: List[str],
     # see the note on pixelArea in _ndvi_chunk for why counting pixels is not.
     total_m2 = max(1.0, area_ha * 10_000.0)
 
-    points: List[Dict[str, Any]] = []
-    for i in range(0, len(steps), CHUNK_MONTHS):
-        chunk = steps[i:i + CHUNK_MONTHS]
+    # Months before the satellite existed are gaps we can state without asking.
+    before = [s for s in steps if s < COVERAGE_START]
+    covered = [s for s in steps if s >= COVERAGE_START]
+
+    points: List[Dict[str, Any]] = [
+        {"t": s, "value": None, "valid_fraction": 0.0, "interpolated": False}
+        for s in before
+    ]
+    for i in range(0, len(covered), CHUNK_MONTHS):
+        chunk = covered[i:i + CHUNK_MONTHS]
         points.extend(_ndvi_chunk(ee, geom, chunk, total_m2))
     return points
 
