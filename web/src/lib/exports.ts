@@ -104,6 +104,49 @@ export function exportMonthlyCsv(cols: Series[]): void {
            'site-scanner-monthly.csv')
 }
 
+/**
+ * The two-date change table, as rows.
+ *
+ * Shared by the CSV file and its tests so the file cannot drift from what the
+ * Compare panel shows. Categorical factors report changed/no change rather
+ * than a difference, and a gap at either end reports no delta at all — the
+ * same rules the panel applies, because a spreadsheet is exactly where an
+ * invented zero would be mistaken for a measurement of no change.
+ */
+export function compareRows(cols: Series[], a: number, b: number): { header: string[]; rows: string[][] } {
+  const [lo, hi] = a <= b ? [a, b] : [b, a]
+  const stepA = cols[0]?.points[lo]?.t ?? ''
+  const stepB = cols[0]?.points[hi]?.t ?? ''
+  const header = ['Factor', 'Unit', stepA, stepB, 'Change', 'Change %']
+
+  const rows = cols.map((c) => {
+    const va = c.points[lo]?.value ?? null
+    const vb = c.points[hi]?.value ?? null
+    const base = [c.meta.name, c.unit]
+    if (va === null || vb === null) {
+      return [...base, va === null ? '' : String(va), vb === null ? '' : String(vb), '', '']
+    }
+    if (typeof va === 'string' || typeof vb === 'string') {
+      return [...base, String(va), String(vb), va === vb ? 'no change' : 'changed', '']
+    }
+    const d = vb - va
+    const pct = va !== 0 ? ((d / Math.abs(va)) * 100).toFixed(1) : ''
+    return [...base, String(va), String(vb), String(Number(d.toFixed(6))), pct]
+  })
+  return { header, rows }
+}
+
+export function exportCompareCsv(cols: Series[], a: number, b: number): void {
+  const { header, rows } = compareRows(cols, a, b)
+  const lines = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))]
+  lines.push('')
+  lines.push(esc('Comparing two single months carries their weather with it. '
+                 + 'For a trend, read the full monthly series rather than the endpoints.'))
+  for (const line of attributionsFor(cols)) lines.push(esc(line))
+  download(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
+           `site-scanner-change-${header[2]}-to-${header[3]}.csv`)
+}
+
 /** GeoJSON with the annual series folded into the feature's properties, so the
  *  shape and its numbers travel together into QGIS. */
 export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: number): void {

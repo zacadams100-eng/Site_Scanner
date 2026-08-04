@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import {
-  exportAnnualCsv, exportGeoJson, exportMonthlyCsv, exportSites, exportXml,
-  printReport, readAoiFile, readSitesFile,
+  exportAnnualCsv, exportCompareCsv, exportGeoJson, exportMonthlyCsv,
+  exportSites, exportXml, printReport, readAoiFile, readSitesFile,
 } from '../lib/exports'
 import { shareUrl } from '../lib/permalink'
 import { formatArea } from '../lib/format'
@@ -21,6 +21,8 @@ export default function Toolbar() {
   const data = useStore((s) => s.data)
   const selected = useStore((s) => s.selected)
   const saved = useStore((s) => s.saved)
+  const timeIndex = useStore((s) => s.timeIndex)
+  const compareIndex = useStore((s) => s.compareIndex)
   const saveAoi = useStore((s) => s.saveAoi)
   const loadSavedAoi = useStore((s) => s.loadSaved)
   const deleteSaved = useStore((s) => s.deleteSaved)
@@ -223,6 +225,11 @@ export default function Toolbar() {
             <button onClick={() => { exportMonthlyCsv(cols); setMenu('none') }}>
               CSV — every month, with confidence
             </button>
+            {compareIndex !== null && (
+              <button onClick={() => { exportCompareCsv(cols, timeIndex, compareIndex); setMenu('none') }}>
+                CSV — change between the two pinned dates
+              </button>
+            )}
             <button onClick={() => { exportXml(cols); setMenu('none') }}>
               Excel workbook
             </button>

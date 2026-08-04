@@ -253,6 +253,18 @@ export default function Timeline() {
                   title="Clear the comparison point">
             vs {labelStep(steps[compareIndex] ?? '')} ×
           </button>
+        ) : data && timeIndex >= 12 ? (
+          /* Comparison was reachable only by shift-clicking the track, which
+             nobody discovers. Year-on-year is the comparison people actually
+             want — this month against the same month last year, which is the
+             one pairing that holds the season constant. */
+          <button
+            className="time-compare time-compare-add"
+            onClick={() => { setCompareIndex(timeIndex - 12); setTab('charts') }}
+            title="Compare with the same month a year earlier. Shift-click the track to pin any other month."
+          >
+            vs a year ago
+          </button>
         ) : (
           factorName && <div className="time-factor">{factorName}</div>
         )}
