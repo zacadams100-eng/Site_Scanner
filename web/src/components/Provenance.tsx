@@ -10,6 +10,23 @@ import type { Series } from '../types'
  * adopts the tool. GEE makes people work this out for themselves; showing it
  * plainly is a genuine differentiator.
  */
+/**
+ * The round-trip cost of the live factors in one base, in words.
+ *
+ * Reported per base rather than per factor because siblings share a single
+ * Earth Engine pass — eleven Sentinel-2 indices cost one query, and listing
+ * eleven identical timings would imply eleven.
+ */
+function queryCost(factors: Series[]): string {
+  const live = factors.filter((f) => f.source === 'earth-engine')
+  const fresh = live.filter((f) => !f.cached)
+  const slowest = Math.max(0, ...fresh.map((f) => f.elapsed_ms ?? 0))
+  if (!fresh.length) return 'Served from cache — no Earth Engine call'
+  const time = slowest >= 1000 ? `${(slowest / 1000).toFixed(1)} s` : `${slowest} ms`
+  const cached = live.length - fresh.length
+  return `${time} of Earth Engine time` + (cached ? `, ${cached} more from cache` : '')
+}
+
 export default function Provenance() {
   const data = useStore((s) => s.data)
   const selected = useStore((s) => s.selected)
@@ -50,6 +67,16 @@ export default function Provenance() {
                 ? 'Live Earth Engine observations'
                 : 'Demo data — generated, not observed'}
             </span>
+            {/* What the answer cost. A live factor is seconds of Earth Engine
+                compute and a cached one is nothing, and the difference is the
+                entire argument for the ingest-then-store architecture — so it
+                belongs on screen rather than in a benchmark file. */}
+            {factors.some((f) => f.source === 'earth-engine') && (
+              <>
+                <span>Query cost</span>
+                <span>{queryCost(factors)}</span>
+              </>
+            )}
           </div>
           <div className="prov-factors">
             {factors.map((f) => (
