@@ -1,25 +1,85 @@
-# Deploying Contour
+# Deploying Site Scanner
 
-Two pieces, deployed separately:
+There are two ways to deploy this, and the first one needs no accounts beyond
+a Vercel login.
 
-| Piece | Where | Config |
-| --- | --- | --- |
-| `app.py` (or the mock) | Google Cloud Run | `Dockerfile` |
-| `web/` (the React app) | Vercel | `vercel.json` |
+| Path | What runs | What you need | What you get |
+| --- | --- | --- | --- |
+| **A. Vercel only** | React app + the credential-free API as one Python serverless function (`api/index.py`) | A Vercel account | Everything except Earth Engine factors |
+| **B. Vercel + Cloud Run** | React app on Vercel, `app.py` on Cloud Run | Vercel, Google Cloud, an Earth Engine service account | The above plus the 24 live satellite factors |
+
+Path A exists because path B used to be the only option, which meant a public
+URL required a Google Cloud account, a billing profile and an Earth Engine
+service account before anyone could see anything at all. That is a lot of setup
+between a repository and a link you can send someone.
 
 `site-scanner.html` is the original single-file prototype. It still works, but
-it predates the catalogue — it calls only `/api/stats`, `/api/summary` and
-`/api/tile/*`, and knows nothing about the 118 factors, the monthly timeline,
-the attribute table or the charts. `web/` is the deployed frontend; the
-prototype is kept for reference.
-
-Nothing here has been run against a real cloud account — no credentials are
-configured yet. Treat the commands as the intended path, not as verified
-output, and expect the first deploy of anything to need a round of fixing.
+it predates the catalogue. `web/` is the deployed frontend; the prototype is
+kept for reference.
 
 ---
 
-## 1. Backend → Cloud Run
+## Path A — Vercel only (start here)
+
+```bash
+npm i -g vercel
+vercel login
+vercel link          # creates .vercel/project.json
+vercel deploy --prod
+```
+
+That is the whole thing. `vercel.json` already declares:
+
+```
+installCommand   npm --prefix web ci
+buildCommand     cp demo/site-scanner-demo.html web/public/demo.html
+                 npm --prefix web run build
+outputDirectory  web/dist
+functions        api/index.py  (includeFiles "*.py", maxDuration 30)
+rewrites         /api/(.*) -> /api/index
+```
+
+No environment variables are required. The function imports the same
+`routes_catalog` router the real backend mounts, so the API contract is
+identical; factors return generated data and say so, plus whatever the
+open-data sources (`open_data.py`) can reach.
+
+### Deploying from CI instead
+
+`.github/workflows/deploy.yml` runs the full test suite and then deploys, on
+manual trigger. It needs three repository secrets, all from Vercel:
+
+| Secret | Where it comes from |
+| --- | --- |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `VERCEL_ORG_ID` | `.vercel/project.json` after `vercel link` |
+| `VERCEL_PROJECT_ID` | same file |
+
+### Verify the deployment
+
+```bash
+URL=https://your-project.vercel.app
+curl -sS "$URL/api/catalog" | head -c 200      # 266 factors
+curl -sS -D- -o /dev/null "$URL/"              # 200, CSP headers present
+curl -sS "$URL/basemap/england.json" -o /dev/null -w '%{http_code} %{size_download}\n'
+```
+
+The third one matters: the bundled basemap is what makes the map legible when
+the raster tiles are blocked, and the SPA catch-all rewrite will happily return
+`index.html` with a 200 for a missing file (see "Known gaps").
+
+### If the API 404s
+
+Vercel can route a rewritten request to a function in more than one shape, and
+not all of them preserve `/api/catalog` as the path the function sees.
+`api/index.py` normalises it from the ASGI path or from
+`x-vercel-original-path` / `x-forwarded-uri`, and `tests/test_serverless.py`
+covers all three. If you still get a 404, check what path the function received
+before assuming the application's routing is wrong.
+
+---
+
+## Path B — adding the Earth Engine backend on Cloud Run
 
 ### Deploy the mock first (no Earth Engine needed)
 
@@ -105,25 +165,28 @@ real backend — check `APP_MODULE`.
 
 ---
 
-## 2. Frontend → Vercel
+## Pointing the frontend at Cloud Run
 
-`vercel.json` is already set up for the Vite build. It installs and builds
-`web/`, publishes `web/dist`, and proxies `/api/*` to Cloud Run. The only thing
-you have to change is the backend URL.
+Once Cloud Run is up, point the frontend at it by replacing the serverless
+rewrite in `vercel.json`:
 
-First put the Cloud Run URL into `vercel.json`, replacing the placeholder in
-the `/api/:path*` rewrite:
+```json
+{ "source": "/api/(.*)", "destination": "https://YOUR-SERVICE.a.run.app/api/$1" }
+```
 
 ```bash
 API=$(gcloud run services describe contour-api --region europe-west2 --format='value(status.url)')
-sed -i "s#https://REPLACE-WITH-CLOUD-RUN-URL.a.run.app#${API}#" vercel.json   # macOS: sed -i ''
-```
-
-Then:
-
-```bash
+python3 - <<EOF
+import json
+d = json.load(open("vercel.json"))
+d["rewrites"][0] = {"source": "/api/(.*)", "destination": "$API/api/\$1"}
+json.dump(d, open("vercel.json", "w"), indent=2)
+EOF
 vercel deploy --prod
 ```
+
+Keep `api/index.py` in the repository either way — it is what a preview
+deployment falls back to when the Cloud Run service is down or not yet built.
 
 Vercel runs, from the repo root:
 

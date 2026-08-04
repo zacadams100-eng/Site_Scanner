@@ -1,0 +1,87 @@
+# Deploy to Vercel.
+#
+# Manual by default. Deploying on every push to a branch is the wrong default
+# for a project whose data layer is still half demo — you want to choose when
+# the public URL changes.
+#
+# Set up once, in the repository's Settings → Secrets and variables → Actions:
+#
+#   VERCEL_TOKEN     Vercel → Account Settings → Tokens
+#   VERCEL_ORG_ID    from .vercel/project.json after `vercel link`
+#   VERCEL_PROJECT_ID  same file
+#
+# With those three present this workflow needs no other configuration: the API
+# runs as a serverless function in the same project, so there is no second
+# service to point at and no Earth Engine credentials involved.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which deployment to make
+        type: choice
+        options: [preview, production]
+        default: preview
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The same checks CI runs. A deployment that skips them is how a broken
+      # build reaches the only URL anyone actually looks at.
+      - name: Install
+        run: npm --prefix web ci
+
+      - name: Typecheck, test and build
+        run: |
+          npm --prefix web run lint
+          npm --prefix web test
+          npx --prefix web tsc -b --noEmit || npx --prefix web tsc -b
+          npm --prefix web run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Python tests
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN is not set — see the header of this file"
+            exit 1
+          fi
+          npm i -g vercel@latest
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+            vercel build --prod --token="$VERCEL_TOKEN"
+            url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          else
+            vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+            vercel build --token="$VERCEL_TOKEN"
+            url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          fi
+          echo "Deployed to $url"
+          echo "### Deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+
+      # A deploy that returns a URL serving a broken catalogue is not a deploy.
+      - name: Smoke test the deployment
+        run: |
+          sleep 5
+          echo "Check by hand if this step is skipped: curl <url>/api/catalog"

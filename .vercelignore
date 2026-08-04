@@ -1,27 +1,26 @@
-# Vercel builds the React app in web/ and publishes web/dist. Everything
-# Python goes to Cloud Run via the Dockerfile instead.
+# Vercel builds the React app in web/ and publishes web/dist, and runs the
+# credential-free API as one Python serverless function (api/index.py).
 #
-# Excluding requirements.txt also stops Vercel's framework detection from
-# treating this as a Python project and trying to build serverless functions.
+# The project's Python modules are NOT excluded any more: the function imports
+# them, and vercel.json's functions.includeFiles glob bundles them. Excluding
+# them was correct when the only backend was Cloud Run; it would now produce a
+# function that cannot import its own catalogue.
 
+# The Earth Engine backend belongs on Cloud Run, not in a serverless function —
+# earthengine-api and its Google client stack blow past the bundle limit.
 app.py
-mock_ee_backend.py
-routes_catalog.py
-catalog.py
-series.py
-summary.py
-geometry.py
-cache.py
-requirements.txt
-requirements-dev.txt
+ee_series.py
 Dockerfile
 .dockerignore
+requirements.txt
+requirements-dev.txt
 pytest.ini
 
 bench/
 ingest/
 scripts/
 tests/
+docs/
 __pycache__/
 *.pyc
 .pytest_cache/
