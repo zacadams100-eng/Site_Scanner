@@ -204,3 +204,71 @@ def test_cog_roundtrips_its_values(tmp_path):
     path = write_cog(tmp_path / "t.tif", data, transform, "EPSG:4326")
     with rasterio.open(path) as src:
         np.testing.assert_allclose(src.read(1), data, rtol=1e-5)
+
+
+# --------------------------------------------------------------------------
+# The runner's extent handling
+#
+# These exist because `--synthetic` used to generate a fixed 512x512 tile over
+# a hard-coded window regardless of the manifest, which made every timing taken
+# from it meaningless — see docs/INGEST-BENCHMARK.md, "Two bugs this run
+# found". A regression here would be silent and would only show up as a
+# benchmark that measures nothing.
+# --------------------------------------------------------------------------
+def test_raster_shape_accounts_for_longitude_shrinking_with_latitude():
+    """One degree of longitude is ~62% of a degree of latitude in metres at
+    England's latitude, so a degree-square window is 62% as wide in pixels as
+    it is tall. Using one pixel size for both stretches the raster by 60% and
+    quietly corrupts every cell statistic."""
+    import math
+
+    from ingest.run import raster_shape
+
+    w, h = raster_shape((-0.5, 51.07, 0.5, 52.07), 10)
+    assert h == pytest.approx(1.0 * 111_320 / 10, rel=0.01)
+    assert w / h == pytest.approx(math.cos(math.radians(51.57)), rel=0.01)
+
+
+def test_raster_shape_scales_with_resolution():
+    from ingest.run import raster_shape
+
+    coarse = raster_shape((-0.85, 51.07, 0.06, 51.47), 100)
+    fine = raster_shape((-0.85, 51.07, 0.06, 51.47), 10)
+    assert fine[0] == pytest.approx(coarse[0] * 10, rel=0.01)
+    assert fine[1] == pytest.approx(coarse[1] * 10, rel=0.01)
+
+
+def test_the_surrey_manifest_is_the_extent_the_benchmark_measured():
+    """docs/INGEST-BENCHMARK.md quotes 6,338 x 4,453 px. If the manifest moves,
+    every number in that document silently stops applying to it."""
+    from ingest.run import raster_shape
+
+    m = Manifest.load("ingest/manifests/ndvi_s2_surrey.yaml")
+    assert raster_shape(m.spatial.bbox, m.spatial.resolution_m) == (6338, 4453)
+
+
+def test_a_national_raster_at_ten_metres_is_refused_rather_than_attempted():
+    """4.2 billion pixels is 16.7 GB before the COG writer takes its copy. The
+    OOM reaper arriving at month nine of a backfill is a much worse failure
+    than an error message at month one."""
+    from ingest.run import fetch_raster
+
+    m = Manifest.load("ingest/manifests/ndvi_s2.yaml")     # England, 10 m
+    with pytest.raises(SystemExit) as exc:
+        fetch_raster(m, "2024-01", synthetic=True, out_dir=None)
+    assert "will not fit in memory" in str(exc.value)
+    assert "--window" in str(exc.value), "the error must say what to do instead"
+
+
+def test_a_synthetic_raster_covers_the_window_it_was_asked_for():
+    from ingest.run import fetch_raster
+
+    m = Manifest.load("ingest/manifests/ndvi_s2.yaml")
+    window = (-0.85, 51.07, -0.80, 51.10)
+    data, transform, bounds = fetch_raster(m, "2024-01", synthetic=True,
+                                           out_dir=None, window=window)
+    assert bounds == window
+    # Corners of the array map back to the corners of the window.
+    west, north = transform * (0, 0)
+    east, south = transform * (data.shape[1], data.shape[0])
+    assert (west, south, east, north) == pytest.approx(window, abs=1e-6)

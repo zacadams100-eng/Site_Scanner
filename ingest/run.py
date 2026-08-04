@@ -51,14 +51,48 @@ CREATE TABLE IF NOT EXISTS ingest_progress (
 """
 
 
+DEFAULT_BBOX = [-6.42, 49.86, 1.77, 55.81]          # England
+
+# Above this, a single timestep will not fit in a modest machine's memory:
+# 100 M float32 pixels is 400 MB for the array alone, before the COG writer
+# takes its copy. Refusing loudly beats being killed by the OOM reaper halfway
+# through month nine of a backfill.
+MAX_PIXELS = 100_000_000
+
+
+def raster_shape(bbox, resolution_m: float) -> tuple:
+    """Pixel dimensions of `bbox` at `resolution_m`, in EPSG:4326.
+
+    Longitude degrees shrink with latitude, so a metre resolution over England
+    is about 1.6× more longitude degrees per pixel than latitude degrees. Using
+    one number for both — which is the easy mistake — produces a raster
+    stretched by 60% and cell statistics that are quietly wrong.
+    """
+    import math
+
+    west, south, east, north = bbox
+    mid = math.radians((south + north) / 2)
+    deg_lat = resolution_m / 111_320.0
+    deg_lon = resolution_m / (111_320.0 * max(0.1, math.cos(mid)))
+    width = max(1, int(round((east - west) / deg_lon)))
+    height = max(1, int(round((north - south) / deg_lat)))
+    return width, height
+
+
 def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
-                 out_dir: Path):
+                 out_dir: Path, window: Optional[tuple] = None):
     """Produce a raster for one timestep.
 
-    With `--synthetic` this generates one. In production this is where the
-    Earth Engine export, or the HTTP fetch, or the S3 copy goes — the rest of
-    the pipeline does not care which, because it only ever sees an array plus
-    a transform.
+    With `--synthetic` this generates one **at the manifest's declared extent
+    and resolution**. That distinction matters: a synthetic run that quietly
+    substituted a fixed 512×512 tile would exercise the code path but measure
+    nothing, because every cost in this pipeline — pixels, COG size, H3 cells,
+    rows — scales with extent and resolution and with nothing else. The
+    generated *values* are meaningless; the shape of the work is not.
+
+    In production this is where the Earth Engine export, or the HTTP fetch, or
+    the S3 copy goes — the rest of the pipeline does not care which, because it
+    only ever sees an array plus a transform.
     """
     if not synthetic:
         raise NotImplementedError(
@@ -66,13 +100,20 @@ def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
             "credentials; run with --synthetic until those exist"
         )
 
-    bbox = manifest.spatial.bbox or [-6.42, 49.86, 1.77, 55.81]
-    # A small window, not all of England — the point is to exercise the code
-    # path, and a 10 m national raster will not fit in this sandbox.
-    window = (bbox[0], bbox[1], bbox[0] + 0.25, bbox[1] + 0.25)
+    window = tuple(window or manifest.spatial.bbox or DEFAULT_BBOX)
+    width, height = raster_shape(window, manifest.spatial.resolution_m)
+    if width * height > MAX_PIXELS:
+        raise SystemExit(
+            f"{width:,}×{height:,} = {width * height / 1e6:,.0f} M pixels for one "
+            f"timestep of {manifest.id} at {manifest.spatial.resolution_m} m.\n"
+            f"That will not fit in memory. Use --window to ingest a sub-extent, "
+            f"or tile the manifest — which is what a national run at 10 m needs "
+            f"regardless (see docs/INGEST-BENCHMARK.md)."
+        )
+
     seed = abs(hash((manifest.id, timestep))) % (2 ** 31)
     data, transform = synthetic_raster(
-        window, 512, 512, seed=seed, kind=manifest.kind,
+        window, width, height, seed=seed, kind=manifest.kind,
         lo=-0.2, hi=0.9, nodata=manifest.nodata,
         nodata_fraction=0.15 if manifest.nodata is not None else 0.0,
     )
@@ -80,13 +121,19 @@ def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
 
 
 def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
-                 out_dir: Path, dsn: Optional[str], dry_run: bool) -> int:
+                 out_dir: Path, dsn: Optional[str], dry_run: bool,
+                 window: Optional[tuple] = None,
+                 stats_out: Optional[dict] = None) -> int:
     steps = manifest.timesteps()
     if limit:
         steps = steps[:limit]
 
+    extent = tuple(window or manifest.spatial.bbox or DEFAULT_BBOX)
+    px_w, px_h = raster_shape(extent, manifest.spatial.resolution_m)
     print(f"{manifest.id}: {len(steps)} timestep(s), "
           f"H3 res {manifest.h3_resolutions}, kind={manifest.kind}")
+    print(f"  extent {extent}  →  {px_w:,}×{px_h:,} px at "
+          f"{manifest.spatial.resolution_m} m ({px_w * px_h / 1e6:.1f} M/timestep)")
     if dry_run:
         for s in steps[:5]:
             print(f"  would write {manifest.asset_key(s)}")
@@ -105,6 +152,11 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
 
     total_cells = 0
     t_start = time.perf_counter()
+    # Per-stage seconds, so a slow run says *which* stage is slow. Ingest that
+    # only reports a total tells you it is too slow and nothing about why.
+    stage = {"fetch": 0.0, "cog": 0.0, "aggregate": 0.0, "load": 0.0}
+    cog_bytes = 0
+    done = 0
 
     for step in steps:
         if conn and _already_done(conn, manifest, step):
@@ -112,24 +164,34 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
             continue
 
         t0 = time.perf_counter()
-        data, transform, bounds = fetch_raster(manifest, step, synthetic, out_dir)
+        data, transform, bounds = fetch_raster(manifest, step, synthetic,
+                                               out_dir, window=extent)
+        stage["fetch"] += time.perf_counter() - t0
 
         # 1. COG to object storage (local dir stands in for it here).
+        t1 = time.perf_counter()
         cog_path = out_dir / manifest.asset_key(step)
         writer = write_categorical_cog if manifest.kind == "categorical" else write_cog
         writer(cog_path, data, transform, "EPSG:4326", nodata=manifest.nodata)
+        stage["cog"] += time.perf_counter() - t1
+        cog_bytes += cog_path.stat().st_size
 
         # 2. Aggregate to every declared H3 tier.
         for res in manifest.h3_resolutions:
+            t2 = time.perf_counter()
             stats = list(aggregate_array(
                 data, transform, bounds, dataset_id=manifest.id, t=step,
                 res=res, kind=manifest.kind, nodata=manifest.nodata,
             ))
+            stage["aggregate"] += time.perf_counter() - t2
             total_cells += len(stats)
             if conn:
+                t3 = time.perf_counter()
                 _load(conn, res, stats)
                 _mark_done(conn, manifest, step, res, len(stats))
+                stage["load"] += time.perf_counter() - t3
 
+        done += 1
         print(f"  {step}: {cog_path.stat().st_size // 1024} KiB COG, "
               f"{total_cells:,} cells cumulative, {time.perf_counter() - t0:.2f}s")
 
@@ -137,8 +199,18 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
         conn.commit()
         conn.close()
 
-    print(f"{manifest.id}: done in {time.perf_counter() - t_start:.1f}s, "
-          f"{total_cells:,} cell-rows")
+    elapsed = time.perf_counter() - t_start
+    print(f"{manifest.id}: done in {elapsed:.1f}s, {total_cells:,} cell-rows")
+    if done:
+        print("  per timestep: " + "  ".join(
+            f"{k} {v / done:.2f}s" for k, v in stage.items() if v))
+        print(f"  {elapsed / done:.2f}s/timestep, "
+              f"{cog_bytes / done / 1e6:.1f} MB COG/timestep, "
+              f"{total_cells / done:,.0f} cells/timestep")
+    if stats_out is not None:
+        stats_out.update(steps=done, seconds=elapsed, cells=total_cells,
+                         cog_bytes=cog_bytes, stage=stage,
+                         pixels=px_w * px_h, extent=extent)
     return 0
 
 
@@ -192,11 +264,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--out", type=Path, default=Path("/tmp/site-scanner-cogs"))
     ap.add_argument("--dsn", help="Postgres DSN; omitted means COGs only")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--window", type=float, nargs=4,
+                    metavar=("W", "S", "E", "N"),
+                    help="ingest a sub-extent of the manifest's bbox; the way "
+                         "a national run at 10 m is tiled")
     args = ap.parse_args(argv)
 
     manifest = Manifest.load(args.manifest)
     return run_manifest(manifest, synthetic=args.synthetic, limit=args.limit,
-                        out_dir=args.out, dsn=args.dsn, dry_run=args.dry_run)
+                        out_dir=args.out, dsn=args.dsn, dry_run=args.dry_run,
+                        window=tuple(args.window) if args.window else None)
 
 
 if __name__ == "__main__":
