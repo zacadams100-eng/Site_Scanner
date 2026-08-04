@@ -298,6 +298,16 @@ mitigation is the ingest-then-store architecture, where Earth Engine derives
 products in batch and users are served from our own storage. That path is built
 but unused.
 
+Both licence questions now have emails drafted and waiting to be sent, in
+`docs/licensing/` — one to Google about the batch-derivation pattern, one to
+ESA about which licence Sentinel-2 actually carries. Send the ESA one first;
+it is cheaper and it may make the Google one unnecessary.
+`docs/licensing/DECISION-LOG.md` decides in advance what to do for every
+possible reply, so nobody re-argues the architecture when one arrives. The
+standing conclusion across all six branches: ingest-then-store is mandatory in
+four of them and merely advisable in the other two, so `ingest/` is the real
+architecture and the on-request Earth Engine path is a prototype that survived.
+
 **Sentinel-2's licence is recorded as CC BY-SA 3.0 IGO and flagged
 `commercial="verify"`** in `catalog.py`. Share-alike on a commercial derived
 product would be a real constraint, but Copernicus data is generally
