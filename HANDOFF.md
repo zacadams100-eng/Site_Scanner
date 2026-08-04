@@ -55,6 +55,18 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
+### The interface was rebranded
+
+It is now a light, quiet, instrument-like interface: paper ground, moss
+sidebar, one instrument blue used only for "here, now", IBM Plex Sans / Inter /
+IBM Plex Mono with mono reserved for measurement, and a proper frame — 64px top
+bar, 280px collapsible sidebar, map, report panel, 28px status bar carrying
+coordinates, scale, zoom, CRS, cell count and connection state.
+
+`BRAND.md` records the specification and where each rule lives. The old dark
+canvas with copper accents and backdrop blur is gone; do not reintroduce blur,
+heavy shadows or gradients, and keep colour at roughly 95% neutral.
+
 ### Added since
 - **Place search.** A postcode, place name or pasted `lat, lng` moves the map.
   Until then the only way to reach a field was to pan across England on an
@@ -264,7 +276,8 @@ is not the same as meeting its condition, and the app was doing the former.
 | `web/src/components/MapCanvas.tsx` | Drawing, editing, cell painting — and every MapLibre trap |
 | `series.py` | The generator that stands in for unbuilt factors |
 | `mock_ee_backend.py` | Credential-free backend; keeps frontend work unblocked |
-| `web/src/index.css` | Three-layer token system and the elevation ladder |
+| `web/src/index.css` | Three-layer token system, the frame, every component rule |
+| `BRAND.md` | The brand spec and where each rule lives in the code |
 | `TECHNICAL_PLAN.md` | Architecture and the reasoning behind it |
 | `BENCHMARK.md` | The measurements the design rests on |
 | `DESIGN_SPEC.md` | Feature spec and UI plan, with the open questions in §0 and §8 |

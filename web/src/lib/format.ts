@@ -107,18 +107,24 @@ export function rampPosition(v: number, factor: Factor): number {
 }
 
 /**
- * A single sequential ramp, dark to accent. Deliberately one ramp rather than
+ * A single sequential ramp, pale to deep. Deliberately one ramp rather than
  * per-factor palettes: with 118 factors, bespoke colour schemes become
  * impossible to keep coherent, and a consistent ramp means users learn to read
- * "darker = less" once.
+ * it once.
+ *
+ * Rebuilt for a paper ground: it starts near the page so a low value recedes
+ * into it, and runs through the brand's moss to a deep instrument blue. The
+ * lightness falls monotonically along the ramp, which is what keeps it
+ * readable in greyscale and to a colour-blind reader — the ordering survives
+ * even when the hue does not.
  */
 const RAMP: [number, number, number][] = [
-  [16, 26, 42],
-  [28, 62, 78],
-  [58, 104, 94],
-  [124, 146, 102],
-  [198, 164, 112],
-  [255, 166, 131],
+  [246, 243, 235],
+  [214, 220, 200],
+  [166, 189, 158],
+  [109, 150, 126],
+  [56, 111, 116],
+  [23, 71, 97],
 ]
 
 export function rampColor(t: number, alpha = 1): string {
@@ -132,12 +138,14 @@ export function rampColor(t: number, alpha = 1): string {
 }
 
 /** Stable colour per series, for multi-line charts and legends. */
-// Coral leads so the primary series matches the accent and the scrubber; the
-// rest fan out in hue and stay distinguishable against navy.
+// Moss leads, because the first series is the one drawn on the map and the map
+// draws it in the brand's green. The rest fan out in hue at a lightness that
+// holds against paper — nothing fluorescent, nothing that vibrates next to its
+// neighbour, and no two adjacent entries confusable in greyscale.
 const SERIES_COLORS = [
-  '#ff7a5c', '#6fc3d4', '#b9c48f', '#8f9fd4',
-  '#d99ec4', '#e3b072', '#7fb8a0', '#c4877a',
-  '#9db4d9', '#cfa6d4', '#a8c47f', '#d4a06f',
+  '#4d6048', '#1f88b4', '#a8722c', '#7b5ea7',
+  '#2f7d6b', '#b4534f', '#5d7f2f', '#8a5a78',
+  '#3f6b96', '#96742f', '#547a5c', '#7a4f3a',
 ]
 
 export function seriesColor(i: number): string {

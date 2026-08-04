@@ -42,7 +42,7 @@ maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
 const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } }],
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#f1eee8' } }],
 }
 
 const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -89,6 +89,9 @@ export default function MapCanvas() {
   const timeIndex = useStore((s) => s.timeIndex)
   const catalog = useStore((s) => s.catalog)
   const flyTo = useStore((s) => s.flyTo)
+  const overlayOpacity = useStore((s) => s.overlayOpacity)
+  const setCursor = useStore((s) => s.setCursor)
+  const setView = useStore((s) => s.setView)
 
   // Drawing state lives in refs, not React state: it changes on every
   // mousemove and re-rendering the tree at that rate would drop frames.
@@ -133,13 +136,13 @@ export default function MapCanvas() {
         id: 'aoi-fill',
         type: 'fill',
         source: 'aoi',
-        paint: { 'fill-color': '#ff7a5c', 'fill-opacity': 0.06 },
+        paint: { 'fill-color': '#4d6048', 'fill-opacity': 0.07 },
       })
       map.addLayer({
         id: 'aoi-line',
         type: 'line',
         source: 'aoi',
-        paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
+        paint: { 'line-color': '#4d6048', 'line-width': 2 },
       })
 
       // Corner handles for resizing. Above the outline so they stay grabbable
@@ -151,13 +154,13 @@ export default function MapCanvas() {
         id: 'draft-fill',
         type: 'fill',
         source: 'draft',
-        paint: { 'fill-color': '#e05f42', 'fill-opacity': 0.1 },
+        paint: { 'fill-color': '#1f88b4', 'fill-opacity': 0.08 },
       })
       map.addLayer({
         id: 'draft-line',
         type: 'line',
         source: 'draft',
-        paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        paint: { 'line-color': '#1f88b4', 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
 
       map.addLayer({
@@ -166,9 +169,9 @@ export default function MapCanvas() {
         source: 'handles',
         paint: {
           'circle-radius': 6,
-          'circle-color': '#ff7a5c',
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#0b1220',
+          'circle-color': '#ffffff',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#4d6048',
         },
       })
 
@@ -187,7 +190,10 @@ export default function MapCanvas() {
           source: 'osm',
           // Desaturated and dimmed so data layers read as the foreground. The
           // basemap is context, not content.
-          paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
+          // Washed rather than dimmed: on a paper ground the basemap has to
+          // lose saturation and contrast, not brightness, or it turns to mud
+          // under the value overlay.
+          paint: { 'raster-opacity': 0.42, 'raster-saturation': -0.85, 'raster-contrast': -0.25 },
         }, 'cells-fill')
       }
 
@@ -205,9 +211,34 @@ export default function MapCanvas() {
       if (!String(e?.error?.message ?? '').includes('Failed to fetch')) console.warn(e?.error)
     })
 
+    // Feed the status bar. A GIS that cannot tell you where the pointer is,
+    // how far across the picture is, and in what projection, is a picture of a
+    // map rather than a map.
+    const report = () => {
+      const c = map.getCenter()
+      // Metres per pixel at this latitude, times the CSS reference of 96dpi,
+      // gives the denominator of a real representative fraction.
+      const mPerPx = 156543.03392 * Math.cos((c.lat * Math.PI) / 180) / Math.pow(2, map.getZoom())
+      setView({ zoom: map.getZoom(), scale: mPerPx * 96 / 0.0254 })
+    }
+    const onMouseMove = (e: maplibregl.MapMouseEvent) =>
+      setCursor({ lng: e.lngLat.lng, lat: e.lngLat.lat })
+    const onMouseOut = () => setCursor(null)
+    map.on('move', report)
+    map.on('zoom', report)
+    map.on('mousemove', onMouseMove)
+    map.on('mouseout', onMouseOut)
+    report()
+
     mapRef.current = map
-    return () => { map.remove(); mapRef.current = null; setReady(false) }
-  }, [])
+    return () => {
+      map.off('move', report)
+      map.off('zoom', report)
+      map.off('mousemove', onMouseMove)
+      map.off('mouseout', onMouseOut)
+      map.remove(); mapRef.current = null; setReady(false)
+    }
+  }, [setCursor, setView])
 
   // ---- drawing ------------------------------------------------------------
   useEffect(() => {
@@ -346,21 +377,38 @@ export default function MapCanvas() {
       setDraft(null)
     }
 
+    // A stroke released outside the canvas — over the report panel, which
+    // covers half the map on a small screen — never reached MapLibre's own
+    // mouseup, so the shape was silently discarded and the tool stayed armed.
+    // The window sees every release; the last position on the map is where the
+    // shape was.
+    let lastSeen: maplibregl.LngLat | null = null
+    const trackMove = (e: maplibregl.MapMouseEvent) => { lastSeen = e.lngLat }
+    const windowUp = () => {
+      if (drawing.current && lastSeen) onUp(lastSeen)
+    }
+
     map.on('mousedown', mouseDown)
     map.on('mousemove', mouseMove)
+    map.on('mousemove', trackMove)
     map.on('mouseup', mouseUp)
     map.on('touchstart', touchStart)
     map.on('touchmove', touchMove)
     map.on('touchend', touchEnd)
     map.on('touchcancel', touchCancel)
+    window.addEventListener('mouseup', windowUp)
+    window.addEventListener('touchend', windowUp)
     return () => {
       map.off('mousedown', mouseDown)
       map.off('mousemove', mouseMove)
+      map.off('mousemove', trackMove)
       map.off('mouseup', mouseUp)
       map.off('touchstart', touchStart)
       map.off('touchmove', touchMove)
       map.off('touchend', touchEnd)
       map.off('touchcancel', touchCancel)
+      window.removeEventListener('mouseup', windowUp)
+      window.removeEventListener('touchend', windowUp)
     }
   }, [drawMode, setAoi])
 
@@ -575,6 +623,18 @@ export default function MapCanvas() {
       maxZoom: 15,
     })
   }, [aoi, ready])
+
+  // ---- overlay opacity ----------------------------------------------------
+  // A layer you cannot fade is a layer you cannot check against the ground
+  // beneath it, which is most of what a value overlay is for.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || !map.getLayer('cells-fill')) return
+    map.setPaintProperty('cells-fill', 'fill-opacity', overlayOpacity)
+    // Readable from a test, so "the slider moved" and "the map changed" can be
+    // asserted separately rather than assumed to be the same thing.
+    ;(window as unknown as { __cellsOpacity?: number }).__cellsOpacity = overlayOpacity
+  }, [overlayOpacity, ready])
 
   // ---- go to a searched place --------------------------------------------
   // The panels float over the map, so centring on a place would put it behind

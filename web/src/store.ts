@@ -77,6 +77,21 @@ interface State {
   browserOpen: boolean
   templatesOpen: boolean
 
+  sidebarOpen: boolean
+  sidebarSection: 'layers' | 'sites' | 'data' | 'analysis'
+  panelOpen: boolean
+  /** How strongly the value overlay is painted over the basemap. A layer you
+   *  cannot fade is a layer you cannot check against the ground beneath it. */
+  overlayOpacity: number
+
+  /** Live instrument readouts for the status bar. Held here rather than in
+   *  MapCanvas because the bar is a sibling of the map, not a child. */
+  cursor: { lng: number; lat: number } | null
+  view: { zoom: number; scale: number } | null
+  /** The site currently open, if it was loaded from a saved one — shown in the
+   *  top bar the way a document name is. */
+  projectName: string | null
+
   /**
    * A pending map move, consumed by MapCanvas.
    *
@@ -92,7 +107,7 @@ interface State {
   setCatalogError: (e: string | null) => void
   setMock: (m: boolean) => void
   setDrawMode: (m: DrawMode) => void
-  setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean }) => void
+  setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean; keepProject?: boolean }) => void
   undo: () => void
   redo: () => void
   saveAoi: (name: string) => void
@@ -110,6 +125,12 @@ interface State {
   setTab: (t: 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
   setTemplatesOpen: (o: boolean) => void
+  setSidebarOpen: (o: boolean) => void
+  setSidebarSection: (s: 'layers' | 'sites' | 'data' | 'analysis') => void
+  setPanelOpen: (o: boolean) => void
+  setOverlayOpacity: (o: number) => void
+  setCursor: (c: { lng: number; lat: number } | null) => void
+  setView: (v: { zoom: number; scale: number } | null) => void
   refresh: () => Promise<void>
   hydrateFromUrl: () => void
   syncUrl: () => void
@@ -176,6 +197,16 @@ export const useStore = create<State>((set, get) => ({
   activeTab: 'table',
   browserOpen: false,
   templatesOpen: false,
+  // Open on a desktop, closed on a phone: at 390px the panel covers most of
+  // the map, and a first-time tap on the map is far more likely to be a drawn
+  // shape than a mis-tap on a section that was never asked for.
+  sidebarOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  sidebarSection: 'layers',
+  panelOpen: true,
+  overlayOpacity: 0.72,
+  cursor: null,
+  view: null,
+  projectName: null,
   flyTo: null,
 
   goTo: (lng, lat, zoom = 14) => set({ flyTo: { lng, lat, zoom, nonce: Date.now() } }),
@@ -199,6 +230,10 @@ export const useStore = create<State>((set, get) => ({
     set({
       aoi: g,
       drawMode: null,
+      // Drawing somewhere else is a new site, not the saved one under a new
+      // shape — so the document name goes with it unless we were told to keep
+      // it (a restore, or an edit of the same site).
+      projectName: opts?.keepProject ? get().projectName : null,
       // Cap the history so a long session cannot grow it without bound.
       past: opts?.skipHistory ? past : [...past, aoi].slice(-40),
       future: opts?.skipHistory ? get().future : [],
@@ -241,7 +276,7 @@ export const useStore = create<State>((set, get) => ({
     }
     const next = [entry, ...saved].slice(0, 50)
     persistSaved(next)
-    set({ saved: next })
+    set({ saved: next, projectName: entry.name })
   },
 
   loadSaved: (id) => {
@@ -254,8 +289,9 @@ export const useStore = create<State>((set, get) => ({
     if (entry.factors?.length) patch.selected = entry.factors.slice(0, MAX_FACTORS)
     if (typeof entry.timeIndex === 'number') patch.timeIndex = entry.timeIndex
     if (entry.compareIndex !== undefined) patch.compareIndex = entry.compareIndex
-    if (Object.keys(patch).length) set(patch)
-    get().setAoi(entry.geometry)
+    patch.projectName = entry.name
+    set(patch)
+    get().setAoi(entry.geometry, { keepProject: true })
   },
 
   deleteSaved: (id) => {
@@ -336,6 +372,12 @@ export const useStore = create<State>((set, get) => ({
   setTab: (t) => set({ activeTab: t }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
   setTemplatesOpen: (o) => set({ templatesOpen: o }),
+  setSidebarOpen: (o) => set({ sidebarOpen: o }),
+  setSidebarSection: (s) => set({ sidebarSection: s }),
+  setPanelOpen: (o) => set({ panelOpen: o }),
+  setOverlayOpacity: (o) => set({ overlayOpacity: Math.max(0, Math.min(1, o)) }),
+  setCursor: (c) => set({ cursor: c }),
+  setView: (v) => set({ view: v }),
 
   // Keeps the address bar in step with state, so a copied URL always restores
   // exactly what is on screen.

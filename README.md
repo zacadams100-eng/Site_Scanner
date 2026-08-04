@@ -88,6 +88,10 @@ of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
 The React frontend that replaces `site-scanner.html`. Vite + TypeScript +
 MapLibre, talking to whichever backend is on port 8000.
 
+The interface follows `BRAND.md`: paper ground, moss structure, one instrument
+blue that only ever means "here, now", IBM Plex Sans / Inter / IBM Plex Mono,
+and a frame of top bar, left sidebar, map, report panel and status bar.
+
 ```bash
 # terminal 1 — the API
 uvicorn mock_ee_backend:app --reload --port 8000

@@ -109,7 +109,7 @@ export default function Timeline() {
     const chartH = h - stripH - 3
 
     // Year gridlines, so 180 monthly steps stay legible.
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.strokeStyle = 'rgba(35,35,35,0.07)'
     ctx.lineWidth = 1
     steps.forEach((s, i) => {
       if (!s.endsWith('-01')) return
@@ -130,7 +130,7 @@ export default function Timeline() {
     const y = (v: number) => chartH - ((v - lo) / span) * (chartH - 6) - 3
 
     // Fill under the line, broken at gaps.
-    ctx.fillStyle = 'rgba(255,122,92,0.14)'
+    ctx.fillStyle = 'rgba(77,96,72,0.10)'
     let runStart = -1
     for (let i = 0; i <= values.length; i++) {
       const v = values[i]
@@ -148,7 +148,7 @@ export default function Timeline() {
     // The line itself. Gaps stay gaps — a cloudy month is a hole, not a
     // straight line between two distant observations.
     ctx.strokeStyle = seriesColor(0)
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 1.75
     ctx.lineJoin = 'round'
     let drawing = false
     ctx.beginPath()
@@ -162,7 +162,7 @@ export default function Timeline() {
     // The comparison marker, when a second position is pinned.
     if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
       const cx = x(compareIndex)
-      ctx.strokeStyle = 'rgba(111,195,212,0.9)'
+      ctx.strokeStyle = 'rgba(31,136,180,0.95)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([3, 2])
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
@@ -175,8 +175,8 @@ export default function Timeline() {
       const bw = Math.max(1, w / steps.length)
       const f = p.valid_fraction
       ctx.fillStyle = p.value === null
-        ? 'rgba(63,77,99,0.85)'
-        : `rgba(111,195,212,${0.18 + 0.62 * f})`
+        ? 'rgba(216,211,201,0.95)'
+        : `rgba(31,136,180,${0.18 + 0.6 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
   }, [primarySeries, steps, compareIndex])

@@ -8,24 +8,29 @@ import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
 import Provenance from './components/Provenance'
 import PlaceSearch from './components/PlaceSearch'
+import Sidebar from './components/Sidebar'
+import StatusBar from './components/StatusBar'
 import Toolbar from './components/Toolbar'
 import Templates from './components/Templates'
 import Compare from './components/Compare'
+import BrandMark from './components/BrandMark'
 import { formatArea } from './lib/format'
 import type { DrawMode } from './types'
 
+/** Drawing tools. Outline geometry on a 24 grid, 2px stroke, rounded joins —
+ *  the same drawing rules as every other icon in the interface. */
 const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: ReactNode }[] = [
   {
     id: 'rect', label: 'Rectangle', hint: 'Drag across the map to draw a rectangle',
-    icon: <rect x="3" y="4.5" width="14" height="11" rx="1.5" />,
+    icon: <rect x="4" y="6" width="16" height="12" rx="1.5" />,
   },
   {
     id: 'circle', label: 'Circle', hint: 'Drag from the centre outward',
-    icon: <circle cx="10" cy="10" r="6.5" />,
+    icon: <circle cx="12" cy="12" r="7" />,
   },
   {
     id: 'freehand', label: 'Freehand', hint: 'Drag to trace any shape',
-    icon: <path d="M4 13c1-5 4-7 6-5s-1 5 1 6 4-2 5-5" />,
+    icon: <path d="M5 15.5c1-6 4.5-8.5 7-6.5s-1.5 6 1 7 4.5-2.5 6-6" />,
   },
 ]
 
@@ -52,6 +57,10 @@ export default function App() {
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const setAoiFromDrop = useStore((s) => s.setAoi)
+  const sidebarOpen = useStore((s) => s.sidebarOpen)
+  const panelOpen = useStore((s) => s.panelOpen)
+  const setPanelOpen = useStore((s) => s.setPanelOpen)
+  const projectName = useStore((s) => s.projectName)
 
   // Named rather than inline, so the error notice can offer the same attempt
   // again instead of making the user reload the page.
@@ -94,8 +103,8 @@ export default function App() {
       try {
         setAoiFromDrop(await readAoiFile(file))
       } catch {
-        /* Toolbar's picker surfaces the detailed message; a silent no-op is
-           right for a stray drag of an unrelated file. */
+        /* The Data section's picker surfaces the detailed message; a silent
+           no-op is right for a stray drag of an unrelated file. */
       }
     }
     window.addEventListener('keydown', onKey)
@@ -115,75 +124,24 @@ export default function App() {
       : 'Pick a tool, then drag on the map'
 
   return (
-    <div className="app">
-      <MapCanvas />
-
-      {/* Tool rail — floats over the canvas rather than sitting in a frame */}
-      <div className="tool-rail">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            className={`tool${drawMode === t.id ? ' is-active' : ''}`}
-            onClick={() => setDrawMode(drawMode === t.id ? null : t.id)}
-            title={t.hint}
-            aria-pressed={drawMode === t.id}
-            aria-label={t.label}
-          >
-            <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
-                 stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              {t.icon}
-            </svg>
-          </button>
-        ))}
-        <button className="tool tool-sep" onClick={undo} disabled={!canUndo}
-                title="Undo (Cmd+Z)" aria-label="Undo">
-          <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
-               stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 5L3.5 8.5 7 12" /><path d="M3.5 8.5H12a4.5 4.5 0 010 9H8" />
-          </svg>
-        </button>
-        <button className="tool" onClick={redo} disabled={!canRedo}
-                title="Redo (Cmd+Shift+Z)" aria-label="Redo">
-          <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
-               stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M13 5l3.5 3.5L13 12" /><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4" />
-          </svg>
-        </button>
-        {aoi && (
-          <button className="tool tool-clear" onClick={() => setAoi(null)} title="Remove the drawn shape">
-            <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
-                 stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-              <path d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      <div className="hint-bar">{hint}</div>
-
+    <div className={`app${sidebarOpen ? '' : ' rail-collapsed'}${panelOpen ? '' : ' panel-closed'}`}>
       <header className="topbar">
         <div className="brand">
-          {/* The logo's bracket, reduced to something that survives at 18px.
-              The frog does not — at this size it becomes a smudge — so the
-              mark keeps the frame and the copper and drops the illustration. */}
-          <svg className="brand-mark" viewBox="0 0 24 24" aria-hidden focusable="false">
-            <path
-              d="M8 3H3v18h5M16 3h5v18h-5"
-              fill="none" stroke="currentColor" strokeWidth="2.1"
-              strokeLinecap="square"
-            />
-            <circle cx="12" cy="12" r="3.4" fill="currentColor" />
-          </svg>
-          <span className="brand-name">
-            <b>Site</b> Scanner
-          </span>
-          {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
+          <BrandMark className="brand-mark" />
+          <span className="brand-name"><b>Site</b> Scanner</span>
         </div>
+
+        <div className="topbar-doc">
+          <span className="doc-name">{projectName ?? (aoi ? 'Untitled site' : 'No site open')}</span>
+          {data && <span className="doc-meta mono">{formatArea(data.area_ha)}</span>}
+        </div>
+
         <PlaceSearch />
+
         <div className="topbar-right">
           {isMock && (
             <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
-              mock data
+              demo data
             </span>
           )}
           {data && data.real_factors && data.real_factors.length > 0 && (
@@ -192,28 +150,82 @@ export default function App() {
               {data.real_factors.length} live
             </span>
           )}
-          {data && (
-            <span className={`badge badge-${data.precision}`}
-                  title={data.precision === 'approx'
-                    ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
-                    : 'Exact — computed from source pixels'}>
-              {data.precision}
-            </span>
-          )}
+          {catalog && <span className="badge">{catalog.coverage.name}</span>}
           <FactorBrowser />
         </div>
       </header>
+
+      <Sidebar />
+
+      <main className="stage">
+        <MapCanvas />
+
+        {/* Map controls — one floating rectangle over the canvas, nothing else */}
+        <div className="tool-rail">
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              className={`tool${drawMode === t.id ? ' is-active' : ''}`}
+              onClick={() => setDrawMode(drawMode === t.id ? null : t.id)}
+              title={t.hint}
+              aria-pressed={drawMode === t.id}
+              aria-label={t.label}
+            >
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {t.icon}
+              </svg>
+            </button>
+          ))}
+          <span className="tool-sep" aria-hidden />
+          <button className="tool" onClick={undo} disabled={!canUndo}
+                  title="Undo (Cmd+Z)" aria-label="Undo">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 6 4 10l4 4" /><path d="M4 10h9a5 5 0 0 1 0 10H9" />
+            </svg>
+          </button>
+          <button className="tool" onClick={redo} disabled={!canRedo}
+                  title="Redo (Cmd+Shift+Z)" aria-label="Redo">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m16 6 4 4-4 4" /><path d="M20 10h-9a5 5 0 0 0 0 10h4" />
+            </svg>
+          </button>
+          {aoi && (
+            <button className="tool tool-clear" onClick={() => setAoi(null)}
+                    title="Remove the drawn shape" aria-label="Remove the drawn shape">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+                   stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 6 18 18M18 6 6 18" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <div className="hint-bar">{hint}</div>
+
+        <Timeline />
+      </main>
 
       {/* Data panel — the Excel half */}
       <aside className="data-panel">
         <div className="panel-head">
           <div className="panel-title">
             {aoi ? 'Site report' : 'No area drawn'}
-            {data && <span className="panel-sub">{formatArea(data.area_ha)}</span>}
+            {data && <span className="panel-sub mono">{formatArea(data.area_ha)}</span>}
+            <button className="icon-btn panel-hide" onClick={() => setPanelOpen(false)}
+                    title="Hide the report" aria-label="Hide the report">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="m10 7 5 5-5 5" />
+              </svg>
+            </button>
           </div>
-          <div className="tabs">
+          <div className="tabs" role="tablist">
             {(['table', 'charts', 'sources'] as const).map((t) => (
-              <button key={t} className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
+              <button key={t} role="tab" aria-selected={tab === t}
+                      className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
                 {t === 'table' ? 'Table' : t === 'charts' ? 'Charts' : 'Sources'}
               </button>
             ))}
@@ -232,7 +244,7 @@ export default function App() {
               {/* A backend that was not running yet is the usual cause, and it
                   is usually running a few seconds later. Reloading the whole
                   page to find out is a needless reset. */}
-              <button className="tb notice-retry" onClick={loadCatalog}>Try again</button>
+              <button className="btn btn-secondary btn-sm" onClick={loadCatalog}>Try again</button>
             </div>
           )}
 
@@ -243,7 +255,7 @@ export default function App() {
                 The attribute table and charts generate themselves — no extra steps.
               </p>
               {catalog && (
-                <p className="placeholder-meta">
+                <p className="placeholder-meta mono">
                   {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly
                   steps · {catalog.time.start.slice(0, 4)}–{catalog.time.end.slice(0, 4)}
                 </p>
@@ -259,7 +271,7 @@ export default function App() {
                   timeout or a dropped connection is to ask again — not to
                   redraw the area, which was the only route out before. */}
               {aoi && (
-                <button className="tb notice-retry" onClick={() => void refresh()}>
+                <button className="btn btn-secondary btn-sm" onClick={() => void refresh()}>
                   Try again
                 </button>
               )}
@@ -278,7 +290,17 @@ export default function App() {
         </div>
       </aside>
 
-      <Timeline />
+      {!panelOpen && (
+        <button className="panel-show" onClick={() => setPanelOpen(true)}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m14 7-5 5 5 5" />
+          </svg>
+          Report
+        </button>
+      )}
+
+      <StatusBar />
       <Templates />
     </div>
   )
