@@ -7,6 +7,25 @@ export const PARTIAL_YEAR_NOTE =
   'the "months observed" columns say how many contributed.'
 
 /**
+ * The notices the licences require, deduplicated.
+ *
+ * Nearly every source here is free to use commercially *on condition* that a
+ * specific wording is shown — the Crown copyright line for OGL, "modified
+ * Copernicus … data" for Sentinel, Ordnance Survey's own form of words. An
+ * exported file is where the obligation is most likely to be forgotten and
+ * most likely to matter, because it is the copy that leaves and gets passed
+ * on. Several factors usually share one source, hence the dedup.
+ */
+export function attributionsFor(cols: Series[]): string[] {
+  const seen = new Set<string>()
+  for (const c of cols) {
+    const line = c.meta.base_meta.attribution
+    if (line) seen.add(line)
+  }
+  return [...seen]
+}
+
+/**
  * Getting data out.
  *
  * Counter-intuitively, making it easy to leave makes people stay. A tool you
@@ -55,6 +74,7 @@ export function exportAnnualCsv(cols: Series[], area_ha: number): void {
     `# Site Scanner export — ${new Date().toISOString().slice(0, 10)}`,
     `# Area: ${area_ha.toFixed(1)} ha`,
     `# Sources: ${[...new Set(cols.map((c) => c.meta.base_meta.name))].join('; ')}`,
+    ...attributionsFor(cols).map((a) => `# ${a}`),
     `# ${PARTIAL_YEAR_NOTE}`,
     header.map(esc).join(','),
     ...rows.map((r) => r.map(esc).join(',')),
@@ -90,6 +110,7 @@ export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: num
     name: 'Site Scanner AOI',
     area_ha: Number(area_ha.toFixed(2)),
     exported: new Date().toISOString(),
+    attribution: attributionsFor(cols),
   }
   for (const c of cols) {
     props[c.factor_id] = Object.fromEntries(
@@ -153,6 +174,9 @@ export function exportXml(cols: Series[]): void {
   ${cols.map((c) => `<Row>${cell(c.meta.name)}${cell(c.meta.base_meta.source)}` +
       `${cell(c.meta.base_meta.licence)}` +
       `${cell(c.meta.base_meta.resolution_m ? c.meta.base_meta.resolution_m + ' m' : 'vector')}</Row>`).join('')}
+  <Row></Row>
+  <Row>${cell('Required attribution')}</Row>
+  ${attributionsFor(cols).map((a) => `<Row>${cell(a)}</Row>`).join('')}
  </Table></Worksheet>
 </Workbook>`
   download(new Blob([xml], { type: 'application/vnd.ms-excel' }),

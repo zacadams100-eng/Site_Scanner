@@ -385,3 +385,43 @@ def test_the_real_source_receives_the_drawn_geometry(client, registry):
                                      "factor_ids": ["ndvi"], **SHORT})
     assert seen["geometry"] == GUILDFORD
     assert seen["area_ha"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Attribution — a licence condition, not a nicety
+# ---------------------------------------------------------------------------
+def test_every_base_carries_the_notice_its_licence_requires():
+    """Almost every source here permits commercial use *on condition* that a
+    specific wording is displayed. Naming the licence is not the same as
+    meeting it, and a missing notice is a breach on a product being sold."""
+    for base in catalog.BASES:
+        assert base.get("attribution"), f"{base['id']} has no attribution"
+        assert len(base["attribution"]) > 15, f"{base['id']} attribution is a stub"
+
+
+def test_crown_copyright_sources_say_so():
+    """OGL requires the Crown copyright line, not just 'OGL v3'."""
+    for base in catalog.BASES:
+        if base["licence"] == "OGL v3":
+            text = base["attribution"].lower()
+            assert "crown copyright" in text or "open government licence" in text, \
+                f"{base['id']} is OGL but its notice omits the required wording"
+
+
+def test_copernicus_sources_use_the_modified_data_wording():
+    for bid in ("sentinel2_sr", "sentinel1_sar", "era5_land", "copernicus_air"):
+        assert "modified copernicus" in catalog.BASE_BY_ID[bid]["attribution"].lower()
+
+
+def test_attributions_are_deduplicated_for_display():
+    """Several factors usually share one source; repeating the notice four
+    times is noise that gets designed away, taking the notice with it."""
+    lines = catalog.attributions_for(["sentinel2_sr", "sentinel1_sar", "os_open"])
+    assert len(lines) == 2
+
+
+def test_commercial_flags_are_triaged_not_assumed():
+    """Sentinel is recorded as CC BY-SA, which would bite on a commercial
+    derived product. It must stay flagged until someone confirms it."""
+    assert catalog.COMMERCIAL_USE["sentinel2_sr"] == "verify"
+    assert set(catalog.COMMERCIAL_USE.values()) <= {"yes", "verify"}

@@ -117,6 +117,93 @@ BASES: List[Dict[str, Any]] = [
 
 BASE_BY_ID = {b["id"]: b for b in BASES}
 
+
+# ---------------------------------------------------------------------------
+# Attribution and commercial terms
+# ---------------------------------------------------------------------------
+# Almost every licence here is free for commercial use *conditional on
+# attribution in a specified form*. Naming the source is not enough: OGL wants
+# the Crown copyright line, Copernicus wants "modified Copernicus … data",
+# Ordnance Survey wants its own wording. Displaying the licence name while
+# omitting the required notice is the most common way an otherwise permissive
+# licence gets breached, and it is the state this app was in.
+#
+# These strings travel with the numbers — into the UI, and into every export,
+# because a CSV that leaves the building carries the obligation with it.
+#
+# `commercial` is a triage flag for COMMERCIAL_READINESS.md, not legal advice:
+#   "yes"    — the licence text plainly permits commercial use with attribution
+#   "verify" — something needs confirming before money changes hands
+# ---------------------------------------------------------------------------
+from datetime import date as _date  # noqa: E402
+
+_YEAR = _date.today().year
+
+ATTRIBUTION: Dict[str, str] = {
+    "sentinel2_sr": "Contains modified Copernicus Sentinel data {year}",
+    "sentinel1_sar": "Contains modified Copernicus Sentinel data {year}",
+    "esa_worldcover": "© ESA WorldCover project, licensed under CC BY 4.0",
+    "lidar_dtm": "© Environment Agency copyright and/or database right {year}. "
+                 "All rights reserved. Licensed under the Open Government "
+                 "Licence v3.0.",
+    "modis_lst": "MODIS data courtesy of NASA LP DAAC, USGS/EROS Center",
+    "era5_land": "Contains modified Copernicus Climate Change Service "
+                 "information {year}",
+    "haduk_precip": "© Crown copyright, Met Office. Contains public sector "
+                    "information licensed under the Open Government Licence v3.0",
+    "jrc_surface_water": "© European Union, Joint Research Centre — "
+                         "Global Surface Water",
+    "ea_flood_zones": "© Environment Agency copyright and/or database right "
+                      "{year}. All rights reserved. Licensed under the Open "
+                      "Government Licence v3.0.",
+    "ghsl_built": "© European Union, 1995–{year} — Global Human Settlement "
+                  "Layer, Joint Research Centre",
+    "os_open": "Contains OS data © Crown copyright and database right {year}",
+    "worldpop": "© WorldPop, University of Southampton, licensed under CC BY 4.0",
+    "ons_imd": "Source: Office for National Statistics and MHCLG, licensed "
+               "under the Open Government Licence v3.0",
+    "land_registry_ppd": "Contains HM Land Registry data © Crown copyright and "
+                         "database right {year}. This data is licensed under "
+                         "the Open Government Licence v3.0.",
+    "soilgrids": "© ISRIC — World Soil Information (SoilGrids), licensed "
+                 "under CC BY 4.0",
+    "bgs_geology": "Contains British Geological Survey materials © UKRI {year}",
+    "copernicus_air": "Contains modified Copernicus Atmosphere Monitoring "
+                      "Service information {year}",
+    "natural_england": "© Natural England copyright. Contains Ordnance Survey "
+                       "data © Crown copyright and database right {year}",
+    "viirs_nightlights": "VIIRS nighttime lights — NOAA/NCEI and Colorado "
+                         "School of Mines",
+    "pvgis": "© European Union, 2001–{year}. PVGIS, Joint Research Centre",
+}
+
+# The two Sentinel entries are flagged deliberately. They are recorded here as
+# CC BY-SA 3.0 IGO, and share-alike on a commercial derived product would be a
+# genuine constraint — but Copernicus Sentinel data is generally distributed
+# under the Copernicus terms (Regulation 1159/2013), which permit commercial
+# reuse with attribution and impose no share-alike. One of those two things is
+# wrong, and which one matters, so it is marked for confirmation rather than
+# quietly assumed either way.
+COMMERCIAL_USE: Dict[str, str] = {
+    b["id"]: ("verify" if b["id"] in ("sentinel2_sr", "sentinel1_sar") else "yes")
+    for b in BASES
+}
+
+for _b in BASES:
+    _b["attribution"] = ATTRIBUTION[_b["id"]].format(year=_YEAR)
+    _b["commercial"] = COMMERCIAL_USE[_b["id"]]
+
+
+def attributions_for(base_ids) -> List[str]:
+    """Deduplicated attribution lines for a set of bases, ready to display."""
+    seen, out = set(), []
+    for bid in base_ids:
+        text = BASE_BY_ID[bid]["attribution"]
+        if text not in seen:
+            seen.add(text)
+            out.append(text)
+    return out
+
 # ---------------------------------------------------------------------------
 # Factors.
 #

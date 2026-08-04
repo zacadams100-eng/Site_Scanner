@@ -9,6 +9,12 @@ export interface Base {
   name: string
   source: string
   licence: string
+  /** The exact notice this licence requires — not the licence name. Most of
+   *  these permit commercial use only on condition this text is displayed, so
+   *  it travels with the numbers into the UI and into every export. */
+  attribution: string
+  /** Triage flag from the catalogue: 'yes' or 'verify'. Not legal advice. */
+  commercial?: string
   url: string
   native_cadence: string
   cadence: string
