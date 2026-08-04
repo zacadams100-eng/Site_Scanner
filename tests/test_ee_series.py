@@ -25,16 +25,25 @@ def ee_series(monkeypatch):
 
     import ee_series as mod
 
+    # The sharing cache is module-level and would otherwise leak a result from
+    # one test into the next, which would hide exactly the bug it exists to
+    # create — a stale series for the wrong AOI.
+    mod._GROUP_CACHE.clear()
+
     # Stand in for the Earth Engine round trip, recording what it was asked
-    # for so a test can assert months were never sent.
+    # for so a test can assert months were never sent, and counting calls so a
+    # test can assert siblings shared one.
     mod._asked = []
+    mod._chunk_calls = []
 
     def fake_chunk(ee, geom, steps, total_m2):
         mod._asked.extend(steps)
-        return [{"t": s, "value": 0.5, "valid_fraction": 1.0,
-                 "interpolated": False} for s in steps]
+        mod._chunk_calls.append(len(steps))
+        return {name: [{"t": s, "value": 0.5, "valid_fraction": 1.0,
+                        "interpolated": False} for s in steps]
+                for name in mod.S2_FACTORS}
 
-    monkeypatch.setattr(mod, "_ndvi_chunk", fake_chunk)
+    monkeypatch.setattr(mod, "_s2_chunk", fake_chunk)
     return mod
 
 
@@ -87,17 +96,54 @@ def test_a_fully_covered_range_asks_for_everything(ee_series):
 
 def test_requests_are_chunked(ee_series):
     """One call for 180 months risks the payload limit and loses the lot."""
-    calls = []
-    original = ee_series._ndvi_chunk
-
-    def counting(ee, geom, steps, total_m2):
-        calls.append(len(steps))
-        return original(ee, geom, steps, total_m2)
-
-    ee_series._ndvi_chunk = counting
     ee_series.ndvi_series(GEOM, months(2018, 2025), 100.0)
-    assert len(calls) > 1
-    assert max(calls) <= ee_series.CHUNK_MONTHS
+    assert len(ee_series._chunk_calls) > 1
+    assert max(ee_series._chunk_calls) <= ee_series.CHUNK_MONTHS
+
+
+# ---------------------------------------------------------------------------
+# Sharing one Sentinel-2 pass across the index family
+# ---------------------------------------------------------------------------
+def test_sibling_indices_share_a_single_pass(ee_series):
+    """Loading and cloud-masking the scenes is nearly all the cost. Six
+    indices off the same imagery must not fetch it six times."""
+    steps = months(2018, 2019)
+    for factor_id in ("ndvi", "ndmi", "ndbi", "evi", "savi", "nbr"):
+        ee_series.REAL_SERIES[factor_id](GEOM, steps, 100.0)
+
+    assert len(ee_series._chunk_calls) == 1, "the imagery was fetched more than once"
+
+
+def test_a_different_aoi_is_not_served_from_the_cache(ee_series):
+    """The failure this cache could cause is the worst kind — plausible
+    numbers for the wrong place."""
+    other = {"type": "Polygon", "coordinates": [[[9, 51], [9.01, 51],
+                                                 [9.01, 51.01], [9, 51.01], [9, 51]]]}
+    ee_series.ndvi_series(GEOM, months(2018, 2018), 100.0)
+    ee_series.ndvi_series(other, months(2018, 2018), 100.0)
+    assert len(ee_series._chunk_calls) == 2
+
+
+def test_a_different_time_range_is_not_served_from_the_cache(ee_series):
+    ee_series.ndvi_series(GEOM, months(2018, 2018), 100.0)
+    ee_series.ndvi_series(GEOM, months(2019, 2019), 100.0)
+    assert len(ee_series._chunk_calls) == 2
+
+
+def test_every_sentinel2_index_is_a_real_catalogue_factor(ee_series):
+    import catalog
+
+    for factor_id in ee_series.S2_FACTORS:
+        f = catalog.FACTOR_BY_ID[factor_id]
+        assert f["base"] == "sentinel2_sr", f"{factor_id} is not a Sentinel-2 factor"
+
+
+def test_modelled_indices_are_left_out_rather_than_approximated(ee_series):
+    """Tasselled-cap components need published per-sensor coefficients and
+    leaf area index needs a validated canopy model. A plausible-looking
+    approximation is worse here than a blank column."""
+    for factor_id in ("greenness", "wetness", "brightness", "leaf_area_index"):
+        assert factor_id not in ee_series.REAL_SERIES
 
 
 def test_ndvi_is_registered_as_a_real_factor(ee_series):

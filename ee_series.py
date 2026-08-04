@@ -24,6 +24,8 @@ which measured the alternative at 1–50 ms). Every response carries
 `elapsed_ms` so the cost is visible rather than guessed at.
 """
 
+import json
+from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional
 
 # Sentinel-2 scene classification values that must not contribute to a
@@ -53,8 +55,67 @@ CHUNK_MONTHS = 36
 COVERAGE_START = "2017-03"
 
 
-def _masked_ndvi_collection(geom, start, end):
-    """Cloud-masked NDVI images for a window, as an ImageCollection."""
+# Sentinel-2 surface reflectance is stored as integers scaled by 10,000.
+# Normalised differences are scale-invariant so they do not care, but EVI,
+# SAVI, MSAVI and the chlorophyll index mix reflectance with additive
+# constants — feed those raw DNs and the constants are meaningless.
+S2_SCALE = 0.0001
+
+
+def _s2_index_image(ee, img):
+    """Every catalogue index computable from one Sentinel-2 scene, as bands.
+
+    Computing them together is the point. Loading and cloud-masking the
+    imagery dominates the cost; the band arithmetic on top is nearly free. So
+    a request for six indices should be one pass over the scenes, not six.
+
+    Four of the catalogue's fifteen are deliberately absent. Greenness,
+    wetness and brightness are tasselled-cap components, which need published
+    per-sensor coefficients, and leaf area index needs a validated canopy
+    model. Approximating any of them would produce numbers that look right
+    and are not, which is worse here than a blank column.
+    """
+    r = img.select(["B2", "B3", "B4", "B5", "B8", "B11", "B12"]).multiply(S2_SCALE)
+    b2, b3, b4 = r.select("B2"), r.select("B3"), r.select("B4")
+    b5, b8 = r.select("B5"), r.select("B8")
+    b11, b12 = r.select("B11"), r.select("B12")
+
+    def nd(a, b):
+        return a.subtract(b).divide(a.add(b))
+
+    # MSAVI: (2N + 1 − √((2N + 1)² − 8(N − R))) / 2
+    two_n1 = b8.multiply(2).add(1)
+    msavi = two_n1.subtract(
+        two_n1.pow(2).subtract(b8.subtract(b4).multiply(8)).sqrt()
+    ).divide(2)
+
+    bands = {
+        "ndvi": nd(b8, b4),
+        "gndvi": nd(b8, b3),
+        "ndmi": nd(b8, b11),
+        "nbr": nd(b8, b12),
+        "ndbi": nd(b11, b8),
+        "ndwi": nd(b3, b8),
+        "bare_soil_index": nd(b11.add(b4), b8.add(b2)),
+        "evi": b8.subtract(b4).multiply(2.5).divide(
+            b8.add(b4.multiply(6)).subtract(b2.multiply(7.5)).add(1)),
+        "savi": b8.subtract(b4).multiply(1.5).divide(b8.add(b4).add(0.5)),
+        "msavi": msavi,
+        "chlorophyll_index": b8.divide(b5).subtract(1),
+    }
+    names = sorted(bands)
+    return ee.Image.cat([bands[n].rename(n) for n in names]), names
+
+
+# Factor ids this module serves from one Sentinel-2 pass.
+S2_FACTORS = sorted([
+    "ndvi", "gndvi", "ndmi", "nbr", "ndbi", "ndwi", "bare_soil_index",
+    "evi", "savi", "msavi", "chlorophyll_index",
+])
+
+
+def _masked_s2_collection(geom, start, end):
+    """Cloud-masked Sentinel-2 scenes for a window."""
     import ee
 
     def mask(img):
@@ -69,15 +130,57 @@ def _masked_ndvi_collection(geom, start, end):
         .filterBounds(geom)
         .filterDate(start, end)
         .map(mask)
-        .map(lambda img: img.normalizedDifference(["B8", "B4"]).rename("NDVI"))
     )
 
 
-def ndvi_series(geometry: dict, steps: List[str],
-                area_ha: float) -> List[Dict[str, Any]]:
-    """Monthly mean NDVI over `geometry`, one point per step in `steps`.
+# ---------------------------------------------------------------------------
+# Shared computation
+# ---------------------------------------------------------------------------
+# Factors that come off the same imagery should cost one round trip, not one
+# each. A user selecting NDVI, NDMI and NDBI is asking three questions of the
+# same Sentinel-2 scenes; loading and cloud-masking those scenes is nearly all
+# of the cost, and the band arithmetic on top is close to free.
+#
+# The registry hands each factor to us separately, so the sharing happens
+# here: the first factor of a group computes the whole group and caches it,
+# and its siblings in the same request read the cache. The key includes the
+# geometry and the exact steps, so a different AOI or a different time range
+# never reuses a result.
+#
+# Small and short by design — this exists to collapse the handful of calls
+# inside one HTTP request, not to be a real cache. cache.py is that.
+_GROUP_CACHE: "OrderedDict[tuple, Dict[str, List[Dict[str, Any]]]]" = OrderedDict()
+_GROUP_CACHE_MAX = 6
 
-    Returns the same point shape `series.generate_series` produces:
+
+def _group_key(prefix: str, geometry: dict, steps: List[str]) -> tuple:
+    return (prefix, json.dumps(geometry, sort_keys=True), tuple(steps))
+
+
+def _cached_group(key: tuple, compute) -> Dict[str, List[Dict[str, Any]]]:
+    hit = _GROUP_CACHE.get(key)
+    if hit is not None:
+        _GROUP_CACHE.move_to_end(key)
+        return hit
+    value = compute()
+    _GROUP_CACHE[key] = value
+    while len(_GROUP_CACHE) > _GROUP_CACHE_MAX:
+        _GROUP_CACHE.popitem(last=False)
+    return value
+
+
+def _gap(step: str) -> Dict[str, Any]:
+    return {"t": step, "value": None, "valid_fraction": 0.0, "interpolated": False}
+
+
+# ---------------------------------------------------------------------------
+# Sentinel-2 indices
+# ---------------------------------------------------------------------------
+def s2_group(geometry: dict, steps: List[str],
+             area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    """Every Sentinel-2 index, one point per step, in one pass.
+
+    Each point has the shape `series.generate_series` produces:
         {"t": "2024-07", "value": 0.62, "valid_fraction": 0.83,
          "interpolated": False}
 
@@ -86,45 +189,56 @@ def ndvi_series(geometry: dict, steps: List[str],
     """
     import ee
 
-    geom = ee.Geometry(geometry)
+    def compute() -> Dict[str, List[Dict[str, Any]]]:
+        geom = ee.Geometry(geometry)
 
-    # The area the AOI *could* cover, so the fraction actually observed is
-    # meaningful. This drives the confidence shading in the table and the
-    # availability strip in the timeline, so it has to be true square metres —
-    # see the note on pixelArea in _ndvi_chunk for why counting pixels is not.
-    total_m2 = max(1.0, area_ha * 10_000.0)
+        # The area the AOI *could* cover, so the fraction actually observed is
+        # meaningful. This drives the confidence shading in the table and the
+        # availability strip in the timeline, so it has to be true square
+        # metres — see the note on pixelArea below for why counting pixels is
+        # not.
+        total_m2 = max(1.0, area_ha * 10_000.0)
 
-    # Months before the satellite existed are gaps we can state without asking.
-    before = [s for s in steps if s < COVERAGE_START]
-    covered = [s for s in steps if s >= COVERAGE_START]
+        # Months before the satellite existed are gaps we can state without
+        # asking.
+        before = [s for s in steps if s < COVERAGE_START]
+        covered = [s for s in steps if s >= COVERAGE_START]
 
-    points: List[Dict[str, Any]] = [
-        {"t": s, "value": None, "valid_fraction": 0.0, "interpolated": False}
-        for s in before
-    ]
-    for i in range(0, len(covered), CHUNK_MONTHS):
-        chunk = covered[i:i + CHUNK_MONTHS]
-        points.extend(_ndvi_chunk(ee, geom, chunk, total_m2))
-    return points
+        out: Dict[str, List[Dict[str, Any]]] = {
+            name: [_gap(s) for s in before] for name in S2_FACTORS
+        }
+        for i in range(0, len(covered), CHUNK_MONTHS):
+            chunk = _s2_chunk(ee, geom, covered[i:i + CHUNK_MONTHS], total_m2)
+            for name in S2_FACTORS:
+                out[name].extend(chunk[name])
+        return out
+
+    return _cached_group(_group_key("s2", geometry, steps), compute)
 
 
-def _ndvi_chunk(ee, geom, steps: List[str], total_m2: float) -> List[Dict[str, Any]]:
-    """One Earth Engine round trip for a run of months."""
+def _s2_chunk(ee, geom, steps: List[str],
+              total_m2: float) -> Dict[str, List[Dict[str, Any]]]:
+    """One Earth Engine round trip for a run of months, all indices."""
     first = ee.Date(steps[0] + "-01")
+    names = S2_FACTORS
 
     def month_feature(i):
         i = ee.Number(i)
         m_start = first.advance(i, "month")
-        m_end = m_start.advance(1, "month")
-        coll = _masked_ndvi_collection(geom, m_start, m_end)
+        coll = _masked_s2_collection(geom, m_start, m_start.advance(1, "month"))
 
         # An empty collection has no bands, and reducing it errors server-side
         # rather than returning null. Substituting a fully-masked image keeps
         # the month in the series as an honest gap.
-        empty = ee.Image.constant(0).rename("NDVI").updateMask(ee.Image.constant(0))
-        ndvi = ee.Image(ee.Algorithms.If(coll.size().gt(0), coll.median(), empty))
+        blank = ee.Image.constant([0] * len(names)).rename(names).updateMask(
+            ee.Image.constant(0))
+        indices = ee.Image(ee.Algorithms.If(
+            coll.size().gt(0),
+            _s2_index_image(ee, coll.median())[0],
+            blank,
+        ))
 
-        stats = ndvi.reduceRegion(
+        stats = indices.reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=geom,
             scale=NDVI_SCALE_M,
@@ -147,47 +261,55 @@ def _ndvi_chunk(ee, geom, steps: List[str], total_m2: float) -> List[Dict[str, A
         #
         # pixelArea() returns true square metres whatever the projection, so
         # summing it over the unmasked pixels gives a fraction that means what
-        # it says.
+        # it says. One coverage figure serves every index, because they all
+        # come from the same masked pixels.
         valid_area = (
-            ee.Image.pixelArea().updateMask(ndvi.mask()).reduceRegion(
-                reducer=ee.Reducer.sum(),
-                geometry=geom,
-                scale=NDVI_SCALE_M,
-                maxPixels=1e9,
-                bestEffort=True,
-            )
+            ee.Image.pixelArea()
+            .updateMask(indices.select(names[0]).mask())
+            .reduceRegion(reducer=ee.Reducer.sum(), geometry=geom,
+                          scale=NDVI_SCALE_M, maxPixels=1e9, bestEffort=True)
         )
 
-        return ee.Feature(None, {
-            "t": m_start.format("YYYY-MM"),
-            "mean": stats.get("NDVI"),
-            "valid_m2": valid_area.get("area"),
-            "images": coll.size(),
-        })
+        props = {"t": m_start.format("YYYY-MM"),
+                 "valid_m2": valid_area.get("area")}
+        for n in names:
+            props[n] = stats.get(n)
+        return ee.Feature(None, props)
 
     fc = ee.FeatureCollection(ee.List.sequence(0, len(steps) - 1).map(month_feature))
     rows = fc.getInfo()["features"]
 
-    out: List[Dict[str, Any]] = []
+    out: Dict[str, List[Dict[str, Any]]] = {n: [] for n in names}
     for row in rows:
         p = row["properties"]
-        mean = p.get("mean")
         valid_m2 = p.get("valid_m2") or 0.0
         valid = min(1.0, float(valid_m2) / total_m2) if total_m2 else 0.0
-
-        # No imagery, or every pixel masked, is a gap — not a zero.
-        if mean is None or valid_m2 <= 0:
-            out.append({"t": p["t"], "value": None,
-                        "valid_fraction": round(valid, 3), "interpolated": False})
-            continue
-
-        out.append({
-            "t": p["t"],
-            "value": round(float(mean), 4),
-            "valid_fraction": round(valid, 3),
-            "interpolated": False,
-        })
+        for n in names:
+            v = p.get(n)
+            # No imagery, or every pixel masked, is a gap — not a zero.
+            if v is None or valid_m2 <= 0:
+                out[n].append({"t": p["t"], "value": None,
+                               "valid_fraction": round(valid, 3),
+                               "interpolated": False})
+            else:
+                out[n].append({"t": p["t"], "value": round(float(v), 4),
+                               "valid_fraction": round(valid, 3),
+                               "interpolated": False})
     return out
+
+
+def _s2_factor(factor_id: str):
+    """One factor's view of the shared Sentinel-2 result."""
+    def series(geometry: dict, steps: List[str],
+               area_ha: float) -> List[Dict[str, Any]]:
+        return s2_group(geometry, steps, area_ha)[factor_id]
+    series.__name__ = f"{factor_id}_series"
+    return series
+
+
+# Kept as a name because scripts/check_real_ndvi.py and the smoke test call it
+# directly, and it reads better than s2_group(...)["ndvi"] at the call site.
+ndvi_series = _s2_factor("ndvi")
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +497,9 @@ def lc_tree_pct_series(geometry: dict, steps: List[str],
 # same split `catalog.py` already encodes as kind='categorical', and the reason
 # it must never be averaged.
 REAL_SERIES: Dict[str, Callable[[dict, List[str], float], List[Dict[str, Any]]]] = {
-    "ndvi": ndvi_series,
+    # Eleven indices off one Sentinel-2 pass. Selecting several of them costs
+    # the same as selecting one.
+    **{fid: _s2_factor(fid) for fid in S2_FACTORS},
     "air_temp_mean": air_temp_series,
     "lc_dominant": lc_dominant_series,
     "lc_tree_pct": lc_tree_pct_series,
