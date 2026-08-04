@@ -111,7 +111,7 @@ export default function App() {
   const hint = drawMode
     ? TOOLS.find((t) => t.id === drawMode)!.hint
     : aoi
-      ? 'Scrub the timeline, or pick another tool to redraw'
+      ? 'Drag the shape to move it, or a corner to resize'
       : 'Pick a tool, then drag on the map'
 
   return (

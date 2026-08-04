@@ -106,6 +106,9 @@ What it does today:
 - **Draw** a rectangle, circle or freehand shape. Freehand is simplified with
   Douglas-Peucker on release and repaired if it self-intersects, so a scribble
   does not become a 600-vertex polygon that slows every later call.
+- **Adjust** a drawn area without redrawing it: drag inside to move, drag a
+  corner to resize. "Almost right, ten metres north" used to mean tracing the
+  whole outline again. Undo covers both.
 - **Scrub** 180 monthly steps from 2011 to 2025. The timeline draws the area's
   whole series inside its own track, with a data-availability strip beneath —
   it is a chart you can already read before you touch it. Scrubbing repaints
@@ -114,6 +117,10 @@ What it does today:
   twelve months. Copy pastes as TSV straight into Excel; CSV downloads.
 - **See** up to four charts chosen automatically from the selected factors,
   grouped so that two different units never share an axis.
+- **Compare** two dates: "vs a year ago" pins the same month twelve steps back
+  in one click, shift-clicking the track pins any other month, and the change
+  table exports as CSV. A gap at either end reports no change rather than a
+  zero, and a class code reports changed/no change rather than arithmetic.
 - **Check** every number's source, resolution and licence under Sources.
 - **Find** a site by postcode, place name, or coordinates pasted straight in
   (`51.235, -0.57`). Lookups go to postcodes.io — free, keyless, ONS and
@@ -129,7 +136,8 @@ What it does today:
   browser away from empty and does not follow you to another machine.
 
 Keyboard: `←`/`→` step a month, `PgUp`/`PgDn` a year, `Home`/`End` jump to the
-ends, `space` plays. The timeline is a real `<input type="range">` underneath
+ends, `space` plays. Clicking the date itself opens a month field, because
+reaching one step out of 180 by dragging means aiming at five pixels. The timeline is a real `<input type="range">` underneath
 the custom rendering, so screen readers and touch work without reimplementation.
 
 ### The data layer

@@ -70,6 +70,19 @@ Do not "tidy this up" by removing the labels.
 - **The catalogue says which factors are real.** `/api/catalog` marks each
   factor `real`, and the browser can filter to just those — the honesty label
   now arrives before the query rather than after it.
+- **A drawn area can be moved and resized.** Drag inside it, or drag a corner.
+  Redrawing was the only adjustment before, which is cheap for a rectangle and
+  destroys a hand-traced outline. The camera deliberately does not refit after
+  an edit; it still does after a fresh draw.
+- **Comparison is reachable and exportable.** "vs a year ago" pins the same
+  month twelve steps back — shift-clicking the track, the only route before,
+  is not something anyone discovers — and the change table exports as CSV
+  carrying the panel's rules with it.
+- **Dead ends removed.** A failed query offers to retry rather than requiring
+  the area to be redrawn, and the timeline date is clickable as a month field.
+- **The layout was driven on a tablet and a phone for the first time**, which
+  found the drawing tools sitting underneath the report sheet on a phone —
+  the entire point of the app, behind a panel.
 - **`/api/series` is cached per factor.** Adding a factor used to re-run every
   Earth Engine query already on screen. One short browsing session against a
   six-live-factor backend measured 18 hits to 6 misses.

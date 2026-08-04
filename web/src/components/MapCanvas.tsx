@@ -73,6 +73,9 @@ export default function MapCanvas() {
   const freePoints = useRef<[number, number][]>([])
   const modeRef = useRef(drawMode)
   modeRef.current = drawMode
+  // Set when a change came from nudging an existing shape rather than drawing
+  // a new one, so the camera does not refit on every small adjustment.
+  const skipFit = useRef(false)
 
   // ---- init ---------------------------------------------------------------
   useEffect(() => {
@@ -115,6 +118,10 @@ export default function MapCanvas() {
         paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
       })
 
+      // Corner handles for resizing. Above the outline so they stay grabbable
+      // when the shape is small.
+      map.addSource('handles', { type: 'geojson', data: EMPTY })
+
       map.addSource('draft', { type: 'geojson', data: EMPTY })
       map.addLayer({
         id: 'draft-fill',
@@ -127,6 +134,18 @@ export default function MapCanvas() {
         type: 'line',
         source: 'draft',
         paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+      })
+
+      map.addLayer({
+        id: 'handles-circle',
+        type: 'circle',
+        source: 'handles',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#ff7a5c',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#0b1220',
+        },
       })
 
       // The basemap goes on last and sits beneath everything of ours, so a
@@ -321,6 +340,188 @@ export default function MapCanvas() {
     }
   }, [drawMode, setAoi])
 
+  // ---- move and resize the drawn area -------------------------------------
+  /**
+   * Drag inside the shape to move it; drag a corner to resize it.
+   *
+   * Before this the only way to adjust an area was to draw it again, which is
+   * cheap for a rectangle and destroys a hand-traced outline. "Almost right,
+   * ten metres north" is the most common thing a user wants next, and redrawing
+   * is the worst possible answer to it.
+   *
+   * Only active with no drawing tool selected, so the tools always win the
+   * gesture — and the map still pans normally anywhere outside the shape.
+   */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || !aoi || drawMode) return
+
+    const ring = aoi.coordinates[0]
+    const lngs = ring.map((p) => p[0])
+    const lats = ring.map((p) => p[1])
+    const west = Math.min(...lngs), east = Math.max(...lngs)
+    const south = Math.min(...lats), north = Math.max(...lats)
+
+    const handleSrc = map.getSource('handles') as maplibregl.GeoJSONSource | undefined
+    const aoiSrc = map.getSource('aoi') as maplibregl.GeoJSONSource | undefined
+    const corners: [string, number, number][] = [
+      ['sw', west, south], ['se', east, south], ['ne', east, north], ['nw', west, north],
+    ]
+    handleSrc?.setData({
+      type: 'FeatureCollection',
+      features: corners.map(([id, lng, lat]) => ({
+        type: 'Feature',
+        properties: { corner: id },
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+      })),
+    })
+
+    let mode: 'move' | 'resize' | null = null
+    let anchor: [number, number] = [0, 0]     // the corner held still while resizing
+    let start: maplibregl.LngLat | null = null
+
+    const preview = (g: GeoJSON.Polygon) => {
+      aoiSrc?.setData({ type: 'Feature', geometry: g, properties: {} })
+      const r = g.coordinates[0]
+      const xs = r.map((p) => p[0]), ys = r.map((p) => p[1])
+      const w = Math.min(...xs), e = Math.max(...xs), s = Math.min(...ys), n = Math.max(...ys)
+      handleSrc?.setData({
+        type: 'FeatureCollection',
+        features: ([['sw', w, s], ['se', e, s], ['ne', e, n], ['nw', w, n]] as [string, number, number][])
+          .map(([id, lng, lat]) => ({
+            type: 'Feature', properties: { corner: id },
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+          })),
+      })
+    }
+
+    const moved = (ll: maplibregl.LngLat): GeoJSON.Polygon | null => {
+      if (!start) return null
+      if (mode === 'move') {
+        const dx = ll.lng - start.lng
+        const dy = ll.lat - start.lat
+        return {
+          type: 'Polygon',
+          coordinates: [ring.map(([x, y]) => [x + dx, y + dy])],
+        }
+      }
+      // Resize scales about the opposite corner. The guard stops a shape being
+      // dragged through its own anchor and coming back inside out — and stops
+      // a division by nearly zero turning a field into a continent.
+      const [ax, ay] = anchor
+      const sx = (ll.lng - ax) / ((start.lng - ax) || 1e-9)
+      const sy = (ll.lat - ay) / ((start.lat - ay) || 1e-9)
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) return null
+      const clamp = (s: number) => Math.max(0.05, Math.min(20, s))
+      const cx = clamp(Math.abs(sx)), cy = clamp(Math.abs(sy))
+      return {
+        type: 'Polygon',
+        coordinates: [ring.map(([x, y]) => [ax + (x - ax) * cx, ay + (y - ay) * cy])],
+      }
+    }
+
+    const hitHandle = (pt: maplibregl.Point) => {
+      // A few pixels of slack: a 6px circle is an unfair target on a tablet.
+      const box: [maplibregl.PointLike, maplibregl.PointLike] = [
+        [pt.x - 10, pt.y - 10], [pt.x + 10, pt.y + 10],
+      ]
+      return map.queryRenderedFeatures(box, { layers: ['handles-circle'] })[0]
+    }
+
+    const onDown = (pt: maplibregl.Point, ll: maplibregl.LngLat): boolean => {
+      const handle = hitHandle(pt)
+      if (handle) {
+        mode = 'resize'
+        const corner = handle.properties?.corner as string
+        anchor = [
+          corner.includes('w') ? east : west,
+          corner.includes('s') ? north : south,
+        ]
+      } else if (map.queryRenderedFeatures(pt, { layers: ['aoi-fill'] }).length) {
+        mode = 'move'
+      } else {
+        return false
+      }
+      start = ll
+      map.dragPan.disable()
+      return true
+    }
+
+    const onMove = (ll: maplibregl.LngLat) => {
+      if (!mode) return
+      const g = moved(ll)
+      if (g) preview(g)
+    }
+
+    const onUp = (ll: maplibregl.LngLat) => {
+      if (!mode) return
+      const g = moved(ll)
+      mode = null
+      start = null
+      map.dragPan.enable()
+      // A click with no drag must not spend a query on an identical shape.
+      if (g && JSON.stringify(g) !== JSON.stringify(aoi)) {
+        // The refit belongs to a newly drawn shape, not to a nudge — flying
+        // the camera after every small adjustment makes editing unusable.
+        skipFit.current = true
+        setAoi(g)
+      } else {
+        preview(aoi)
+      }
+    }
+
+    const mouseDown = (e: maplibregl.MapMouseEvent) => {
+      if (onDown(e.point, e.lngLat)) e.preventDefault()
+    }
+    const mouseMove = (e: maplibregl.MapMouseEvent) => {
+      if (mode) { onMove(e.lngLat); return }
+      // Cursor is the only affordance saying the shape can be grabbed at all.
+      const canvas = map.getCanvas()
+      if (hitHandle(e.point)) canvas.style.cursor = 'nwse-resize'
+      else if (map.queryRenderedFeatures(e.point, { layers: ['aoi-fill'] }).length) canvas.style.cursor = 'move'
+      else canvas.style.cursor = ''
+    }
+    const mouseUp = (e: maplibregl.MapMouseEvent) => onUp(e.lngLat)
+
+    let lastTouch: maplibregl.LngLat | null = null
+    const touchStart = (e: maplibregl.MapTouchEvent) => {
+      if (e.points.length > 1) return
+      lastTouch = e.lngLat
+      if (onDown(e.point, e.lngLat)) e.preventDefault()
+    }
+    const touchMove = (e: maplibregl.MapTouchEvent) => {
+      if (!mode) return
+      e.preventDefault()
+      lastTouch = e.lngLat
+      onMove(e.lngLat)
+    }
+    const touchEnd = () => { if (lastTouch) onUp(lastTouch) }
+
+    map.on('mousedown', mouseDown)
+    map.on('mousemove', mouseMove)
+    map.on('mouseup', mouseUp)
+    map.on('touchstart', touchStart)
+    map.on('touchmove', touchMove)
+    map.on('touchend', touchEnd)
+    return () => {
+      map.off('mousedown', mouseDown)
+      map.off('mousemove', mouseMove)
+      map.off('mouseup', mouseUp)
+      map.off('touchstart', touchStart)
+      map.off('touchmove', touchMove)
+      map.off('touchend', touchEnd)
+      // React runs this cleanup *after* the drawing effect has re-run, so
+      // clearing these unconditionally would undo the crosshair and the
+      // pan-lock a freshly selected tool had just set.
+      if (!modeRef.current) {
+        map.getCanvas().style.cursor = ''
+        map.dragPan.enable()
+      }
+      const src = map.getSource('handles') as maplibregl.GeoJSONSource | undefined
+      src?.setData(EMPTY)
+    }
+  }, [aoi, drawMode, ready, setAoi])
+
   // ---- AOI outline --------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current
@@ -329,6 +530,7 @@ export default function MapCanvas() {
     if (!src) return
     if (!aoi) { src.setData(EMPTY); return }
     src.setData({ type: 'Feature', geometry: aoi, properties: {} })
+    if (skipFit.current) { skipFit.current = false; return }
     const [w, s, e, n] = turf.bbox({ type: 'Feature', geometry: aoi, properties: {} }) as
       [number, number, number, number]
     // The map spans the full window, but the data panel and timeline sit on top
