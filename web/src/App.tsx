@@ -156,8 +156,20 @@ export default function App() {
 
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" />
-          <span className="brand-name">Site Scanner</span>
+          {/* The logo's bracket, reduced to something that survives at 18px.
+              The frog does not — at this size it becomes a smudge — so the
+              mark keeps the frame and the copper and drops the illustration. */}
+          <svg className="brand-mark" viewBox="0 0 24 24" aria-hidden focusable="false">
+            <path
+              d="M8 3H3v18h5M16 3h5v18h-5"
+              fill="none" stroke="currentColor" strokeWidth="2.1"
+              strokeLinecap="square"
+            />
+            <circle cx="12" cy="12" r="3.4" fill="currentColor" />
+          </svg>
+          <span className="brand-name">
+            <b>Site</b> Scanner
+          </span>
           {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
         </div>
         <div className="topbar-right">

@@ -11,39 +11,128 @@
   not "designed"; spreadsheet conventions are load-bearing because users'
   hands already know them.
 
-  Colour is reserved for data. Chrome is navy neutrals plus one coral accent —
-  coral means "here, now, yours"; semantic colour is held separate from it.
+  Colour is reserved for data. Chrome is slate neutrals plus one copper accent —
+  copper means "here, now, yours"; semantic colour is held separate from it.
+
+  Tokens are three-layered: primitive (raw values, named for what they are),
+  semantic (named for what they mean), component (named for where they are
+  used). Only the primitive block contains hex codes. A rule that reaches past
+  its layer — a button referring to --copper-400 rather than --accent — is the
+  thing that makes a palette impossible to change later, which is exactly the
+  position this file was in before.
 */
 
+/* ===========================================================================
+   LAYER 1 — PRIMITIVES
+   Raw values, named for what they are. Nothing outside this block should use
+   a hex code.
+
+   Sampled from the brand: the poison-dart frog's copper, the dusty blue it
+   sits on, the navy of the bracket, the cream of the wordmark. The reference
+   photography sits in the same family — sky blue, burnt orange, soft grey
+   gradients, hairline white frames.
+
+   The previous palette ran near-black (#0b1220) against a hot coral
+   (#ff7a5c). It was legible but loud. Everything here is pulled toward the
+   middle: the ground lifts, the accent drops from fluorescent to metal, and
+   the neutrals carry a little warmth instead of reading as cold blue-white.
+   =========================================================================== */
 :root {
-  /* Ink and coral. Deep navy ground, warm coral accent — the contrast a
-     nautical chart uses, and the reason it reads as a map rather than a
-     dashboard. Neutrals are navy-biased rather than pure grey. */
-  --bg: #0b1220;
-  --surface: rgba(19, 28, 46, .93);
-  --surface-solid: #131c2e;
-  --surface-raised: #1a2438;
-  --line: rgba(255, 255, 255, .09);
-  --line-strong: rgba(255, 255, 255, .17);
+  /* Slate — blue-grey, the ground everything sits on. Deliberately not pure
+     grey; a map wants a cool ground, but not a black one. */
+  --slate-950: #121822;
+  --slate-900: #171f2a;
+  --slate-850: #1c2531;
+  --slate-800: #232d3b;
+  --slate-700: #2b3646;
+  --slate-600: #384556;
+  --slate-500: #4d5c70;
+  --slate-400: #6b7a8f;
+  --slate-300: #97a3b3;
+  --slate-200: #bcc5d0;
 
-  --text: #e6ecf5;
-  --text-dim: #94a3b8;
-  --text-faint: #64748b;
+  /* Copper — the frog. The accent, and the only thing allowed to be warm
+     unless it is data. */
+  --copper-600: #a8481f;
+  --copper-500: #c25f2f;
+  --copper-400: #d97742;
+  --copper-300: #e5946a;
 
-  --accent: #ff7a5c;
-  --accent-dim: #e05f42;
+  /* Cream — the wordmark. Used for type rather than surfaces, so text reads
+     as ink on paper rather than light on glass. */
+  --cream-100: #e9e5dc;
+  --cream-300: #c3bfb6;
 
-  /* Semantic colour, deliberately not the accent. Coral means "here, now,
+  /* Sky — the blue in the reference photography. Reserved for data. */
+  --sky-400: #6fb0cd;
+  --sand-400: #d2a570;
+  --rose-400: #c96f80;
+
+  /* ==========================================================================
+     LAYER 2 — SEMANTICS
+     What a colour means. Components refer to these, never to primitives.
+     ========================================================================== */
+  --bg: var(--slate-950);
+
+  /* The elevation ladder — the "layers" the interface was missing.
+     Four steps, each one lighter than the last, each with its own border and
+     shadow. Depth is carried by all three together: lightness alone reads as
+     a colour change, and shadow alone reads as a smudge.
+
+       1  panels resting on the map
+       2  cards and rows inside a panel
+       3  controls that float above their panel
+       4  popovers and menus above everything
+
+     Anything that opens over something else must move up exactly one step.
+     Skipping a step is what makes an interface feel flat or chaotic. */
+  --layer-1: rgba(28, 37, 49, .94);
+  --layer-1-solid: var(--slate-850);
+  --layer-2: var(--slate-800);
+  --layer-3: var(--slate-700);
+  --layer-4: var(--slate-600);
+
+  --line: rgba(255, 255, 255, .07);
+  --line-strong: rgba(255, 255, 255, .14);
+  /* The hairline frame from the reference photography — a single bright pixel
+     along the top edge, which is what makes a raised surface look lit rather
+     than merely paler. */
+  --edge-light: inset 0 1px 0 rgba(255, 255, 255, .06);
+
+  --text: var(--cream-100);
+  --text-dim: var(--slate-300);
+  --text-faint: var(--slate-400);
+
+  --accent: var(--copper-400);
+  --accent-dim: var(--copper-600);
+  --accent-quiet: rgba(217, 119, 66, .16);
+
+  /* Semantic colour, deliberately not the accent. Copper means "here, now,
      yours"; these mean what the data is doing. Absence is not badness, so a
      month with no usable observation reads dim-neutral rather than red. */
-  --good: #6fc3d4;
-  --warn: #e3b072;
-  --bad: #e0687f;
-  --absent: #3f4d63;
+  --good: var(--sky-400);
+  --warn: var(--sand-400);
+  --bad: var(--rose-400);
+  --absent: var(--slate-600);
+
+  /* Kept as aliases so the rules below this block did not all have to change
+     in the same commit as the palette. */
+  --surface: var(--layer-1);
+  --surface-solid: var(--layer-1-solid);
+  --surface-raised: var(--layer-2);
 
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 10px 34px rgba(0, 0, 0, .55);
+
+  /* Shadows scale with the ladder. The old single shadow was a 34px blur at
+     55% black against a near-black ground — heavy enough to read as a dark
+     halo rather than depth. These are shorter, softer, and doubled: a tight
+     contact shadow plus a wide ambient one, which is how real elevation
+     looks. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .18), 0 4px 14px rgba(0, 0, 0, .22);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, .20), 0 10px 26px rgba(0, 0, 0, .26);
+  --shadow-3: 0 4px 10px rgba(0, 0, 0, .24), 0 18px 44px rgba(0, 0, 0, .32);
+  --shadow: var(--shadow-2);
 
   --panel-w: 460px;
   --timeline-h: 96px;
@@ -85,10 +174,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .maplibregl-ctrl-bottom-right { margin-right: calc(var(--panel-w) + 12px); }
 .maplibregl-ctrl-bottom-right,
 .maplibregl-ctrl-bottom-left { margin-bottom: calc(var(--timeline-h) + 8px); }
-.maplibregl-ctrl-attrib { background: rgba(0, 0, 0, 0.5) !important; font-size: 10px; }
+.maplibregl-ctrl-attrib { background: rgba(28, 37, 49, .72) !important; font-size: 10px; }
 .maplibregl-ctrl-attrib a { color: var(--text-faint) !important; }
 .maplibregl-ctrl-scale {
-  background: rgba(0, 0, 0, 0.4) !important;
+  background: rgba(28, 37, 49, .72) !important;
+  backdrop-filter: blur(8px);
   border-color: var(--line-strong) !important;
   color: var(--text-dim) !important;
   font-size: 10px;
@@ -105,18 +195,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .brand { display: flex; align-items: center; gap: 9px; }
 .brand-mark {
-  width: 13px; height: 13px; border-radius: 4px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-  box-shadow: 0 0 14px rgba(255, 122, 92, 0.35);
+  width: 18px; height: 18px; flex: none;
+  color: var(--accent);
+  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, .7));
 }
+/* The wordmark is set the way the logo is: wide, letterspaced caps, split
+   across two weights so "Site" recedes and "Scanner" carries. Tracking opens
+   up rather than tightening — the logo's proportions are the identity. */
 .brand-name {
-  font-weight: 600; letter-spacing: -0.01em; font-size: 15px;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+  font-size: 12.5px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--text);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .8);
 }
+.brand-name b { font-weight: 500; color: var(--text-faint); }
 .brand-scope {
   font-size: 11px; color: var(--text-faint);
   padding: 2px 7px; border: 1px solid var(--line); border-radius: 20px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(28, 37, 49, .72); backdrop-filter: blur(8px);
 }
 
 .topbar-right { display: flex; align-items: center; gap: 8px; }
@@ -124,18 +220,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .badge {
   font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
   padding: 3px 8px; border-radius: 20px; border: 1px solid var(--line-strong);
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(28, 37, 49, .72); backdrop-filter: blur(8px);
 }
-.badge-mock { color: var(--warn); border-color: rgba(227, 176, 114, 0.45); }
+.badge-mock { color: var(--warn); border-color: rgba(210, 165, 112, .42); }
 .badge-approx { color: var(--text-dim); }
-.badge-exact { color: var(--good); border-color: rgba(111, 195, 212, 0.4); }
+.badge-exact { color: var(--good); border-color: rgba(111, 176, 205, .4); }
 
 /* ---------- Tool rail ---------- */
 .tool-rail {
   position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
   display: flex; flex-direction: column; gap: 6px; padding: 7px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
-  box-shadow: var(--shadow); backdrop-filter: blur(16px); z-index: 6;
+  background: var(--layer-1); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow-2), var(--edge-light);
+  backdrop-filter: blur(16px) saturate(120%); z-index: 6;
 }
 .tool {
   width: 40px; height: 40px; display: grid; place-items: center;
@@ -145,8 +242,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tool:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .tool:active { transform: scale(0.94); }
 .tool.is-active {
-  background: rgba(255, 122, 92, 0.16);
-  border-color: rgba(255, 122, 92, 0.45);
+  background: var(--accent-quiet);
+  border-color: rgba(217, 119, 66, .42);
   color: var(--accent);
 }
 .tool-clear { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 11px; }
@@ -155,7 +252,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .hint-bar {
   position: absolute; left: 68px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--text-dim);
-  background: rgba(0, 0, 0, 0.55); padding: 5px 11px; border-radius: 20px;
+  background: rgba(28, 37, 49, .72); backdrop-filter: blur(8px);
+  padding: 5px 11px; border-radius: 20px;
   border: 1px solid var(--line); backdrop-filter: blur(8px);
   pointer-events: none; z-index: 6; white-space: nowrap;
 }
@@ -164,13 +262,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .browser-toggle {
   display: flex; align-items: center; gap: 7px;
   padding: 6px 12px 6px 7px; border-radius: 20px;
-  background: var(--surface); border: 1px solid var(--line);
-  font-size: 12px; backdrop-filter: blur(12px); box-shadow: var(--shadow);
+  background: var(--layer-1); border: 1px solid var(--line);
+  font-size: 12px; backdrop-filter: blur(12px) saturate(120%);
+  box-shadow: var(--shadow-1), var(--edge-light);
 }
 .browser-toggle:hover, .browser-toggle.is-open { border-color: var(--line-strong); }
 .browser-toggle .count {
   min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
-  background: rgba(255, 122, 92, 0.18); color: var(--accent);
+  background: rgba(217, 119, 66, 0.18); color: var(--accent);
   display: grid; place-items: center; font-size: 11px; font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -179,14 +278,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: absolute; top: 52px; right: calc(var(--panel-w) + 14px);
   width: 340px; max-height: calc(100vh - var(--timeline-h) - 80px);
   display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--line-strong);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  backdrop-filter: blur(20px); z-index: 20; overflow: hidden;
+  background: var(--layer-3); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow-3), var(--edge-light);
+  backdrop-filter: blur(20px) saturate(120%); z-index: 20; overflow: hidden;
 }
 .browser-head { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); }
 .browser-search {
   flex: 1; padding: 7px 10px; border-radius: var(--radius-sm);
-  border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line-strong); background: rgba(0, 0, 0, .22);
   color: var(--text); font: inherit; font-size: 13px; outline: none;
 }
 .browser-search:focus { border-color: var(--accent-dim); }
@@ -245,10 +344,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .data-panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: var(--panel-w);
   display: flex; flex-direction: column;
-  background: var(--surface-solid); border-left: 1px solid var(--line);
+  background: var(--layer-1-solid); border-left: 1px solid var(--line-strong);
+  box-shadow: -1px 0 0 rgba(0, 0, 0, .25), -18px 0 40px rgba(0, 0, 0, .18);
   z-index: 8;
 }
-.panel-head { padding: 13px 16px 0; border-bottom: 1px solid var(--line); }
+.panel-head {
+  padding: 13px 16px 0;
+  background: var(--layer-2);
+  border-bottom: 1px solid var(--line-strong);
+  box-shadow: var(--edge-light);
+}
 .panel-title {
   display: flex; align-items: baseline; gap: 9px;
   font-size: 14px; font-weight: 600; margin-bottom: 11px;
@@ -279,8 +384,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .notice { margin: 16px; padding: 13px 15px; border-radius: var(--radius-sm); font-size: 12.5px; }
 .notice-error {
-  background: rgba(224, 104, 127, 0.11); border: 1px solid rgba(224, 104, 127, 0.32);
-  color: #f3c0ca;
+  background: rgba(201, 111, 128, 0.11); border: 1px solid rgba(201, 111, 128, 0.32);
+  color: var(--rose-400);
 }
 .notice p { margin: 6px 0 0; }
 .notice-fix { color: var(--text-dim); font-size: 11.5px; }
@@ -313,7 +418,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .attr-table th {
   position: sticky; top: 0; z-index: 2;
-  background: var(--surface-raised); border-bottom: 1px solid var(--line-strong);
+  background: var(--layer-2); border-bottom: 1px solid var(--line-strong);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .18);
   padding: 7px 10px; text-align: right; font-weight: 600; font-size: 11px;
   color: var(--text-dim); white-space: nowrap; vertical-align: bottom;
 }
@@ -328,21 +434,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .col-year {
   position: sticky; left: 0; z-index: 1; text-align: left !important;
-  background: var(--surface-solid); font-weight: 600;
+  background: var(--layer-1-solid); font-weight: 600;
   border-right: 1px solid var(--line);
+  white-space: nowrap; min-width: 74px; width: 74px;
 }
-.attr-table th.col-year { z-index: 3; background: var(--surface-raised); }
+.attr-table th.col-year { z-index: 3; background: var(--layer-2); }
 
 .year-row { cursor: pointer; }
 .year-row:hover td { background: rgba(255, 255, 255, 0.035); }
-.year-row.is-current td { background: rgba(255, 122, 92, 0.10); }
+.year-row.is-current td { background: rgba(217, 119, 66, 0.10); }
 .year-row.is-current .col-year { color: var(--accent); }
 .year-row.is-open .col-year { color: var(--accent); }
 
 .month-row { cursor: pointer; font-size: 11px; color: var(--text-dim); }
 .month-row td { padding: 3px 10px; background: rgba(0, 0, 0, 0.22); }
 .month-row:hover td { background: rgba(255, 255, 255, 0.04); }
-.month-row.is-current td { background: rgba(255, 122, 92, 0.14); color: var(--text); }
+.month-row.is-current td { background: rgba(217, 119, 66, 0.14); color: var(--text); }
 .month-label { padding-left: 24px !important; font-weight: 400 !important; color: var(--text-faint); }
 
 /* Confidence: a number from three cloud-free pixels must not look as solid as
@@ -356,8 +463,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- Charts ---------- */
 .chart-stack { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .chart-card {
-  background: var(--surface-raised); border: 1px solid var(--line);
+  background: var(--layer-2); border: 1px solid var(--line);
   border-radius: var(--radius-sm); padding: 11px 12px 6px;
+  box-shadow: var(--shadow-1), var(--edge-light);
 }
 .chart-head { margin-bottom: 6px; }
 .chart-title { font-size: 12.5px; font-weight: 600; }
@@ -368,8 +476,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------- Provenance ---------- */
 .provenance { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .prov-card {
-  background: var(--surface-raised); border: 1px solid var(--line);
+  background: var(--layer-2); border: 1px solid var(--line);
   border-radius: var(--radius-sm); padding: 12px;
+  box-shadow: var(--shadow-1), var(--edge-light);
 }
 .prov-name { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
 .prov-grid {
@@ -402,7 +511,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(255, 255, 255, 0.05); color: var(--accent);
   transition: transform 120ms, background 120ms;
 }
-.play-btn:hover { background: rgba(255, 122, 92, 0.15); }
+.play-btn:hover { background: rgba(217, 119, 66, 0.15); }
 .play-btn:active { transform: scale(0.92); }
 
 .time-readout { width: 148px; flex: none; }
@@ -414,7 +523,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .time-value.is-gap { color: var(--absent); font-style: italic; }
 .low-conf {
   font-size: 9px; padding: 1px 4px; border-radius: 3px; font-style: normal;
-  background: rgba(227, 176, 114, 0.18); color: var(--warn);
+  background: rgba(210, 165, 112, 0.18); color: var(--warn);
 }
 .time-factor {
   font-size: 10.5px; color: var(--text-faint);
@@ -437,12 +546,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .track-input::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 3px; height: 42px; border-radius: 2px;
-  background: var(--accent); box-shadow: 0 0 10px rgba(255, 122, 92, 0.7);
+  background: var(--accent); box-shadow: 0 0 10px rgba(217, 119, 66, 0.7);
   border: none;
 }
 .track-input::-moz-range-thumb {
   width: 3px; height: 42px; border-radius: 2px; border: none;
-  background: var(--accent); box-shadow: 0 0 10px rgba(255, 122, 92, 0.7);
+  background: var(--accent); box-shadow: 0 0 10px rgba(217, 119, 66, 0.7);
 }
 
 .track-years { position: absolute; left: 0; right: 0; bottom: -2px; height: 14px; }
@@ -481,13 +590,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tb-small { padding: 2px 8px; font-size: 10.5px; }
 .tb-count {
   font-size: 9.5px; padding: 0 4px; border-radius: 7px; font-variant-numeric: tabular-nums;
-  background: rgba(255, 122, 92, 0.2); color: var(--accent);
+  background: rgba(217, 119, 66, 0.2); color: var(--accent);
 }
 .tb-wrap { position: relative; }
 .tb-menu {
   position: absolute; top: calc(100% + 5px); left: 0; z-index: 30; min-width: 232px;
-  background: var(--surface-raised); border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 4px;
+  background: var(--layer-4); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-3), var(--edge-light);
+  padding: 4px;
   display: flex; flex-direction: column; max-height: 320px; overflow-y: auto;
 }
 .tb-menu > button {
@@ -510,14 +620,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   width: 24px; border: none; background: transparent; color: var(--text-faint);
   font-size: 15px; border-radius: 5px;
 }
-.tb-saved-del:hover { color: var(--bad); background: rgba(224, 104, 127, 0.13); }
+.tb-saved-del:hover { color: var(--bad); background: rgba(201, 111, 128, 0.13); }
 .tb-flash {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 40;
   padding: 6px 10px; border-radius: 6px; font-size: 11.5px; max-width: 100%;
   background: var(--surface-raised); border: 1px solid var(--line-strong);
   color: var(--good); box-shadow: var(--shadow);
 }
-.tb-flash-error { color: #f3c0ca; border-color: rgba(224, 104, 127, 0.42); cursor: pointer; }
+.tb-flash-error { color: var(--rose-400); border-color: rgba(201, 111, 128, 0.42); cursor: pointer; }
 
 .tool:disabled { opacity: 0.3; cursor: not-allowed; }
 .tool-sep { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 11px; }
@@ -554,7 +664,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- Compare ---------- */
 .compare-card {
-  background: var(--surface-raised); border: 1px solid rgba(111, 195, 212, 0.28);
+  background: var(--surface-raised); border: 1px solid rgba(111, 176, 205, 0.28);
   border-radius: var(--radius-sm); padding: 11px 12px 10px; margin: 12px 12px 0;
 }
 .compare-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 9px; }
@@ -573,14 +683,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .compare-note { margin-top: 9px; font-size: 10.5px; color: var(--text-faint); line-height: 1.45; }
 
 .time-compare {
-  font-size: 10.5px; color: var(--good); background: rgba(111, 195, 212, 0.13);
-  border: 1px solid rgba(111, 195, 212, 0.3); border-radius: 20px;
+  font-size: 10.5px; color: var(--good); background: rgba(111, 176, 205, 0.13);
+  border: 1px solid rgba(111, 176, 205, 0.3); border-radius: 20px;
   padding: 1px 7px; margin-top: 1px;
 }
-.time-compare:hover { background: rgba(111, 195, 212, 0.22); }
+.time-compare:hover { background: rgba(111, 176, 205, 0.22); }
 
 /* A column backed by real observations, next to columns that are not. Marking
    it per column matters more than a single page-level badge: a half-real
    report is fine, but implying it is uniformly one or the other is not. */
 .th-name .live { color: var(--good); margin-right: 4px; font-size: 8px; vertical-align: middle; }
-.badge-live { color: var(--good); border-color: rgba(111, 195, 212, 0.45); }
+.badge-live { color: var(--good); border-color: rgba(111, 176, 205, 0.45); }
