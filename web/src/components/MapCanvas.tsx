@@ -42,10 +42,61 @@ maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
 const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#f1eee8' } }],
+  // Sea. The land polygons of the bundled basemap sit on top of this, which
+  // is what gives the map a coastline before a single tile has loaded.
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e6ecee' } }],
 }
 
 const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+/**
+ * The bundled basemap: coastline, urban areas, water, motorways, railways and
+ * towns, generalised from Natural Earth (public domain) and shipped with the
+ * app — see scripts/build_basemap.py.
+ *
+ * It exists because the raster underlay is the one part of this map that is
+ * allowed to fail, and when it did the canvas was an empty rectangle: no
+ * coast, no towns, no roads, nothing to say whether you were looking at Devon
+ * or Durham. Cartography this basic should not depend on a third party being
+ * up, and at 1:10 million it is exactly the right detail for the zooms where
+ * someone is *finding* a site rather than drawing one.
+ *
+ * The raster still earns its place at close range, so the two hand over: the
+ * bundled layers carry the map to about z11 and fade as the raster fades in.
+ */
+const BASEMAP_URL = '/basemap/england.json'
+
+type PlaceFeature = GeoJSON.Feature<GeoJSON.Point, {
+  name: string
+  pop_max: number | null
+  adm1name: string | null
+  featurecla: string | null
+}>
+
+interface BasemapData {
+  attribution: string
+  land: GeoJSON.FeatureCollection
+  urban: GeoJSON.FeatureCollection
+  lakes: GeoJSON.FeatureCollection
+  rivers: GeoJSON.FeatureCollection
+  roads: GeoJSON.FeatureCollection
+  rail: GeoJSON.FeatureCollection
+  places: GeoJSON.FeatureCollection
+}
+
+/** Which places are worth naming at this zoom.
+ *
+ *  A map with every town on it at national zoom is unreadable, and one with
+ *  only London on it at county zoom is useless. The threshold falls as you
+ *  come in, which is how a paper atlas does it too. */
+function placeCutoff(zoom: number): number {
+  if (zoom < 6) return 700_000
+  if (zoom < 7) return 400_000
+  if (zoom < 8) return 200_000
+  if (zoom < 9) return 90_000
+  if (zoom < 10.5) return 40_000
+  return 0
+}
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
@@ -79,6 +130,13 @@ export default function MapCanvas() {
   // React state rather than a ref: when the style becomes ready the AOI and
   // cell effects must re-run, and flipping a ref would not re-render.
   const [ready, setReady] = useState(false)
+  // Place labels are DOM markers rather than a symbol layer: MapLibre needs a
+  // glyph server to render text, and standing one up — or depending on
+  // someone else's — to write "Guildford" on a map is the wrong trade. As
+  // markers they also get the interface's own typeface for free.
+  const [places, setPlaces] = useState<PlaceFeature[]>([])
+  const placeMarkers = useRef<maplibregl.Marker[]>([])
+  const userMarkers = useRef<maplibregl.Marker[]>([])
 
   const drawMode = useStore((s) => s.drawMode)
   const setAoi = useStore((s) => s.setAoi)
@@ -92,6 +150,10 @@ export default function MapCanvas() {
   const overlayOpacity = useStore((s) => s.overlayOpacity)
   const setCursor = useStore((s) => s.setCursor)
   const setView = useStore((s) => s.setView)
+  const markers = useStore((s) => s.markers)
+  const addMarker = useStore((s) => s.addMarker)
+  const moveMarker = useStore((s) => s.moveMarker)
+  const setDrawMode = useStore((s) => s.setDrawMode)
 
   // Drawing state lives in refs, not React state: it changes on every
   // mousemove and re-rendering the tree at that rate would drop frames.
@@ -175,8 +237,96 @@ export default function MapCanvas() {
         },
       })
 
-      // The basemap goes on last and sits beneath everything of ours, so a
-      // failure here costs context and nothing else.
+      // The bundled basemap goes underneath everything of ours. It is added
+      // before the raster so the raster covers it as it fades in.
+      void fetch(BASEMAP_URL)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((b: BasemapData) => {
+          if (!map.style || map.getSource('bm-land')) return
+          const first = map.getLayer('cells-fill') ? 'cells-fill' : undefined
+
+          const add = (id: string, data: GeoJSON.FeatureCollection,
+                       layer: Omit<maplibregl.LayerSpecification, 'id' | 'source'>) => {
+            map.addSource(id, {
+              type: 'geojson', data,
+              ...(id === 'bm-land' ? { attribution: b.attribution } : {}),
+            })
+            map.addLayer({ id, source: id, ...layer } as maplibregl.LayerSpecification, first)
+          }
+
+          // Land on sea, towns on land, water over both, then the network.
+          add('bm-land', b.land, {
+            type: 'fill',
+            paint: { 'fill-color': '#fdfcfa', 'fill-outline-color': '#c9c3b7' },
+          })
+          add('bm-urban', b.urban, {
+            type: 'fill',
+            paint: {
+              'fill-color': '#ebe7de',
+              'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.9, 11, 0.5, 13, 0],
+            },
+          })
+          add('bm-lakes', b.lakes, {
+            type: 'fill',
+            paint: { 'fill-color': '#dbe7ec', 'fill-outline-color': '#b7cdd6' },
+          })
+          add('bm-rivers', b.rivers, {
+            type: 'line',
+            paint: {
+              'line-color': '#b7cdd6',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.6],
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0.9, 12.5, 0],
+            },
+          })
+          add('bm-rail', b.rail, {
+            type: 'line',
+            paint: {
+              'line-color': '#a9a396', 'line-width': 0.7, 'line-dasharray': [3, 2],
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0, 8.5, 0.8, 12, 0],
+            },
+          })
+          // Two passes so a road reads as a road: a pale casing under a
+          // darker line, which is what stops a network turning into spaghetti.
+          add('bm-roads-casing', b.roads, {
+            type: 'line',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': ['interpolate', ['linear'], ['zoom'],
+                             5, ['case', ['==', ['get', 'type'], 'Major Highway'], 2.4, 1.4],
+                             11, ['case', ['==', ['get', 'type'], 'Major Highway'], 7, 4]],
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 10.5, 0.9, 12.5, 0],
+            },
+          })
+          add('bm-roads', b.roads, {
+            type: 'line',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': ['case', ['==', ['get', 'type'], 'Major Highway'], '#8a9a7e', '#c2bcae'],
+              'line-width': ['interpolate', ['linear'], ['zoom'],
+                             5, ['case', ['==', ['get', 'type'], 'Major Highway'], 1.1, 0.6],
+                             11, ['case', ['==', ['get', 'type'], 'Major Highway'], 4, 2]],
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 10.5, 0.95, 12.5, 0],
+            },
+          })
+          // The coast last, so it sits over the fills it bounds.
+          add('bm-coast', b.land, {
+            type: 'line',
+            paint: {
+              'line-color': '#8c9aa0',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 10, 1.4],
+              'line-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 13, 0],
+            },
+          })
+
+          setPlaces(b.places.features as PlaceFeature[])
+          map.getSource('bm-land') && setReady(true)
+        })
+        .catch(() => {
+          // A missing bundle costs context and nothing else — the same
+          // contract the raster has always had.
+        })
+
       if (!map.getSource('osm')) {
         map.addSource('osm', {
           type: 'raster',
@@ -193,7 +343,14 @@ export default function MapCanvas() {
           // Washed rather than dimmed: on a paper ground the basemap has to
           // lose saturation and contrast, not brightness, or it turns to mud
           // under the value overlay.
-          paint: { 'raster-opacity': 0.42, 'raster-saturation': -0.85, 'raster-contrast': -0.25 },
+          // Fades in as the bundled layers fade out: coarse vector data is
+          // better than nothing at national zoom and worse than tiles at
+          // field zoom, so each carries the range it is actually good for.
+          paint: {
+            'raster-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 12.5, 0.62],
+            'raster-saturation': -0.8,
+            'raster-contrast': -0.15,
+          },
         }, 'cells-fill')
       }
 
@@ -231,6 +388,9 @@ export default function MapCanvas() {
     report()
 
     mapRef.current = map
+    // Readable from a test driving the camera. One line, and the alternative
+    // is scripting scroll-wheel gestures to hit an exact zoom.
+    ;(window as unknown as { __map?: maplibregl.Map }).__map = map
     return () => {
       map.off('move', report)
       map.off('zoom', report)
@@ -623,6 +783,103 @@ export default function MapCanvas() {
       maxZoom: 15,
     })
   }, [aoi, ready])
+
+  // ---- markers ------------------------------------------------------------
+  /**
+   * Drop a pin with the point tool, then drag it to correct it.
+   *
+   * Kept out of the drawing effect on purpose: a marker is a note about where
+   * something is, not an area to measure, so it must never trigger a query or
+   * disturb the drawn shape.
+   */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || drawMode !== 'point') return
+    const onClick = (e: maplibregl.MapMouseEvent) => {
+      addMarker(e.lngLat.lng, e.lngLat.lat)
+      // One pin per press of the tool, the way every GIS does it — staying
+      // armed is how you end up with nine pins and one intention.
+      setDrawMode(null)
+    }
+    map.getCanvas().style.cursor = 'crosshair'
+    map.on('click', onClick)
+    return () => {
+      map.off('click', onClick)
+      if (!modeRef.current) map.getCanvas().style.cursor = ''
+    }
+  }, [drawMode, addMarker, setDrawMode])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    for (const m of userMarkers.current) m.remove()
+    userMarkers.current = markers.map((mk) => {
+      const el = document.createElement('div')
+      el.className = 'map-marker'
+      el.innerHTML =
+        '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden>' +
+        '<path d="M12 22s7.5-6.4 7.5-12a7.5 7.5 0 1 0-15 0c0 5.6 7.5 12 7.5 12Z"' +
+        ' fill="currentColor" stroke="#fff" stroke-width="1.6"/>' +
+        '<circle cx="12" cy="10" r="2.6" fill="#fff"/></svg>' +
+        '<span class="map-marker-name"></span>'
+      el.querySelector('.map-marker-name')!.textContent = mk.name
+      el.title = `${mk.name} — ${mk.lat.toFixed(5)}, ${mk.lng.toFixed(5)}`
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
+        .setLngLat([mk.lng, mk.lat])
+        .addTo(map)
+      marker.on('dragend', () => {
+        const p = marker.getLngLat()
+        moveMarker(mk.id, p.lng, p.lat)
+      })
+      return marker
+    })
+    return () => {
+      for (const m of userMarkers.current) m.remove()
+      userMarkers.current = []
+    }
+  }, [markers, moveMarker])
+
+  // ---- place labels -------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !places.length) return
+
+    const render = () => {
+      const cutoff = placeCutoff(map.getZoom())
+      const bounds = map.getBounds()
+      const wanted = places.filter((f) => {
+        const [lng, lat] = f.geometry.coordinates
+        return (f.properties.pop_max ?? 0) >= cutoff &&
+               lng >= bounds.getWest() && lng <= bounds.getEast() &&
+               lat >= bounds.getSouth() && lat <= bounds.getNorth()
+      // A cap as well as a cutoff: zoomed into a conurbation, "every place
+      // above 40,000" is still forty labels on top of each other.
+      }).slice(0, 40)
+
+      for (const m of placeMarkers.current) m.remove()
+      placeMarkers.current = wanted.map((f) => {
+        const el = document.createElement('div')
+        const big = (f.properties.pop_max ?? 0) >= 250_000
+        el.className = `map-place${big ? ' is-major' : ''}`
+        el.innerHTML = '<span class="map-place-dot"></span>' +
+                       `<span class="map-place-name"></span>`
+        el.querySelector('.map-place-name')!.textContent = f.properties.name
+        return new maplibregl.Marker({ element: el, anchor: 'left' })
+          .setLngLat(f.geometry.coordinates as [number, number])
+          .addTo(map)
+      })
+    }
+
+    render()
+    map.on('moveend', render)
+    map.on('zoomend', render)
+    return () => {
+      map.off('moveend', render)
+      map.off('zoomend', render)
+      for (const m of placeMarkers.current) m.remove()
+      placeMarkers.current = []
+    }
+  }, [places])
 
   // ---- overlay opacity ----------------------------------------------------
   // A layer you cannot fade is a layer you cannot check against the ground

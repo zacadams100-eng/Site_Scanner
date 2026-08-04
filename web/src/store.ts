@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Catalog, Cell, DrawMode, Factor, SeriesResponse } from './types'
+import type { Catalog, Cell, DrawMode, Factor, Marker, SeriesResponse } from './types'
 import { fetchCells, fetchSeries } from './api'
 import { decodeState, writeUrl, type Template } from './lib/permalink'
 
@@ -36,6 +36,7 @@ export interface SavedAoi {
   factors?: string[]
   timeIndex?: number
   compareIndex?: number | null
+  markers?: Marker[]
 }
 
 /** What an exported sites file looks like. Versioned so a later format change
@@ -60,6 +61,9 @@ interface State {
   past: (GeoJSON.Polygon | null)[]
   future: (GeoJSON.Polygon | null)[]
   saved: SavedAoi[]
+  /** Named points on the map. Saved with the workspace and exported with the
+   *  shape, but never queried — a marker is a note, not an area. */
+  markers: Marker[]
 
   selected: string[]
   data: SeriesResponse | null
@@ -75,10 +79,9 @@ interface State {
 
   activeTab: 'table' | 'charts' | 'sources'
   browserOpen: boolean
-  templatesOpen: boolean
 
   sidebarOpen: boolean
-  sidebarSection: 'layers' | 'sites' | 'data' | 'analysis'
+  sidebarSection: 'layers' | 'templates' | 'sites' | 'data' | 'analysis'
   panelOpen: boolean
   /** How strongly the value overlay is painted over the basemap. A layer you
    *  cannot fade is a layer you cannot check against the ground beneath it. */
@@ -116,6 +119,10 @@ interface State {
   renameSaved: (id: string, name: string) => void
   updateSaved: (id: string) => void
   importSites: (sites: SavedAoi[]) => number
+  addMarker: (lng: number, lat: number, name?: string) => void
+  renameMarker: (id: string, name: string) => void
+  moveMarker: (id: string, lng: number, lat: number) => void
+  removeMarker: (id: string) => void
   toggleFactor: (id: string) => void
   setSelected: (ids: string[]) => void
   applyTemplate: (t: Template) => void
@@ -124,9 +131,8 @@ interface State {
   setPlaying: (p: boolean) => void
   setTab: (t: 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
-  setTemplatesOpen: (o: boolean) => void
   setSidebarOpen: (o: boolean) => void
-  setSidebarSection: (s: 'layers' | 'sites' | 'data' | 'analysis') => void
+  setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
   setPanelOpen: (o: boolean) => void
   setOverlayOpacity: (o: number) => void
   setCursor: (c: { lng: number; lat: number } | null) => void
@@ -187,6 +193,7 @@ export const useStore = create<State>((set, get) => ({
   past: [],
   future: [],
   saved: loadSaved(),
+  markers: [],
   selected: DEFAULT_FACTORS,
   data: null,
   loading: false,
@@ -196,7 +203,6 @@ export const useStore = create<State>((set, get) => ({
   compareIndex: null,
   activeTab: 'table',
   browserOpen: false,
-  templatesOpen: false,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn
   // shape than a mis-tap on a section that was never asked for.
@@ -223,7 +229,14 @@ export const useStore = create<State>((set, get) => ({
   },
   setCatalogError: (e) => set({ catalogError: e }),
   setMock: (m) => set({ isMock: m }),
-  setDrawMode: (m) => set({ drawMode: m }),
+  setDrawMode: (m) => {
+    // Arming a tool on a narrow screen folds the sidebar away. Its panel is an
+    // overlay there, covering most of the map — so "pick the marker tool, tap
+    // the map" ended with the tap landing on the sidebar and nothing
+    // happening, which reads as a broken tool.
+    const narrow = typeof window !== 'undefined' && window.innerWidth <= 900
+    set(m && narrow ? { drawMode: m, sidebarOpen: false } : { drawMode: m })
+  },
 
   setAoi: (g, opts) => {
     const { aoi, past } = get()
@@ -273,6 +286,7 @@ export const useStore = create<State>((set, get) => ({
       factors: selected,
       timeIndex,
       compareIndex,
+      markers: get().markers,
     }
     const next = [entry, ...saved].slice(0, 50)
     persistSaved(next)
@@ -289,6 +303,7 @@ export const useStore = create<State>((set, get) => ({
     if (entry.factors?.length) patch.selected = entry.factors.slice(0, MAX_FACTORS)
     if (typeof entry.timeIndex === 'number') patch.timeIndex = entry.timeIndex
     if (entry.compareIndex !== undefined) patch.compareIndex = entry.compareIndex
+    patch.markers = entry.markers ?? []
     patch.projectName = entry.name
     set(patch)
     get().setAoi(entry.geometry, { keepProject: true })
@@ -316,7 +331,8 @@ export const useStore = create<State>((set, get) => ({
     const next = saved.map((s) =>
       s.id === id
         ? { ...s, geometry: aoi, area_ha: data?.area_ha ?? s.area_ha,
-            savedAt: Date.now(), factors: selected, timeIndex, compareIndex }
+            savedAt: Date.now(), factors: selected, timeIndex, compareIndex,
+            markers: get().markers }
         : s,
     )
     persistSaved(next)
@@ -338,6 +354,30 @@ export const useStore = create<State>((set, get) => ({
     set({ saved: next })
     return arriving.length
   },
+
+  addMarker: (lng, lat, name) => {
+    const { markers } = get()
+    set({
+      markers: [...markers, {
+        id: `m${Date.now()}`,
+        // Numbered rather than blank: an unnamed pin in a list of eight is
+        // indistinguishable from the other seven, and naming can wait.
+        name: name?.trim() || `Point ${markers.length + 1}`,
+        lng, lat,
+      }],
+    })
+  },
+
+  renameMarker: (id, name) => {
+    const clean = name.trim()
+    if (!clean) return
+    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, name: clean } : m)) })
+  },
+
+  moveMarker: (id, lng, lat) =>
+    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, lng, lat } : m)) }),
+
+  removeMarker: (id) => set({ markers: get().markers.filter((m) => m.id !== id) }),
 
   toggleFactor: (id) => {
     const { selected } = get()
@@ -362,7 +402,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   applyTemplate: (t) => {
-    set({ selected: t.factors.slice(0, MAX_FACTORS), templatesOpen: false, drawMode: t.tool })
+    set({ selected: t.factors.slice(0, MAX_FACTORS), drawMode: t.tool })
     if (get().aoi) void get().refresh()
   },
 
@@ -371,7 +411,6 @@ export const useStore = create<State>((set, get) => ({
   setPlaying: (p) => set({ playing: p }),
   setTab: (t) => set({ activeTab: t }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
-  setTemplatesOpen: (o) => set({ templatesOpen: o }),
   setSidebarOpen: (o) => set({ sidebarOpen: o }),
   setSidebarSection: (s) => set({ sidebarSection: s }),
   setPanelOpen: (o) => set({ panelOpen: o }),

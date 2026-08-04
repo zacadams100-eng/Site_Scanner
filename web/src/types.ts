@@ -120,4 +120,19 @@ export interface CellsResponse {
   centroid: { lng: number; lat: number }
 }
 
-export type DrawMode = 'rect' | 'circle' | 'freehand' | null
+export type DrawMode = 'rect' | 'circle' | 'freehand' | 'point' | null
+
+/**
+ * A place the user has marked and named — an access point, a substation, a
+ * pinch point, the spot the photograph was taken from.
+ *
+ * Deliberately separate from the area: the AOI is what gets measured, and a
+ * marker is a note about where something is. Conflating them would mean every
+ * pin triggered a query.
+ */
+export interface Marker {
+  id: string
+  name: string
+  lng: number
+  lat: number
+}

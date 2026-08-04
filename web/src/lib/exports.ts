@@ -1,5 +1,5 @@
 import type { SavedAoi, SitesFile } from '../store'
-import type { Factor, Series } from '../types'
+import type { Factor, Marker, Series } from '../types'
 import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
 
 /** Explains the months-observed columns wherever a file has room to say it. */
@@ -149,7 +149,8 @@ export function exportCompareCsv(cols: Series[], a: number, b: number): void {
 
 /** GeoJSON with the annual series folded into the feature's properties, so the
  *  shape and its numbers travel together into QGIS. */
-export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: number): void {
+export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: number,
+                              markers: Marker[] = []): void {
   const props: Record<string, unknown> = {
     name: 'Site Scanner AOI',
     area_ha: Number(area_ha.toFixed(2)),
@@ -176,7 +177,17 @@ export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: num
   }
   const fc: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
-    features: [{ type: 'Feature', geometry: aoi, properties: props }],
+    features: [
+      { type: 'Feature', geometry: aoi, properties: props },
+      // Markers ride along as their own features rather than being folded
+      // into the polygon's properties, so QGIS opens them as points and the
+      // labels are already there.
+      ...markers.map((m) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [m.lng, m.lat] },
+        properties: { name: m.name, kind: 'marker' },
+      })),
+    ],
   }
   download(new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' }),
            'site-scanner-aoi.geojson')

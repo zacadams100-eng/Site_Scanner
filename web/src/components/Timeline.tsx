@@ -190,8 +190,14 @@ export default function Timeline() {
   const readout = useMemo(() => {
     if (!point) return null
     if (point.value === null) return { text: 'No usable observation', gap: true }
+    // Money reads £745.9k, not "745.9k £" — the unit goes in front of a
+    // currency and behind everything else, and half the catalogue is money now.
+    const unit = primarySeries?.unit ?? ''
+    const money = unit.startsWith('£')
     return {
-      text: `${compact(point.value)} ${primarySeries?.unit ?? ''}`.trim(),
+      text: money
+        ? `£${compact(point.value)}${unit.slice(1)}`
+        : `${compact(point.value)} ${unit}`.trim(),
       gap: false,
       confidence: point.valid_fraction,
     }

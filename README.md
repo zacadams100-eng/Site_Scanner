@@ -107,6 +107,15 @@ deployed API without an edit.
 
 What it does today:
 
+- **See where you are.** The map ships with its own cartography — coastline,
+  towns and cities, motorways, railways and rivers, generalised from Natural
+  Earth (public domain, `scripts/build_basemap.py`) and styled to the brand.
+  It works with no network at all; the OpenStreetMap raster fades in above
+  zoom 10 for street-level detail and is now optional rather than load-bearing.
+- **Mark** important locations with the marker tool: named, draggable points
+  that save with the site and export with it. An access point, a substation, a
+  pinch point — a marker is a note about where something is, and never
+  triggers a query.
 - **Draw** a rectangle, circle or freehand shape. Freehand is simplified with
   Douglas-Peucker on release and repaired if it self-intersects, so a scribble
   does not become a 600-vertex polygon that slows every later call.
@@ -130,6 +139,11 @@ What it does today:
   (`51.235, -0.57`). Lookups go to postcodes.io — free, keyless, ONS and
   Ordnance Survey open data under the OGL, whose notice is shown with the
   results. Searching only moves the map; it never draws an area for you.
+- **Start from a template.** Twenty-six worked starting points grouped by
+  trade — development appraisal, planning risk, ground conditions, grid
+  connection, solar farm, farm appraisal, biodiversity net gain, multi-peril
+  underwriting, logistics siting — each picking the layers that belong together
+  in that screen.
 - **Filter** the factor list to the ones backed by real satellite
   observations. `/api/catalog` marks each factor `real: true|false`, so the
   demo two thirds of the catalogue is visible as such *before* you spend a
@@ -146,7 +160,7 @@ the custom rendering, so screen readers and touch work without reimplementation.
 
 ### The data layer
 
-`catalog.py` holds 118 factors resolving to 20 base datasets, only 7 of which
+`catalog.py` holds 266 factors resolving to 44 base datasets, only 7 of which
 need monthly storage. That split is the point: slope, aspect, ruggedness and
 height-above-drainage all come off one elevation raster, and NDVI, NDWI, EVI
 and SAVI off the same two Sentinel-2 bands. A factor marked `derived` is

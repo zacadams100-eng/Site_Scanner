@@ -67,6 +67,36 @@ coordinates, scale, zoom, CRS, cell count and connection state.
 canvas with copper accents and backdrop blur is gone; do not reintroduce blur,
 heavy shadows or gradients, and keep colour at roughly 95% neutral.
 
+### The catalogue now serves more than one profession
+
+266 factors across 25 groups and 44 bases. The first half is what the land is
+like — vegetation, terrain, climate, water, habitat. The second half is what
+can be done with it and at what risk: planning and consents, property market,
+buildings and fabric, infrastructure, transport and access, community and
+services, ground risk, energy, agriculture, forestry and carbon, siting and
+logistics.
+
+Every new base carries the same provenance, licence and attribution as the
+old ones, and almost all of them are `stored=False` — a planning register or
+an EPC lookup is an API call, not a raster we hold, so the storage argument in
+TECHNICAL_PLAN.md §8.2 is untouched (22 stored bases, 7 monthly).
+
+None of it is live. It is the same honest position as before: the app labels
+every factor `real` or generated, and 6 of 266 are real today. Do not remove
+the labels; the answer is to implement more of them.
+
+### The map has its own cartography
+
+`scripts/build_basemap.py` bundles coastline, urban areas, water, motorways,
+railways and place names from Natural Earth (public domain) into
+`web/public/basemap/england.json` — 600 KB, styled to the brand, no network
+needed. The OSM raster now fades in above zoom 10 for detail rather than being
+the only thing on the canvas.
+
+Place labels are DOM markers, not a symbol layer: MapLibre needs a glyph server
+to render text, and standing one up to write "Guildford" on a map is the wrong
+trade.
+
 ### Added since
 - **Place search.** A postcode, place name or pasted `lat, lng` moves the map.
   Until then the only way to reach a field was to pan across England on an

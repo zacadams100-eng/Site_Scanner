@@ -433,6 +433,34 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* ---------- Markers ---------- */
+.side-sub {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .14);
+}
+.side-subtitle {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(248, 246, 242, .86);
+}
+.side-panel .btn.is-armed {
+  background: var(--accent-dim); border-color: var(--accent-dim); color: #fff;
+}
+.marker-list { display: flex; flex-direction: column; gap: 3px; }
+.marker-row { display: flex; align-items: center; gap: 2px; }
+.marker-go {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon name' 'icon pos'; gap: 0 7px; align-items: center;
+  text-align: left; padding: 6px 8px; border: none; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .06); color: var(--paper-100);
+}
+.marker-go:hover { background: rgba(255, 255, 255, .14); }
+.marker-go svg { grid-area: icon; opacity: .8; }
+.marker-name {
+  grid-area: name; font-family: var(--font-ui); font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.marker-pos { grid-area: pos; font-size: 9.5px; color: rgba(248, 246, 242, .72); }
+
 /* ---------- Saved sites ---------- */
 .site-list { display: flex; flex-direction: column; gap: 3px; }
 .site { display: flex; align-items: center; gap: 2px; }
@@ -514,6 +542,45 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   background: var(--paper-050); border: 1px solid var(--line);
   padding: 4px 10px; border-radius: var(--radius-sm);
   pointer-events: none; z-index: 5; white-space: nowrap;
+}
+
+/* ---------- Map labels ---------- */
+/* Place names are DOM markers, so they are set in the interface's own
+   typeface rather than in whatever a glyph server happens to serve. A halo
+   rather than a box: a label on a map should sit on the ground, not float
+   above it in a chip. */
+.map-place {
+  display: flex; align-items: center; gap: 4px;
+  transform: translateX(3px); pointer-events: none; white-space: nowrap;
+}
+.map-place-dot {
+  width: 4px; height: 4px; border-radius: 50%; flex: none;
+  background: var(--slate-500); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .85);
+}
+.map-place-name {
+  font-family: var(--font-ui); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .01em; color: var(--ink-700);
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 5px #fff;
+}
+.map-place.is-major .map-place-dot { width: 6px; height: 6px; background: var(--ink-700); }
+.map-place.is-major .map-place-name {
+  font-size: 12px; font-weight: 600; color: var(--ink-900); letter-spacing: .02em;
+}
+
+/* A dropped marker: the one place the accent is allowed to be a solid shape,
+   because a pin has to be findable at a glance on a busy map. */
+.map-marker {
+  display: flex; flex-direction: column; align-items: center;
+  color: var(--accent); cursor: grab;
+  filter: drop-shadow(0 1px 2px rgba(35, 35, 35, .25));
+}
+.map-marker:active { cursor: grabbing; }
+.map-marker-name {
+  order: -1; margin-bottom: 2px;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 600;
+  color: var(--ink-900); white-space: nowrap;
+  background: rgba(255, 255, 255, .88); border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 5px;
 }
 
 /* ===========================================================================
@@ -948,37 +1015,25 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 .conn-dot.is-bad { background: var(--clay-500); }
 
 /* ===========================================================================
-   TEMPLATES — the only modal in the product
+   TEMPLATES — a worked starting point per trade, in the sidebar
    =========================================================================== */
-.modal-scrim {
-  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
-  background: rgba(35, 35, 35, .28); padding: 24px;
+.tpl-group { display: flex; flex-direction: column; gap: 4px; }
+.tpl-sector {
+  font-family: var(--font-ui); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: rgba(248, 246, 242, .7);
+  margin-top: 10px; padding-bottom: 3px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
 }
-.modal {
-  width: min(760px, 100%); max-height: 84vh; overflow-y: auto;
-  background: var(--paper-050); border: 1px solid var(--line);
-  border-radius: var(--radius); box-shadow: var(--shadow-3); padding: 20px 22px 24px;
+.tpl {
+  display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: 8px 9px; border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .06); color: var(--paper-100);
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
 }
-.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.modal-title { font-family: var(--font-ui); font-size: 16px; font-weight: 600; }
-.modal-sub { font-size: 12.5px; color: var(--text-faint); margin-top: 3px; }
-.template-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
-  gap: 10px; margin-top: 18px;
-}
-.template {
-  text-align: left; padding: 13px; border-radius: var(--radius);
-  border: 1px solid var(--line); background: var(--paper-000);
-  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
-}
-.template:hover { border-color: var(--structure); transform: translateY(-1px); }
-.template-name { font-family: var(--font-ui); font-size: 13px; font-weight: 600; }
-.template-blurb { font-size: 11.5px; color: var(--text-faint); margin: 4px 0 9px; line-height: 1.5; }
-.template-factors { display: flex; flex-wrap: wrap; gap: 4px; }
-.template-chip {
-  font-size: 10px; padding: 2px 7px; border-radius: 20px;
-  background: var(--paper-100); border: 1px solid var(--line); color: var(--text-faint);
-}
+.tpl:hover { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .22); }
+.tpl-name { font-family: var(--font-ui); font-size: 12.5px; font-weight: 500; }
+.tpl-blurb { font-size: 11px; line-height: 1.45; color: rgba(248, 246, 242, .82); }
+.tpl-count { font-size: 9.5px; color: rgba(248, 246, 242, .62); margin-top: 2px; }
 
 /* ===========================================================================
    RESPONSIVE — desktop first; a tablet folds the columns, a phone stacks them

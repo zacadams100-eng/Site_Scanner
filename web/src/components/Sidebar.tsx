@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { exportSites, readAoiFile, readSitesFile } from '../lib/exports'
+import { templatesBySector } from '../lib/permalink'
 import { formatArea } from '../lib/format'
 import { rampColor } from '../lib/format'
 
@@ -16,11 +17,13 @@ import { rampColor } from '../lib/format'
  * that does eleven things badly; this one does four things and says so.
  */
 
-type Section = 'layers' | 'sites' | 'data' | 'analysis'
+type Section = 'layers' | 'templates' | 'sites' | 'data' | 'analysis'
 
 const ICONS: Record<Section, ReactNode> = {
   // Outline, 2px, rounded — drawn on the same 24 grid so they sit level.
   layers: <><path d="M12 4 4 8.5l8 4.5 8-4.5L12 4Z" /><path d="M4 13.5 12 18l8-4.5" /></>,
+  // A worked example: a page with a line already on it.
+  templates: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h4" /></>,
   sites: <><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" /><circle cx="12" cy="10" r="2.5" /></>,
   data: <><path d="M12 16V5" /><path d="m8 9 4-4 4 4" /><path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" /></>,
   analysis: <><path d="M4 19h16" /><path d="M7 19v-6" /><path d="M12 19V6" /><path d="M17 19v-9" /></>,
@@ -28,6 +31,7 @@ const ICONS: Record<Section, ReactNode> = {
 
 const LABELS: Record<Section, string> = {
   layers: 'Layers',
+  templates: 'Templates',
   sites: 'Sites',
   data: 'Data',
   analysis: 'Analysis',
@@ -39,7 +43,7 @@ export default function Sidebar() {
   const toggleFactor = useStore((s) => s.toggleFactor)
   const setSelected = useStore((s) => s.setSelected)
   const setBrowserOpen = useStore((s) => s.setBrowserOpen)
-  const setTemplatesOpen = useStore((s) => s.setTemplatesOpen)
+  const applyTemplate = useStore((s) => s.applyTemplate)
   const data = useStore((s) => s.data)
   const aoi = useStore((s) => s.aoi)
   const setAoi = useStore((s) => s.setAoi)
@@ -56,6 +60,12 @@ export default function Sidebar() {
   const setOpen = useStore((s) => s.setSidebarOpen)
   const section = useStore((s) => s.sidebarSection)
   const setSection = useStore((s) => s.setSidebarSection)
+  const markers = useStore((s) => s.markers)
+  const renameMarker = useStore((s) => s.renameMarker)
+  const removeMarker = useStore((s) => s.removeMarker)
+  const goTo = useStore((s) => s.goTo)
+  const setDrawMode = useStore((s) => s.setDrawMode)
+  const drawMode = useStore((s) => s.drawMode)
   const compareIndex = useStore((s) => s.compareIndex)
   const timeIndex = useStore((s) => s.timeIndex)
   const setCompareIndex = useStore((s) => s.setCompareIndex)
@@ -155,7 +165,9 @@ export default function Sidebar() {
                       <span className="layer-text">
                         <span className="layer-name" title={f?.note}>{f?.name ?? id}</span>
                         <span className="layer-src">
-                          {series?.meta.base_meta.name ?? f?.base}
+                          {series?.meta.base_meta.name
+                            ?? catalog?.bases.find((b) => b.id === f?.base)?.name
+                            ?? f?.base}
                           {f?.real && <span className="live-dot" title="Live satellite observations" />}
                         </span>
                       </span>
@@ -173,6 +185,72 @@ export default function Sidebar() {
                 })}
               </div>
 
+              <div className="side-sub">
+                <h3 className="side-subtitle">Markers</h3>
+                <button
+                  className={`btn btn-secondary btn-sm${drawMode === 'point' ? ' is-armed' : ''}`}
+                  onClick={() => setDrawMode(drawMode === 'point' ? null : 'point')}
+                  aria-pressed={drawMode === 'point'}
+                >
+                  {drawMode === 'point' ? 'Click the map…' : 'Add'}
+                </button>
+              </div>
+              {!markers.length && (
+                <p className="side-note">
+                  Mark an access point, a substation, a pinch point — anything
+                  worth naming. Markers save with the site and export with it.
+                </p>
+              )}
+              <div className="marker-list">
+                {markers.map((m) => (
+                  <div key={m.id} className="marker-row">
+                    {renamingId === m.id ? (
+                      <input
+                        autoFocus className="field" defaultValue={m.name}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            renameMarker(m.id, (e.target as HTMLInputElement).value)
+                            setRenamingId(null)
+                          }
+                          if (e.key === 'Escape') setRenamingId(null)
+                        }}
+                        onBlur={(e) => { renameMarker(m.id, e.target.value); setRenamingId(null) }}
+                      />
+                    ) : (
+                      <>
+                        <button className="marker-go" onClick={() => goTo(m.lng, m.lat, 15)}
+                                title="Go to this marker">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" />
+                            <circle cx="12" cy="10" r="2.5" />
+                          </svg>
+                          <span className="marker-name">{m.name}</span>
+                          <span className="marker-pos mono">
+                            {m.lat.toFixed(4)}, {m.lng.toFixed(4)}
+                          </span>
+                        </button>
+                        <button className="icon-btn" title="Rename" aria-label={`Rename ${m.name}`}
+                                onClick={() => setRenamingId(m.id)}>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+                          </svg>
+                        </button>
+                        <button className="icon-btn icon-btn-bad" title="Delete"
+                                aria-label={`Delete ${m.name}`}
+                                onClick={() => removeMarker(m.id)}>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                               strokeWidth="2" strokeLinecap="round" aria-hidden>
+                            <path d="M6 6 18 18M18 6 6 18" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <label className="side-field">
                 <span>Overlay opacity</span>
                 <input
@@ -182,6 +260,29 @@ export default function Sidebar() {
                 />
                 <span className="mono">{Math.round(overlayOpacity * 100)}%</span>
               </label>
+            </>
+          )}
+
+          {section === 'templates' && (
+            <>
+              <div className="side-head"><h2 className="side-title">Templates</h2></div>
+              <p className="side-note">
+                A worked starting point for one trade. Each picks the layers that
+                belong together in that screen; the area stays yours to draw.
+              </p>
+
+              {templatesBySector().map(([sector, list]) => (
+                <div key={sector} className="tpl-group">
+                  <div className="tpl-sector">{sector}</div>
+                  {list.map((t) => (
+                    <button key={t.id} className="tpl" onClick={() => { applyTemplate(t); say(`${t.name} applied`) }}>
+                      <span className="tpl-name">{t.name}</span>
+                      <span className="tpl-blurb">{t.blurb}</span>
+                      <span className="tpl-count mono">{t.factors.length} layers</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
             </>
           )}
 
@@ -355,12 +456,9 @@ export default function Sidebar() {
             <>
               <div className="side-head"><h2 className="side-title">Analysis</h2></div>
               <p className="side-note">
-                Start from a worked question, or compare two dates on the
-                timeline.
+                Compare two dates on the timeline, or start from a worked
+                example in Templates.
               </p>
-              <button className="btn btn-secondary" onClick={() => setTemplatesOpen(true)}>
-                Start from a question…
-              </button>
               <button
                 className="btn btn-secondary"
                 disabled={!data || timeIndex < 12}

@@ -22,6 +22,7 @@ export default function Toolbar() {
   const selected = useStore((s) => s.selected)
   const timeIndex = useStore((s) => s.timeIndex)
   const compareIndex = useStore((s) => s.compareIndex)
+  const markers = useStore((s) => s.markers)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
@@ -93,8 +94,8 @@ export default function Toolbar() {
               Excel workbook
             </button>
             <button disabled={!aoi}
-                    onClick={() => { if (aoi) exportGeoJson(aoi, cols, data.area_ha); setMenuOpen(false) }}>
-              GeoJSON — shape plus data
+                    onClick={() => { if (aoi) exportGeoJson(aoi, cols, data.area_ha, markers); setMenuOpen(false) }}>
+              GeoJSON — shape, data and markers
             </button>
             <button onClick={() => { printReport(cols, data.area_ha, data.centroid); setMenuOpen(false) }}>
               Printable report / PDF

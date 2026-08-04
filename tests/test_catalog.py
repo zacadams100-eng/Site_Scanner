@@ -156,13 +156,45 @@ def test_ndvi_peaks_in_summer():
 
 
 def test_values_stay_inside_the_declared_range():
+    """Every factor, not a sample of four.
+
+    lo/hi drive the colour ramp and the axis, so a generator that overshoots
+    paints a cell off the end of the ramp and draws a chart nobody can read.
+    With 260-odd factors this is the only way to know the whole catalogue is
+    renderable."""
     steps = series_mod.month_steps("2011-01", "2025-12")
-    for fid in ("ndvi", "precip_total", "lst_day", "avg_sale_price"):
-        f = catalog.FACTOR_BY_ID[fid]
-        s = series_mod.generate_series(fid, (-0.57, 51.24), 150.0, steps)
+    for f in catalog.FACTORS:
+        s = series_mod.generate_series(f["id"], (-0.57, 51.24), 150.0, steps)
         for p in s["points"]:
-            if p["value"] is not None:
-                assert f["lo"] <= p["value"] <= f["hi"], (fid, p)
+            v = p["value"]
+            if v is None or isinstance(v, str):
+                continue
+            assert f["lo"] <= v <= f["hi"], (f["id"], v, f["lo"], f["hi"])
+
+
+def test_every_group_has_a_generator_character():
+    """A group the generator has never heard of falls back to the middle of
+    its range and sits there, which reads as broken data rather than as a
+    site. Every group must be tied to some site characteristic."""
+    import series as sm
+    site = {"urbanity": 0.9, "northness": 0.2, "wetness": 0.3,
+            "elevation": 0.4, "affluence": 0.8}
+    rural = {"urbanity": 0.05, "northness": 0.8, "wetness": 0.7,
+             "elevation": 0.6, "affluence": 0.2}
+    for group in catalog.GROUPS:
+        a = sm._coherent_position("x", group, site)
+        b = sm._coherent_position("x", group, rural)
+        assert a != b, f"{group} does not respond to the site at all"
+
+
+def test_the_catalogue_serves_more_than_one_profession():
+    """The point of the second half: a developer, an insurer, a grid engineer
+    and a farm agent should each find their own screen in here."""
+    groups = set(catalog.GROUPS)
+    for expected in ("Planning & consents", "Property market", "Ground risk",
+                     "Infrastructure", "Agriculture", "Energy"):
+        assert expected in groups
+    assert catalog.catalogue_summary()["factor_count"] > 240
 
 
 def test_unknown_factor_raises():
@@ -557,3 +589,29 @@ def test_commercial_flags_are_triaged_not_assumed():
     derived product. It must stay flagged until someone confirms it."""
     assert catalog.COMMERCIAL_USE["sentinel2_sr"] == "verify"
     assert set(catalog.COMMERCIAL_USE.values()) <= {"yes", "verify"}
+
+
+# ---------------------------------------------------------------------------
+# The bundled basemap — a build artefact, so it can rot silently
+# ---------------------------------------------------------------------------
+def test_the_bundled_basemap_is_present_and_complete():
+    """The map's only cartography used to be a third-party raster, and when it
+    failed the canvas was an empty rectangle. This file is the fix, so its
+    absence should break a test rather than a user's first impression."""
+    import json
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parent.parent / "web" / "public" / "basemap" / "england.json"
+    assert path.exists(), "run scripts/build_basemap.py"
+
+    data = json.loads(path.read_text())
+    for layer in ("land", "urban", "lakes", "rivers", "roads", "rail", "places"):
+        assert data[layer]["features"], f"{layer} is empty"
+
+    # It ships to every visitor, so its size is a product decision.
+    assert path.stat().st_size < 1_200_000, "basemap has grown past its budget"
+
+    # England has to be in it, and the labels have to be named.
+    names = {f["properties"]["name"] for f in data["places"]["features"]}
+    assert {"London", "Manchester", "Bristol"} <= names
+    assert data["attribution"]

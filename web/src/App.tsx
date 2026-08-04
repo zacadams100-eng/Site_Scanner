@@ -11,7 +11,6 @@ import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
 import Toolbar from './components/Toolbar'
-import Templates from './components/Templates'
 import Compare from './components/Compare'
 import BrandMark from './components/BrandMark'
 import { formatArea } from './lib/format'
@@ -31,6 +30,10 @@ const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: R
   {
     id: 'freehand', label: 'Freehand', hint: 'Drag to trace any shape',
     icon: <path d="M5 15.5c1-6 4.5-8.5 7-6.5s-1.5 6 1 7 4.5-2.5 6-6" />,
+  },
+  {
+    id: 'point', label: 'Marker', hint: 'Click the map to mark a location',
+    icon: <><path d="M12 21.5s7-6.1 7-11.5a7 7 0 1 0-14 0c0 5.4 7 11.5 7 11.5Z" /><circle cx="12" cy="10" r="2.5" /></>,
   },
 ]
 
@@ -252,6 +255,11 @@ export default function App() {
             <div className="placeholder">
               <p>Draw a rectangle, circle or freehand shape on the map.</p>
               <p className="placeholder-sub">
+                Or open <strong>Templates</strong> in the sidebar for a worked
+                starting point — development appraisal, flood exposure, grid
+                connection, farm appraisal and twenty more.
+              </p>
+              <p className="placeholder-sub">
                 The attribute table and charts generate themselves — no extra steps.
               </p>
               {catalog && (
@@ -301,7 +309,6 @@ export default function App() {
       )}
 
       <StatusBar />
-      <Templates />
     </div>
   )
 }
