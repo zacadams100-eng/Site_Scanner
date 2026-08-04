@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import {
   exportAnnualCsv, exportCompareCsv, exportGeoJson, exportMonthlyCsv,
@@ -43,11 +43,31 @@ export default function Toolbar() {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sitesFileRef = useRef<HTMLInputElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
 
   const cols = useMemo(
     () => selected.map((id) => data?.series[id]).filter((s): s is Series => !!s),
     [selected, data],
   )
+
+  // A menu that only closes by clicking its own button again is a menu that
+  // stays open over the table. Outside click and Escape both dismiss, which is
+  // what every other menu on the machine does.
+  useEffect(() => {
+    if (menu === 'none' && !naming) return
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) { setMenu('none'); setNaming(false) }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMenu('none'); setNaming(false); setRenamingId(null) }
+    }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu, naming])
 
   const say = (msg: string) => {
     setFlash(msg)
@@ -99,7 +119,7 @@ export default function Toolbar() {
   }
 
   return (
-    <div className="toolbar">
+    <div className="toolbar" ref={wrapRef}>
       <button className="tb" onClick={() => setTemplatesOpen(true)}
               title="Start from a worked example">Templates</button>
 

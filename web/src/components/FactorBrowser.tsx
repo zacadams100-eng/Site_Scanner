@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { groupFactors, useStore } from '../store'
 
 /**
@@ -22,6 +22,27 @@ export default function FactorBrowser() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const realCount = catalog?.summary.real_factor_count ?? 0
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Escape and an outside click both close it. The browser covers a third of
+  // the map, and hunting for the button that opened it to get rid of it is a
+  // small tax paid every single time.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!panelRef.current?.contains(t) && !(t as HTMLElement).closest?.('.browser-toggle')) {
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onDown)
+    }
+  }, [open, setOpen])
 
   const grouped = useMemo(() => {
     if (!catalog) return {}
@@ -58,7 +79,7 @@ export default function FactorBrowser() {
       </button>
 
       {open && (
-        <div className="factor-browser">
+        <div className="factor-browser" ref={panelRef}>
           <div className="browser-head">
             <input
               autoFocus
