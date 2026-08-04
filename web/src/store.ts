@@ -89,7 +89,7 @@ interface State {
   goTo: (lng: number, lat: number, zoom?: number) => void
 
   setCatalog: (c: Catalog) => void
-  setCatalogError: (e: string) => void
+  setCatalogError: (e: string | null) => void
   setMock: (m: boolean) => void
   setDrawMode: (m: DrawMode) => void
   setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean }) => void

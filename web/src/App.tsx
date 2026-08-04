@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { useStore } from './store'
 import { fetchCatalog } from './api'
 import MapCanvas from './components/MapCanvas'
@@ -46,13 +46,17 @@ export default function App() {
   const error = useStore((s) => s.error)
   const tab = useStore((s) => s.activeTab)
   const setTab = useStore((s) => s.setTab)
+  const refresh = useStore((s) => s.refresh)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const setAoiFromDrop = useStore((s) => s.setAoi)
 
-  useEffect(() => {
+  // Named rather than inline, so the error notice can offer the same attempt
+  // again instead of making the user reload the page.
+  const loadCatalog = useCallback(() => {
+    setCatalogError(null)
     fetch('/api/catalog')
       .then(async (r) => {
         if (!r.ok) throw new Error(`Catalogue unavailable (${r.status})`)
@@ -68,6 +72,8 @@ export default function App() {
           .catch((e) => setCatalogError(e?.message ?? 'Could not reach the API'))
       })
   }, [setCatalog, setCatalogError, setMock])
+
+  useEffect(() => { loadCatalog() }, [loadCatalog])
 
   // Undo/redo, and drag-and-drop of a boundary file anywhere on the map.
   useEffect(() => {
@@ -223,6 +229,10 @@ export default function App() {
               <p className="notice-fix">
                 Start it with <code>uvicorn mock_ee_backend:app --port 8000</code>
               </p>
+              {/* A backend that was not running yet is the usual cause, and it
+                  is usually running a few seconds later. Reloading the whole
+                  page to find out is a needless reset. */}
+              <button className="tb notice-retry" onClick={loadCatalog}>Try again</button>
             </div>
           )}
 
@@ -245,6 +255,14 @@ export default function App() {
             <div className="notice notice-error">
               <strong>That didn't work.</strong>
               <p>{error}</p>
+              {/* The drawn shape survives a failed query, so the fix for a
+                  timeout or a dropped connection is to ask again — not to
+                  redraw the area, which was the only route out before. */}
+              {aoi && (
+                <button className="tb notice-retry" onClick={() => void refresh()}>
+                  Try again
+                </button>
+              )}
             </div>
           )}
 

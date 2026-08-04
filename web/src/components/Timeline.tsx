@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { compact, labelStep, seriesColor } from '../lib/format'
 
@@ -28,6 +28,22 @@ export default function Timeline() {
 
   const steps = catalog?.time.steps ?? []
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [editingDate, setEditingDate] = useState(false)
+
+  /**
+   * Move the head to a typed or picked month.
+   *
+   * A month outside the covered range clamps to the nearest end rather than
+   * being ignored: someone asking for 2003 is telling us they want the start,
+   * and silently doing nothing reads as a broken field.
+   */
+  const jumpTo = (value: string) => {
+    if (!/^\d{4}-\d{2}$/.test(value) || !steps.length) return
+    const exact = steps.indexOf(value)
+    if (exact >= 0) { setTimeIndex(exact); return }
+    if (value < steps[0]) setTimeIndex(0)
+    else if (value > steps[steps.length - 1]) setTimeIndex(steps.length - 1)
+  }
 
   // Playback. requestAnimationFrame with an accumulator rather than
   // setInterval — a fixed timer makes 180 steps feel like a slideshow, and
@@ -197,7 +213,33 @@ export default function Timeline() {
       </button>
 
       <div className="time-readout">
-        <div className="time-step">{labelStep(step ?? '')}</div>
+        {/* Reaching one month out of 180 by dragging a 900px track means each
+            step is five pixels wide. Clicking the date turns it into a real
+            date field: pick or type a month and the head goes there. Falls
+            back to a text box in browsers with no month picker, where
+            "2019-07" still works. */}
+        {editingDate ? (
+          <input
+            type="month"
+            autoFocus
+            className="time-step-input"
+            min={steps[0]}
+            max={steps[steps.length - 1]}
+            defaultValue={step}
+            aria-label="Jump to a month"
+            onChange={(e) => jumpTo(e.target.value)}
+            onBlur={() => setEditingDate(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { jumpTo((e.target as HTMLInputElement).value); setEditingDate(false) }
+              if (e.key === 'Escape') setEditingDate(false)
+            }}
+          />
+        ) : (
+          <button className="time-step" onClick={() => setEditingDate(true)}
+                  title="Jump to a month">
+            {labelStep(step ?? '')}
+          </button>
+        )}
         {readout && (
           <div className={`time-value${readout.gap ? ' is-gap' : ''}`}>
             {readout.gap ? 'No data' : readout.text}
