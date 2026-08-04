@@ -722,6 +722,28 @@ REAL_SERIES: Dict[str, Callable[[dict, List[str], float], List[Dict[str, Any]]]]
 }
 
 
-def install(registry: Dict[str, Any]) -> None:
+# How far each Earth Engine factor has been proven. NDVI was checked by hand
+# against live Earth Engine — twice, once catching a false success. The rest
+# are correct-by-construction and covered in CI against a stubbed client, which
+# is not the same thing and is not reported as if it were.
+_VERIFIED_EE = {"ndvi"}
+
+
+def _ee_provenance(factor_id: str) -> Dict[str, str]:
+    import catalog
+    base = catalog.FACTOR_BY_ID.get(factor_id, {}).get("base", "")
+    return {
+        "source": catalog.ATTRIBUTION.get(base, "Google Earth Engine"),
+        "status": "verified" if factor_id in _VERIFIED_EE else "written",
+        "note": "" if factor_id in _VERIFIED_EE else
+                "reduction verified in CI against a stubbed client, not against "
+                "live Earth Engine",
+    }
+
+
+def install(registry: Dict[str, Any], provenance: Optional[Dict[str, Any]] = None) -> None:
     """Register the real implementations into routes_catalog's hook."""
     registry.update(REAL_SERIES)
+    if provenance is not None:
+        for factor_id in REAL_SERIES:
+            provenance[factor_id] = _ee_provenance(factor_id)

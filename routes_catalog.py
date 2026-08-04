@@ -60,21 +60,41 @@ def get_catalog() -> Dict[str, Any]:
     """Everything the UI needs to render the factor browser, with provenance
     attached. The frontend never hard-codes a factor list.
 
-    Each factor carries `real`: true where it returns actual satellite
-    observations, false where the generator stands in. Two thirds of the
-    catalogue is demo data, and a user picking factors should be able to see
-    which is which *before* spending a query on one — not afterwards, from a
-    badge on the result.
+    Each factor carries `real`: true where it returns actual observations,
+    false where the generator stands in. Most of the catalogue is still demo
+    data, and a user picking factors should be able to see which is which
+    *before* spending a query on one — not afterwards, from a badge on the
+    result.
+
+    Real factors additionally carry `provenance`: which service answers them
+    and how far that has been proven — `verified` (run against the live
+    service and checked) or `written` (implemented against the documented API
+    and covered by fixture tests, not yet run live). "We wrote it" must never
+    reach a user as "we ran it".
     """
     real_ids = [f["id"] for f in catalog.FACTORS if f["id"] in REAL_SERIES]
-    factors = [{**f, "real": f["id"] in REAL_SERIES} for f in catalog.FACTORS]
+    factors = [
+        {**f, "real": f["id"] in REAL_SERIES,
+         **({"provenance": REAL_SOURCES[f["id"]]} if f["id"] in REAL_SOURCES else {})}
+        for f in catalog.FACTORS
+    ]
+    verified = [fid for fid in real_ids
+                if REAL_SOURCES.get(fid, {}).get("status") == "verified"]
+    total = len(catalog.FACTORS) or 1
     return {
         "factors": factors,
         "real_factor_ids": real_ids,
+        "verified_factor_ids": verified,
         "bases": catalog.BASES,
         "groups": catalog.GROUPS,
         "class_values": catalog.CLASS_VALUES,
-        "summary": {**catalog.catalogue_summary(), "real_factor_count": len(real_ids)},
+        "summary": {
+            **catalog.catalogue_summary(),
+            "real_factor_count": len(real_ids),
+            "verified_factor_count": len(verified),
+            "generated_factor_count": len(catalog.FACTORS) - len(real_ids),
+            "real_share": round(len(real_ids) / total, 4),
+        },
         "coverage": {"name": "England", "bbox": _BBOX},
         "time": {
             "start": catalog.TIME_START,
@@ -117,6 +137,17 @@ def _validate_geometry(geometry: dict) -> tuple:
 # to the generator. Both are labelled in the response, so a half-real
 # catalogue is honest rather than confusing.
 REAL_SERIES: Dict[str, Any] = {}
+
+# Provenance for the entries above, keyed the same way:
+#
+#   {"source": "data.police.uk", "status": "written", "note": "..."}
+#
+# `status` is either "verified" — someone ran it against the live service and
+# checked the answer — or "written", meaning implemented against the documented
+# API and covered by fixture tests but never yet run for real. Installers fill
+# this in; a real factor with no entry is reported as real with unknown
+# provenance rather than silently promoted.
+REAL_SOURCES: Dict[str, Dict[str, str]] = {}
 
 
 @router.get("/api/cache/series")

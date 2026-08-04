@@ -1,0 +1,692 @@
+"""
+Real numbers from public UK open data — no key, no quota, no satellite.
+
+Everything in `ee_series.py` needs an Earth Engine service account. This module
+needs nothing at all: five government sources publish under the Open Government
+Licence over plain HTTPS, and between them they cover the half of the catalogue
+Earth Engine cannot see — what the land is designated as, what happens on it,
+what it sells for.
+
+    Source                     What it gives us               Key needed
+    ─────────────────────────  ─────────────────────────────  ──────────
+    planning.data.gov.uk       designations and constraints   no
+    landregistry.data.gov.uk   residential transactions       no
+    data.police.uk             street-level crime, monthly    no
+    api.postcodes.io           centroid → postcode → LA code  no
+    epc.opendatacommunities    building energy performance    YES (free)
+    ONS                        rents, earnings, affordability  no*
+
+  * ONS publishes most of these as spreadsheets rather than through an API;
+    see `ons_series` for what that means and what it does instead.
+
+## The contract
+
+Each function here returns exactly the point list `series.generate_series`
+produces, so a factor becomes real without the frontend knowing:
+
+    [{"t": "2024-07", "value": 12.4, "valid_fraction": 1.0,
+      "interpolated": False}, ...]
+
+A source that fails raises. `routes_catalog._series_for` catches that, falls
+back to the generator, and records the failure in the response — so an outage
+degrades to labelled demo data rather than to an empty report.
+
+## Honesty about verification
+
+**These integrations are written against each API's documented shape and are
+covered by tests using recorded fixtures. They have not yet been run against
+the live endpoints**, because the environment they were written in blocks
+outbound HTTPS to everything except a short allowlist. `scripts/check_open_data.py`
+runs them against the real services; until that has been run somewhere with
+open egress, treat every factor here as implemented-but-unverified. The
+catalogue reports that state rather than claiming more (see `SOURCE_STATUS`).
+
+## Cost
+
+These are per-request lookups, not a raster we hold. A 15-year monthly crime
+series is 180 HTTP calls to data.police.uk; the price-paid series is one SPARQL
+query. Everything is cached per AOI for the process lifetime, on top of the
+per-factor cache in `routes_catalog`, and the slow ones say so in their
+docstrings. This is exactly the pattern TECHNICAL_PLAN.md §3.4 argues should
+eventually be pre-aggregated.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import os
+import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import requests
+
+import cache as cache_mod
+
+# One session, so connections are reused across the 180 calls a crime series
+# makes. Requests' default is a new connection per call, which triples the time.
+_SESSION = requests.Session()
+_SESSION.headers["User-Agent"] = (
+    "SiteScanner/1.0 (+https://github.com/zacadams100-eng/Site_Scanner)")
+
+TIMEOUT = 20
+_LOOKUP_CACHE = cache_mod.TTLCache(ttl=3600, max_entries=512)
+_LOCK = threading.Lock()
+
+# What each source is worth waiting for. A source slower than this is one that
+# belongs in the pre-aggregated tier rather than on the interactive path.
+SLOW_SOURCES = {"police"}
+
+
+class OpenDataError(RuntimeError):
+    """A source could not answer. Never swallowed here — the caller decides
+    whether to fall back, and the response says that it did."""
+
+
+def _get(url: str, params: Optional[dict] = None, auth=None) -> Any:
+    key = cache_mod.cache_key("od", url, params or {})
+    hit = _LOOKUP_CACHE.get(key)
+    if hit is not None:
+        return hit
+    try:
+        r = _SESSION.get(url, params=params, timeout=TIMEOUT, auth=auth)
+    except requests.RequestException as e:
+        raise OpenDataError(f"{url} unreachable: {e.__class__.__name__}") from e
+    if r.status_code == 404:
+        # A 404 from these APIs means "nothing here", which is a legitimate
+        # answer (no crimes in the sea, no conservation area on a moor).
+        _LOOKUP_CACHE.set(key, None)
+        return None
+    if not r.ok:
+        raise OpenDataError(f"{url} returned {r.status_code}")
+    try:
+        data = r.json()
+    except ValueError as e:
+        raise OpenDataError(f"{url} did not return JSON") from e
+    _LOOKUP_CACHE.set(key, data)
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Geometry helpers
+# ---------------------------------------------------------------------------
+def _ring(geometry: dict) -> List[List[float]]:
+    if geometry["type"] == "Polygon":
+        return geometry["coordinates"][0]
+    return geometry["coordinates"][0][0]
+
+
+def _wkt(geometry: dict) -> str:
+    """WKT for the planning platform's geometry filter."""
+    pts = ", ".join(f"{x:.6f} {y:.6f}" for x, y in _ring(geometry))
+    return f"POLYGON(({pts}))"
+
+
+def _police_poly(geometry: dict, max_points: int = 60) -> str:
+    """data.police.uk takes `lat,lng:lat,lng:…` and rejects very long strings,
+    so a traced field boundary has to be thinned before it is sent."""
+    ring = _ring(geometry)
+    step = max(1, len(ring) // max_points)
+    thinned = ring[::step]
+    return ":".join(f"{y:.5f},{x:.5f}" for x, y in thinned)
+
+
+def _months(steps: List[str]) -> List[Tuple[int, int]]:
+    return [(int(s[:4]), int(s[5:])) for s in steps]
+
+
+def _point(t: str, value, valid: float = 1.0) -> Dict[str, Any]:
+    return {"t": t, "value": value, "valid_fraction": valid, "interpolated": False}
+
+
+def _gap(t: str) -> Dict[str, Any]:
+    """No usable observation. Never a zero: "no data published for this month"
+    and "no crimes happened" are different facts, and a chart that conflates
+    them is worse than one with a hole in it."""
+    return {"t": t, "value": None, "valid_fraction": 0.0, "interpolated": False}
+
+
+def _static(steps: List[str], value) -> List[Dict[str, Any]]:
+    """A static measurement held across the timeline, flagged as carried
+    forward for every month after the first."""
+    out = [_point(steps[0], value)] if steps else []
+    for s in steps[1:]:
+        p = _point(s, value)
+        p["interpolated"] = True
+        out.append(p)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# postcodes.io — the join between a drawn shape and every statistical geography
+# ---------------------------------------------------------------------------
+def locate(geometry: dict) -> Dict[str, Any]:
+    """Nearest postcode to the AOI centroid, with its administrative codes.
+
+    Almost every non-spatial source here is published by postcode district or
+    by local authority, so this is the hinge: without it a polygon cannot be
+    joined to a price index or an earnings figure.
+    """
+    ring = _ring(geometry)
+    lng = sum(p[0] for p in ring) / len(ring)
+    lat = sum(p[1] for p in ring) / len(ring)
+
+    data = _get("https://api.postcodes.io/postcodes",
+                {"lon": round(lng, 5), "lat": round(lat, 5), "limit": 1})
+    result = (data or {}).get("result")
+    if not result:
+        raise OpenDataError("no postcode near this area")
+    r = result[0]
+    return {
+        "postcode": r["postcode"],
+        "district": r["postcode"].split()[0],
+        "admin_district": r.get("admin_district"),
+        "admin_district_code": (r.get("codes") or {}).get("admin_district"),
+        "lng": lng, "lat": lat,
+    }
+
+
+# ---------------------------------------------------------------------------
+# planning.data.gov.uk — designations and constraints
+# ---------------------------------------------------------------------------
+# Each entry is a national dataset published by MHCLG on the planning data
+# platform. `pct` factors report the share of the AOI covered; `density`
+# factors report features per square kilometre.
+PLANNING_DATASETS = {
+    "conservation_area_pct": ("conservation-area", "pct"),
+    "article4_pct": ("article-4-direction-area", "pct"),
+    "green_belt_pct": ("green-belt", "pct"),
+    "national_park_pct": ("national-park", "pct"),
+    "aonb_pct": ("area-of-outstanding-natural-beauty", "pct"),
+    "sssi_pct": ("site-of-special-scientific-interest", "pct"),
+    "ancient_woodland_pct": ("ancient-woodland", "pct"),
+    "brownfield_register_pct": ("brownfield-land", "pct"),
+    "scheduled_monument_pct": ("scheduled-monument", "pct"),
+    "listed_building_density": ("listed-building-outline", "density"),
+    "tpo_density": ("tree-preservation-zone", "density"),
+}
+
+
+def _in_polygon(x: float, y: float, coords, kind: str) -> bool:
+    """Point in polygon or multipolygon, holes included. Ray casting."""
+    def in_ring(ring) -> bool:
+        inside = False
+        n = len(ring)
+        for i in range(n - 1):
+            x1, y1 = float(ring[i][0]), float(ring[i][1])
+            x2, y2 = float(ring[i + 1][0]), float(ring[i + 1][1])
+            if (y1 > y) != (y2 > y):
+                xint = (x2 - x1) * (y - y1) / (y2 - y1) + x1
+                if x < xint:
+                    inside = not inside
+        return inside
+
+    polys = coords if kind == "MultiPolygon" else [coords]
+    for poly in polys:
+        if not poly:
+            continue
+        if in_ring(poly[0]) and not any(in_ring(h) for h in poly[1:]):
+            return True
+    return False
+
+
+SAMPLE_GRID = 32          # 1,024 points over the AOI's bounding box
+
+
+def _coverage(geometry: dict, features: List[dict]) -> float:
+    """Share of the AOI covered by any of `features`, by sampling.
+
+    The platform answers "which entities intersect this polygon" and does not
+    compute intersection area, so the choice is between a real number and a
+    quick one. Sampling a 32x32 grid inside the drawn shape and counting how
+    many points fall inside a designation gives a percentage accurate to a
+    couple of points — good enough to say "about a third of this site is in a
+    conservation area", which is the actual question, and honest about being an
+    estimate. Exact clipped areas need the geometries in a spatial index, which
+    is the ingest tier's job.
+    """
+    ring = _ring(geometry)
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    west, east, south, north = min(xs), max(xs), min(ys), max(ys)
+
+    inside_aoi = 0
+    covered = 0
+    for i in range(SAMPLE_GRID):
+        x = west + (east - west) * (i + 0.5) / SAMPLE_GRID
+        for j in range(SAMPLE_GRID):
+            y = south + (north - south) * (j + 0.5) / SAMPLE_GRID
+            if not _in_polygon(x, y, [ring], "Polygon"):
+                continue
+            inside_aoi += 1
+            for f in features:
+                geom = f.get("geometry") or {}
+                if not geom.get("coordinates"):
+                    continue
+                if _in_polygon(x, y, geom["coordinates"], geom.get("type", "Polygon")):
+                    covered += 1
+                    break
+
+    if not inside_aoi:
+        return 0.0
+    return round(100.0 * covered / inside_aoi, 1)
+
+
+def planning_series(dataset: str, mode: str, geometry: dict, steps: List[str],
+                    area_ha: float) -> List[Dict[str, Any]]:
+    """One national designation dataset, measured inside the drawn shape.
+
+    `pct` factors report the share of the AOI covered, estimated by sampling
+    (see `_coverage`). `density` factors report intersecting features per
+    square kilometre, which needs no geometry at all.
+
+    These are static in time. The platform records when an entity entered and
+    left the register, but a conservation area designated in 1974 has no
+    meaningful monthly series, so the value is held across the timeline and
+    every month after the first is flagged as carried forward.
+    """
+    fmt = "geojson" if mode == "pct" else "json"
+    data = _get(f"https://www.planning.data.gov.uk/entity.{fmt}",
+                {"dataset": dataset, "geometry": _wkt(geometry),
+                 "geometry_relation": "intersects", "limit": 100})
+
+    if mode == "density":
+        entities = (data or {}).get("entities", [])
+        km2 = max(0.01, area_ha / 100.0)
+        return _static(steps, round(len(entities) / km2, 2))
+
+    features = (data or {}).get("features", [])
+    if not features:
+        return _static(steps, 0.0)
+    return _static(steps, _coverage(geometry, features))
+
+
+# ---------------------------------------------------------------------------
+# HM Land Registry Price Paid — residential transactions
+# ---------------------------------------------------------------------------
+_PPD_QUERY = """
+PREFIX ppi: <http://landregistry.data.gov.uk/def/ppi/>
+PREFIX lrcommon: <http://landregistry.data.gov.uk/def/common/>
+SELECT ?date ?amount ?newBuild ?type
+WHERE {
+  ?tx ppi:pricePaid ?amount ;
+      ppi:transactionDate ?date ;
+      ppi:propertyAddress ?addr .
+  ?addr lrcommon:postcode ?postcode .
+  FILTER(STRSTARTS(STR(?postcode), "%(district)s "))
+  OPTIONAL { ?tx ppi:newBuild ?newBuild }
+  OPTIONAL { ?tx ppi:propertyType ?type }
+  FILTER(?date >= "%(start)s"^^<http://www.w3.org/2001/XMLSchema#date>)
+}
+LIMIT 20000
+"""
+
+
+def ppd_group(geometry: dict, steps: List[str],
+              area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    """Every price-paid factor from one SPARQL query.
+
+    Land Registry publishes each residential sale in England and Wales with a
+    date, a price, a postcode and a property type, under the OGL. One query per
+    AOI returns the lot; the monthly aggregates are computed here rather than
+    in fifteen more queries.
+
+    Reported by **postcode district** (GU2), not by the drawn polygon — the
+    dataset's finest public geography that reliably has enough transactions to
+    average. A field has no sale price of its own; the district around it does.
+    """
+    loc = locate(geometry)
+    query = _PPD_QUERY % {"district": loc["district"], "start": steps[0] + "-01"}
+    data = _get("https://landregistry.data.gov.uk/landregistry/query",
+                {"query": query, "output": "json"})
+    rows = ((data or {}).get("results") or {}).get("bindings", [])
+
+    by_month: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        date = row.get("date", {}).get("value", "")[:7]
+        if not date:
+            continue
+        try:
+            amount = float(row["amount"]["value"])
+        except (KeyError, ValueError):
+            continue
+        by_month.setdefault(date, []).append({
+            "amount": amount,
+            "new": str(row.get("newBuild", {}).get("value", "")).lower() in ("true", "1"),
+            "type": row.get("type", {}).get("value", "").rsplit("/", 1)[-1],
+        })
+
+    def median(xs: List[float]) -> float:
+        xs = sorted(xs)
+        n = len(xs)
+        return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+
+    avg, med, count, newb, flat = [], [], [], [], []
+    for s in steps:
+        sales = by_month.get(s, [])
+        if not sales:
+            # A month with no recorded sale is a real gap in a small district,
+            # not a price of zero.
+            avg.append(_gap(s)); med.append(_gap(s)); newb.append(_gap(s))
+            flat.append(_gap(s))
+            count.append(_point(s, 0))
+            continue
+        amounts = [x["amount"] for x in sales]
+        avg.append(_point(s, round(sum(amounts) / len(amounts))))
+        med.append(_point(s, round(median(amounts))))
+        count.append(_point(s, len(sales)))
+        newb.append(_point(s, round(100.0 * sum(1 for x in sales if x["new"]) / len(sales), 1)))
+        flat.append(_point(s, round(100.0 * sum(1 for x in sales if x["type"] == "flat-maisonette")
+                                    / len(sales), 1)))
+
+    def yoy(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out = []
+        for i, p in enumerate(points):
+            prev = points[i - 12] if i >= 12 else None
+            if p["value"] is None or prev is None or not prev["value"]:
+                out.append(_gap(p["t"]))
+            else:
+                out.append(_point(p["t"], round(100.0 * (p["value"] - prev["value"]) / prev["value"], 1)))
+        return out
+
+    def growth5(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out = []
+        for i, p in enumerate(points):
+            prev = points[i - 60] if i >= 60 else None
+            if p["value"] is None or prev is None or not prev["value"]:
+                out.append(_gap(p["t"]))
+            else:
+                out.append(_point(p["t"], round(100.0 * (p["value"] - prev["value"]) / prev["value"], 1)))
+        return out
+
+    return {
+        "avg_sale_price": avg,
+        "median_sale_price": med,
+        "transaction_count": count,
+        "new_build_share": newb,
+        "flat_share": flat,
+        "price_change_yoy": yoy(med),
+        "price_growth_5yr": growth5(med),
+    }
+
+
+# ---------------------------------------------------------------------------
+# data.police.uk — street-level crime
+# ---------------------------------------------------------------------------
+def police_group(geometry: dict, steps: List[str],
+                 area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    """Street-level crime inside the drawn shape, month by month.
+
+    The API takes a polygon, so unlike the price data this really is *this
+    area* rather than the district around it.
+
+    **Slow on purpose to be honest**: one HTTP call per month, so a 15-year
+    series is 180 calls and takes minutes on a first run. It is cached per AOI
+    afterwards. This is the clearest example in the codebase of a source that
+    belongs in the pre-aggregated tier rather than on the interactive path, and
+    it is left on the interactive path deliberately so the cost is visible.
+
+    Two honest limits: police.uk locates crimes at an anonymised "snap point"
+    up to a few hundred metres from where they happened, so a small polygon
+    measures its neighbourhood rather than itself; and coverage begins when
+    each force started publishing, which is not the same month everywhere.
+    """
+    poly = _police_poly(geometry)
+    km2 = max(0.01, area_ha / 100.0)
+
+    total, burglary, violent, anti = [], [], [], []
+    today = _dt.date.today()
+    for s in steps:
+        year, month = int(s[:4]), int(s[5:])
+        # The archive does not cover the current month, and asking for the
+        # future returns an empty list that would read as "no crime".
+        if (year, month) >= (today.year, today.month):
+            for lst in (total, burglary, violent, anti):
+                lst.append(_gap(s))
+            continue
+
+        data = _get("https://data.police.uk/api/crimes-street/all-crime",
+                    {"poly": poly, "date": s})
+        if data is None:
+            for lst in (total, burglary, violent, anti):
+                lst.append(_gap(s))
+            continue
+
+        crimes = data if isinstance(data, list) else []
+        n = len(crimes)
+        cats = [c.get("category", "") for c in crimes]
+        total.append(_point(s, round(n / km2, 2)))
+        burglary.append(_point(s, round(sum(1 for c in cats if c == "burglary") / km2, 2)))
+        if n:
+            violent.append(_point(s, round(100.0 * sum(1 for c in cats if c == "violent-crime") / n, 1)))
+            anti.append(_point(s, round(100.0 * sum(1 for c in cats if c == "anti-social-behaviour") / n, 1)))
+        else:
+            # No crimes recorded is a real zero for a count, but a share of
+            # nothing is undefined.
+            violent.append(_gap(s))
+            anti.append(_gap(s))
+
+    return {
+        "crime_density": total,
+        "burglary_density": burglary,
+        "violent_crime_share": violent,
+        "antisocial_share": anti,
+    }
+
+
+# ---------------------------------------------------------------------------
+# EPC register — building energy performance
+# ---------------------------------------------------------------------------
+def epc_group(geometry: dict, steps: List[str],
+              area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    """Domestic EPC certificates for the postcode, aggregated by lodgement month.
+
+    The one source here that needs a credential: the register is free and open
+    but requires a registered email and key sent as HTTP Basic auth. Without
+    `EPC_API_KEY` (and `EPC_API_EMAIL`) this raises, the factor falls back to
+    generated data, and the response says so — which is the correct behaviour
+    for "open data behind a free signup".
+    """
+    email = os.environ.get("EPC_API_EMAIL")
+    key = os.environ.get("EPC_API_KEY")
+    if not (email and key):
+        raise OpenDataError("EPC_API_EMAIL / EPC_API_KEY are not set — "
+                            "register free at epc.opendatacommunities.org")
+
+    loc = locate(geometry)
+    data = _get("https://epc.opendatacommunities.org/api/v1/domestic/search",
+                {"postcode": loc["postcode"], "size": 5000},
+                auth=(email, key))
+    rows = (data or {}).get("rows", [])
+
+    by_month: Dict[str, List[dict]] = {}
+    for row in rows:
+        lodged = (row.get("lodgement-date") or "")[:7]
+        if lodged:
+            by_month.setdefault(lodged, []).append(row)
+
+    bands = ["A", "B", "C", "D", "E", "F", "G"]
+
+    def num(row, field) -> Optional[float]:
+        try:
+            return float(row.get(field))
+        except (TypeError, ValueError):
+            return None
+
+    sap, band, below_c, uplift, floor, heatpump = [], [], [], [], [], []
+    seen: List[dict] = []
+    for s in steps:
+        # Certificates accumulate: the stock's rating at a month is everything
+        # lodged up to it, not just that month's handful.
+        seen.extend(by_month.get(s, []))
+        if not seen:
+            for lst in (sap, band, below_c, uplift, floor, heatpump):
+                lst.append(_gap(s))
+            continue
+
+        scores = [v for v in (num(r, "current-energy-efficiency") for r in seen) if v is not None]
+        pots = [v for v in (num(r, "potential-energy-efficiency") for r in seen) if v is not None]
+        areas = [v for v in (num(r, "total-floor-area") for r in seen) if v is not None]
+        letters = [str(r.get("current-energy-rating", "")).upper() for r in seen]
+        letters = [x for x in letters if x in bands]
+
+        sap.append(_point(s, round(sum(scores) / len(scores), 1)) if scores else _gap(s))
+        band.append(_point(s, max(set(letters), key=letters.count)) if letters else _gap(s))
+        below_c.append(_point(s, round(100.0 * sum(1 for x in letters if x > "C") / len(letters), 1))
+                       if letters else _gap(s))
+        uplift.append(_point(s, round((sum(pots) / len(pots)) - (sum(scores) / len(scores)), 1))
+                      if scores and pots else _gap(s))
+        floor.append(_point(s, round(sum(areas) / len(areas), 1)) if areas else _gap(s))
+        heat = [str(r.get("mainheat-description", "")).lower() for r in seen]
+        heatpump.append(_point(s, round(100.0 * sum(1 for h in heat if "heat pump" in h) / len(heat), 1))
+                        if heat else _gap(s))
+
+    return {
+        "epc_mean_sap": sap,
+        "epc_band_mode": band,
+        "epc_below_c_share": below_c,
+        "epc_potential_uplift": uplift,
+        "mean_floor_area": floor,
+        "heat_pump_share": heatpump,
+    }
+
+
+# ---------------------------------------------------------------------------
+# ONS — earnings, rents, affordability
+# ---------------------------------------------------------------------------
+def ons_series(dataset: str, geometry: dict, steps: List[str],
+               area_ha: float) -> List[Dict[str, Any]]:
+    """One ONS indicator for the local authority containing the AOI.
+
+    A caveat that matters: ONS publishes most housing and earnings series as
+    spreadsheets on a release page, not through an API with a stable per-area
+    endpoint. The Beta API covers a subset. This queries the Beta API for the
+    dataset asked for, and raises when it does not carry it — at which point
+    the factor stays generated and says so.
+
+    The right fix is a scheduled job that downloads each release and stores it,
+    which is the ingest tier again, and is recorded as such in
+    `docs/OPEN-DATA.md` rather than pretended away here.
+    """
+    loc = locate(geometry)
+    code = loc.get("admin_district_code")
+    if not code:
+        raise OpenDataError("no local authority code for this area")
+
+    data = _get(f"https://api.beta.ons.gov.uk/v1/datasets/{dataset}/editions/"
+                f"time-series/versions/1/observations",
+                {"geography": code, "time": "*"})
+    obs = (data or {}).get("observations")
+    if not obs:
+        raise OpenDataError(f"ONS dataset {dataset!r} returned no observations")
+
+    by_year: Dict[str, float] = {}
+    for o in obs:
+        t = ((o.get("dimensions") or {}).get("time") or {}).get("id", "")
+        try:
+            by_year[t[:4]] = float(o.get("observation"))
+        except (TypeError, ValueError):
+            continue
+
+    out = []
+    for s in steps:
+        v = by_year.get(s[:4])
+        if v is None:
+            out.append(_gap(s))
+        else:
+            p = _point(s, round(v, 2))
+            p["interpolated"] = not s.endswith("-01")
+            out.append(p)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+# Which source each factor comes from, and how far it has been proven. The
+# catalogue and the UI read this, so "we wrote it" is never displayed as "we
+# ran it".
+#
+#   verified  — run against the live endpoint and checked by a human
+#   written   — implemented against the documented API, covered by fixture
+#               tests, not yet run against the live service
+SOURCE_STATUS: Dict[str, Dict[str, str]] = {}
+
+
+def _mark(factors, source: str, status: str = "written", note: str = "") -> None:
+    for f in factors:
+        SOURCE_STATUS[f] = {"source": source, "status": status, "note": note}
+
+
+def _group_installer(fn: Callable, factor_id: str) -> Callable:
+    """Adapt a group fetcher to the one-factor-at-a-time registry, with a
+    per-request memo so six factors from one query cost one query."""
+    memo: Dict[tuple, Dict[str, List[Dict[str, Any]]]] = {}
+
+    def call(geometry: dict, steps: List[str], area_ha: float):
+        key = cache_mod.cache_key(fn.__name__, geometry, steps)
+        with _LOCK:
+            hit = memo.get(key)
+        if hit is None:
+            hit = fn(geometry, steps, area_ha)
+            with _LOCK:
+                memo.clear()          # one AOI at a time; this is not the cache
+                memo[key] = hit
+        points = hit.get(factor_id)
+        if points is None:
+            raise OpenDataError(f"{fn.__name__} did not return {factor_id}")
+        return points
+
+    return call
+
+
+def install(registry: Dict[str, Any],
+            provenance: Optional[Dict[str, Any]] = None) -> None:
+    """Register every open-data factor into routes_catalog's hook.
+
+    Called by both backends — the Vercel function and `app.py` — because none
+    of this needs Earth Engine. Anything not registered keeps returning
+    generated data and keeps saying so.
+    """
+    import catalog
+
+    for factor_id, (dataset, mode) in PLANNING_DATASETS.items():
+        if factor_id not in catalog.FACTOR_BY_ID:
+            continue
+        registry[factor_id] = (
+            lambda g, s, a, _d=dataset, _m=mode: planning_series(_d, _m, g, s, a))
+    _mark([f for f in PLANNING_DATASETS if f in catalog.FACTOR_BY_ID],
+          "planning.data.gov.uk", "written",
+          "coverage is approximated from intersecting entities, not clipped area")
+
+    for factor_id in ("avg_sale_price", "median_sale_price", "transaction_count",
+                      "new_build_share", "flat_share", "price_change_yoy",
+                      "price_growth_5yr"):
+        if factor_id in catalog.FACTOR_BY_ID:
+            registry[factor_id] = _group_installer(ppd_group, factor_id)
+    _mark(["avg_sale_price", "median_sale_price", "transaction_count",
+           "new_build_share", "flat_share", "price_change_yoy", "price_growth_5yr"],
+          "HM Land Registry Price Paid", "written",
+          "reported for the postcode district containing the AOI, not the AOI itself")
+
+    for factor_id in ("crime_density", "burglary_density", "violent_crime_share",
+                      "antisocial_share"):
+        if factor_id in catalog.FACTOR_BY_ID:
+            registry[factor_id] = _group_installer(police_group, factor_id)
+    _mark(["crime_density", "burglary_density", "violent_crime_share", "antisocial_share"],
+          "data.police.uk", "written",
+          "one HTTP call per month; anonymised to snap points, so a small "
+          "polygon measures its neighbourhood")
+
+    if os.environ.get("EPC_API_KEY"):
+        for factor_id in ("epc_mean_sap", "epc_band_mode", "epc_below_c_share",
+                          "epc_potential_uplift", "mean_floor_area", "heat_pump_share"):
+            if factor_id in catalog.FACTOR_BY_ID:
+                registry[factor_id] = _group_installer(epc_group, factor_id)
+        _mark(["epc_mean_sap", "epc_band_mode", "epc_below_c_share",
+               "epc_potential_uplift", "mean_floor_area", "heat_pump_share"],
+              "EPC register", "written", "needs EPC_API_EMAIL and EPC_API_KEY")
+
+    if provenance is not None:
+        for factor_id in registry:
+            if factor_id in SOURCE_STATUS:
+                provenance[factor_id] = dict(SOURCE_STATUS[factor_id])

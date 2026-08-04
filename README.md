@@ -144,10 +144,14 @@ What it does today:
   connection, solar farm, farm appraisal, biodiversity net gain, multi-peril
   underwriting, logistics siting — each picking the layers that belong together
   in that screen.
-- **Filter** the factor list to the ones backed by real satellite
-  observations. `/api/catalog` marks each factor `real: true|false`, so the
-  demo two thirds of the catalogue is visible as such *before* you spend a
-  query on it rather than afterwards.
+- **Filter** the factor list to the ones backed by real observations —
+  satellite from Earth Engine, and 22 more from UK open data that need no
+  credentials at all (planning designations, sold prices, street-level crime;
+  see `docs/OPEN-DATA.md`). `/api/catalog` marks each factor `real: true|false`
+  and gives the real ones a `provenance` saying which service answers them and
+  whether that has been run against the live endpoint or only against recorded
+  fixtures. The demo majority of the catalogue is visible as such *before* you
+  spend a query on it rather than afterwards.
 - **Save** a site as a whole workspace — the shape, the chosen factors and the
   timeline position — then reopen, rename or overwrite it. The list can be
   backed up to a file and restored, because localStorage is one cleared

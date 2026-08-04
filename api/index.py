@@ -42,7 +42,7 @@ from mock_ee_backend import app as _app          # noqa: E402
 try:
     import open_data                              # noqa: E402
     import routes_catalog                         # noqa: E402
-    open_data.install(routes_catalog.REAL_SERIES)
+    open_data.install(routes_catalog.REAL_SERIES, routes_catalog.REAL_SOURCES)
 except ImportError:
     pass
 

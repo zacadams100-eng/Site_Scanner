@@ -55,6 +55,23 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
+### 22 more factors are real without any credentials
+
+`open_data.py` reads UK government open data over plain HTTPS: 11 planning
+designations from planning.data.gov.uk, 7 market factors from one Land
+Registry Price Paid SPARQL query, 4 from data.police.uk. No key, no quota, no
+Earth Engine — so they work in the credential-free backend and in the
+serverless deployment too. Six EPC factors register themselves as soon as
+`EPC_API_EMAIL` and `EPC_API_KEY` exist.
+
+That takes the catalogue to 46 real of 269 (17%). **None of the 22 have been
+run against the live endpoints** — this environment's proxy denies all five
+hosts — so they are marked `written`, not `verified`, and that distinction is
+carried through `/api/catalog` into the UI. `scripts/check_open_data.py`
+promotes them on any machine with open egress. Read `docs/OPEN-DATA.md` before
+quoting any of these numbers as real; it also records why ONS is written but
+deliberately not registered.
+
 ### The interface was rebranded
 
 It is now a light, quiet, instrument-like interface: paper ground, moss
