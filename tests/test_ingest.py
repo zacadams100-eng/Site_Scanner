@@ -5,6 +5,8 @@ credentials, no network. That is deliberate: the pipeline was built this way so
 that cloud day is spent pointing it at real data rather than writing it.
 """
 
+import pathlib
+
 import numpy as np
 import pytest
 
@@ -272,3 +274,133 @@ def test_a_synthetic_raster_covers_the_window_it_was_asked_for():
     west, north = transform * (0, 0)
     east, south = transform * (data.shape[1], data.shape[0])
     assert (west, south, east, north) == pytest.approx(window, abs=1e-6)
+
+
+# --------------------------------------------------------------------------
+# Quantisation
+#
+# Continuous rasters are stored as scaled int16, which is a 3-6x saving on
+# every byte this project keeps (docs/INGEST-BENCHMARK.md Result 5). The risk
+# it introduces is silent: a reader that forgets to unscale gets values
+# 10,000x too large and no error at all.
+# --------------------------------------------------------------------------
+def test_quantising_round_trips_within_the_declared_precision():
+    from ingest.cog import quantise
+
+    values = np.array([[-1.0, -0.2, 0.0], [0.31415, 0.9, 1.0]], dtype=np.float32)
+    raw = quantise(values, scale=0.0001)
+    assert raw.dtype == np.int16
+    back = raw.astype(np.float64) * 0.0001
+    np.testing.assert_allclose(back, values, atol=0.0001)
+
+
+def test_quantising_moves_nodata_onto_the_int16_sentinel():
+    """A float sentinel does not survive scaling: -9999 at a scale of 0.05
+    would need to be stored as -199,980, which int16 cannot hold."""
+    from ingest.cog import INT16_NODATA, quantise
+
+    values = np.array([[0.5, -9999.0], [-9999.0, 0.25]], dtype=np.float32)
+    raw = quantise(values, scale=0.0001, nodata=-9999.0)
+    assert raw[0, 1] == INT16_NODATA
+    assert raw[1, 0] == INT16_NODATA
+    assert raw[0, 0] == 5000
+
+
+def test_quantising_refuses_values_it_cannot_hold():
+    """Clipping would produce a plausible-looking raster that is wrong, and it
+    would be found years later by someone wondering why every hill is exactly
+    the same height."""
+    from ingest.cog import QuantisationError, quantise
+
+    values = np.array([[0.0, 5000.0]], dtype=np.float32)      # metres, say
+    with pytest.raises(QuantisationError) as exc:
+        quantise(values, scale=0.0001)
+    assert "can only store" in str(exc.value)
+
+
+def test_a_quantised_cog_reads_back_as_real_units(tmp_path):
+    """The whole contract in one test: what comes out of read_band is what
+    went into write_cog, in the same units, with holes as NaN."""
+    rasterio = pytest.importorskip("rasterio")
+    from ingest.cog import read_band, write_cog
+
+    data, transform = _raster(lo=-0.2, hi=0.9, nodata=-9999, nodata_fraction=0.2)
+    path = write_cog(tmp_path / "q.tif", data, transform, "EPSG:4326",
+                     nodata=-9999, scale=0.0001)
+
+    with rasterio.open(path) as src:
+        assert src.dtypes[0] == "int16", "continuous rasters must store as int16"
+        assert src.scales[0] == pytest.approx(0.0001)
+        out, nodata = read_band(src)
+
+    assert nodata is None, "a quantised raster reports its holes as NaN"
+    holes = data == -9999
+    assert np.isnan(out[holes]).all()
+    np.testing.assert_allclose(out[~holes], data[~holes], atol=0.0001)
+
+
+def test_reading_a_quantised_cog_raw_would_be_wrong_by_the_scale_factor(tmp_path):
+    """Guards the reason read_band exists. If this ever stops being true,
+    either quantisation was dropped or someone made src.read(1) unscale
+    itself — and the second would be worth knowing about."""
+    rasterio = pytest.importorskip("rasterio")
+    from ingest.cog import write_cog
+
+    data, transform = _raster(lo=0.1, hi=0.9)
+    path = write_cog(tmp_path / "q.tif", data, transform, "EPSG:4326", scale=0.0001)
+    with rasterio.open(path) as src:
+        assert src.read(1).max() > 100, "raw reads are in scaled units"
+
+
+def test_an_unscaled_cog_still_reads_back_unchanged(tmp_path):
+    """Categorical rasters and anything written before this change go through
+    the same reader and must be untouched by it."""
+    rasterio = pytest.importorskip("rasterio")
+    from ingest.cog import read_band, write_categorical_cog
+
+    data, transform = _raster(kind="categorical")
+    path = write_categorical_cog(tmp_path / "c.tif", data, transform, "EPSG:4326")
+    with rasterio.open(path) as src:
+        out, nodata = read_band(src)
+    np.testing.assert_array_equal(out, data)
+    assert nodata is None or nodata == src.nodata
+
+
+def test_aggregating_a_quantised_cog_gives_the_same_answer_as_the_array(tmp_path):
+    """The end-to-end check that matters: quantisation must not move the
+    numbers that reach the database."""
+    pytest.importorskip("rasterio")
+    from ingest.aggregate import aggregate_array, aggregate_cog
+    from ingest.cog import write_cog
+
+    data, transform = _raster(lo=-0.2, hi=0.9)
+    path = write_cog(tmp_path / "q.tif", data, transform, "EPSG:4326", scale=0.0001)
+
+    from_array = {s.h3: s.mean for s in aggregate_array(
+        data, transform, BOUNDS, dataset_id="d", t="2024-01", res=8)}
+    from_cog = {s.h3: s.mean for s in aggregate_cog(
+        str(path), dataset_id="d", t="2024-01", res=8)}
+
+    assert from_array and from_cog.keys() == from_array.keys()
+    for cell, mean in from_array.items():
+        assert from_cog[cell] == pytest.approx(mean, abs=0.0002)
+
+
+def test_every_continuous_manifest_quantises_and_can_hold_its_own_data():
+    """A manifest that forgets `storage` gets int16 at 1e-4 by default, which
+    is right for an index and wrong for elevation. This checks each shipped
+    manifest declares a scale that actually spans its unit."""
+    expected_span = {
+        "ndvi_s2": 1.0, "ndvi_s2_surrey": 1.0,     # indices, [-1, 1]
+        "lidar_dtm": 1000.0,                        # metres above sea level
+    }
+    for path in sorted(pathlib.Path("ingest/manifests").glob("*.yaml")):
+        m = Manifest.load(path)
+        if m.kind != "continuous":
+            continue
+        assert m.storage.dtype == "int16", f"{m.id} is not quantised"
+        lo, hi = m.storage.span()
+        need = expected_span[m.id]
+        assert lo <= -need and hi >= need, (
+            f"{m.id}: scale {m.storage.scale} spans [{lo:.2f}, {hi:.2f}], "
+            f"which cannot hold +/-{need} {m.unit}")

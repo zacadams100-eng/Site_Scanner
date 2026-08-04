@@ -171,8 +171,16 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
         # 1. COG to object storage (local dir stands in for it here).
         t1 = time.perf_counter()
         cog_path = out_dir / manifest.asset_key(step)
-        writer = write_categorical_cog if manifest.kind == "categorical" else write_cog
-        writer(cog_path, data, transform, "EPSG:4326", nodata=manifest.nodata)
+        if manifest.kind == "categorical":
+            # Class codes are already integers and must never be scaled — a
+            # scaled land-cover code is not a land-cover code.
+            write_categorical_cog(cog_path, data, transform, "EPSG:4326",
+                                  nodata=manifest.nodata)
+        else:
+            write_cog(cog_path, data, transform, "EPSG:4326",
+                      nodata=manifest.nodata,
+                      scale=manifest.storage.write_scale,
+                      offset=manifest.storage.offset)
         stage["cog"] += time.perf_counter() - t1
         cog_bytes += cog_path.stat().st_size
 

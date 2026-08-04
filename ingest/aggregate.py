@@ -203,11 +203,17 @@ def aggregate_cog(path: str, *, dataset_id: str, t: str, res: int,
     import rasterio
     from rasterio.warp import transform_bounds
 
+    from ingest.cog import read_band
+
     with rasterio.open(path) as src:
-        data = src.read(1)
+        # Through read_band, never src.read(1): continuous COGs are stored as
+        # scaled int16, and reading one raw gives values 10,000x too large
+        # with no error to notice. It returns nodata as None for a quantised
+        # raster because the holes come back as NaN.
+        data, nodata = read_band(src)
         bounds = transform_bounds(src.crs, "EPSG:4326", *src.bounds) \
             if src.crs and src.crs.to_epsg() != 4326 else tuple(src.bounds)
         yield from aggregate_array(
             data, src.transform, bounds,
-            dataset_id=dataset_id, t=t, res=res, kind=kind, nodata=src.nodata,
+            dataset_id=dataset_id, t=t, res=res, kind=kind, nodata=nodata,
         )
