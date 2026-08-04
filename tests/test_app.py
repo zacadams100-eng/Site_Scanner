@@ -201,7 +201,7 @@ def test_cache_info_endpoint(app_client, guildford_polygon):
     app_client.post("/api/stats", json={"year": 2024, "geometry": guildford_polygon})
 
     body = app_client.get("/api/cache").json()
-    assert set(body) == {"tiles", "stats"}
+    assert set(body) == {"tiles", "stats", "series"}
     assert set(body["stats"]) == {
         "enabled", "entries", "max_entries", "ttl_seconds", "hits", "misses",
     }

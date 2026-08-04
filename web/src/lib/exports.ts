@@ -1,3 +1,4 @@
+import type { SavedAoi, SitesFile } from '../store'
 import type { Factor, Series } from '../types'
 import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
 
@@ -228,6 +229,73 @@ ${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR
   w.document.close()
   w.focus()
   setTimeout(() => w.print(), 350)
+}
+
+/**
+ * Saved sites, out to a file and back.
+ *
+ * Saved sites live in localStorage, which the user can clear by accident, and
+ * which does not follow them to another machine or browser. A list of sites
+ * someone has curated over a term is worth more than any single report, so it
+ * has to be possible to get it out and put it back.
+ */
+export function sitesFile(sites: SavedAoi[]): SitesFile {
+  return {
+    format: 'site-scanner.sites',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    sites,
+  }
+}
+
+export function exportSites(sites: SavedAoi[]): void {
+  const stamp = new Date().toISOString().slice(0, 10)
+  download(
+    new Blob([JSON.stringify(sitesFile(sites), null, 2)], { type: 'application/json' }),
+    `site-scanner-sites-${stamp}.json`,
+  )
+}
+
+/** Parses an exported sites file, keeping only entries that are actually
+ *  usable. A half-readable file should restore what it can and say how much,
+ *  rather than being refused whole. */
+export function parseSitesFile(text: string): SavedAoi[] {
+  let json: any
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error('That file is not a saved-sites file — it is not valid JSON.')
+  }
+  const list = Array.isArray(json) ? json : json?.sites
+  if (!Array.isArray(list)) {
+    throw new Error('That file does not contain a list of saved sites.')
+  }
+  const out: SavedAoi[] = []
+  for (const raw of list) {
+    const geom = raw?.geometry
+    const ring = geom?.coordinates?.[0]
+    if (geom?.type !== 'Polygon' || !Array.isArray(ring) || ring.length < 4) continue
+    out.push({
+      id: String(raw.id ?? `${Date.now()}-${out.length}`),
+      name: String(raw.name ?? 'Untitled site').slice(0, 120),
+      geometry: { type: 'Polygon', coordinates: [closeRing(ring)] },
+      area_ha: Number.isFinite(raw.area_ha) ? Number(raw.area_ha) : 0,
+      savedAt: Number.isFinite(raw.savedAt) ? Number(raw.savedAt) : Date.now(),
+      ...(Array.isArray(raw.factors) && raw.factors.length
+        ? { factors: raw.factors.filter((f: unknown) => typeof f === 'string') }
+        : {}),
+      ...(Number.isFinite(raw.timeIndex) ? { timeIndex: Number(raw.timeIndex) } : {}),
+      ...(raw.compareIndex === null || Number.isFinite(raw.compareIndex)
+        ? { compareIndex: raw.compareIndex === null ? null : Number(raw.compareIndex) }
+        : {}),
+    })
+  }
+  if (!out.length) throw new Error('No usable sites in that file.')
+  return out
+}
+
+export async function readSitesFile(file: File): Promise<SavedAoi[]> {
+  return parseSitesFile(await file.text())
 }
 
 /** Reads a dropped or picked file and returns the first polygon in it.

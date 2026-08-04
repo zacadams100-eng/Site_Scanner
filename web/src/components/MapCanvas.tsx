@@ -64,6 +64,7 @@ export default function MapCanvas() {
   const selected = useStore((s) => s.selected)
   const timeIndex = useStore((s) => s.timeIndex)
   const catalog = useStore((s) => s.catalog)
+  const flyTo = useStore((s) => s.flyTo)
 
   // Drawing state lives in refs, not React state: it changes on every
   // mousemove and re-rendering the tree at that rate would drop frames.
@@ -342,6 +343,25 @@ export default function MapCanvas() {
       maxZoom: 15,
     })
   }, [aoi, ready])
+
+  // ---- go to a searched place --------------------------------------------
+  // The panels float over the map, so centring on a place would put it behind
+  // the report panel. The offset shifts the target into the visible strip of
+  // canvas — the same correction the AOI fit makes with its padding.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !flyTo) return
+    const css = getComputedStyle(document.documentElement)
+    const panel = parseInt(css.getPropertyValue('--panel-w')) || 0
+    const timeline = parseInt(css.getPropertyValue('--timeline-h')) || 0
+    map.flyTo({
+      center: [flyTo.lng, flyTo.lat],
+      zoom: flyTo.zoom,
+      offset: [-panel / 2, -timeline / 2],
+      duration: 900,
+      essential: true,
+    })
+  }, [flyTo])
 
   // ---- cell repaint on time change ---------------------------------------
   // This is the piece that makes scrubbing feel instant: the cell geometry and

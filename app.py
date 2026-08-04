@@ -172,7 +172,11 @@ def health():
 def cache_info():
     """Hit/miss counters, so cache behaviour is observable in a deployed
     instance rather than guessed at."""
-    return {"tiles": TILE_CACHE.info(), "stats": STATS_CACHE.info()}
+    return {
+        "tiles": TILE_CACHE.info(),
+        "stats": STATS_CACHE.info(),
+        "series": routes_catalog.SERIES_CACHE.info(),
+    }
 
 
 class PriceRequest(BaseModel):

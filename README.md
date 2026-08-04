@@ -115,6 +115,18 @@ What it does today:
 - **See** up to four charts chosen automatically from the selected factors,
   grouped so that two different units never share an axis.
 - **Check** every number's source, resolution and licence under Sources.
+- **Find** a site by postcode, place name, or coordinates pasted straight in
+  (`51.235, -0.57`). Lookups go to postcodes.io — free, keyless, ONS and
+  Ordnance Survey open data under the OGL, whose notice is shown with the
+  results. Searching only moves the map; it never draws an area for you.
+- **Filter** the factor list to the ones backed by real satellite
+  observations. `/api/catalog` marks each factor `real: true|false`, so the
+  demo two thirds of the catalogue is visible as such *before* you spend a
+  query on it rather than afterwards.
+- **Save** a site as a whole workspace — the shape, the chosen factors and the
+  timeline position — then reopen, rename or overwrite it. The list can be
+  backed up to a file and restored, because localStorage is one cleared
+  browser away from empty and does not follow you to another machine.
 
 Keyboard: `←`/`→` step a month, `PgUp`/`PgDn` a year, `Home`/`End` jump to the
 ends, `space` plays. The timeline is a real `<input type="range">` underneath
@@ -168,8 +180,18 @@ request (`cache.py`) — the README's own recommendation, now implemented.
 Redrawing the same shape or stepping the year slider back and forth no longer
 re-runs `reduceRegion`.
 
-`GET /api/cache` reports hits, misses and entry counts. `CONTOUR_CACHE_TTL=0`
-disables it; the default TTL is 15 minutes.
+`/api/series` is cached too, and that one matters most: a real Earth Engine
+factor costs seconds, and without a cache that outlives the request, adding a
+twelfth factor to a report re-runs the eleven already on screen. The key is
+per factor, per geometry, per time range, so changing the selection only costs
+the factors that actually changed. Generated factors are not cached (they are
+microseconds) and failures are never cached — a flaky call is retried on the
+next request rather than frozen in for fifteen minutes.
+
+`GET /api/cache` reports hits, misses and entry counts for all three caches;
+`GET /api/cache/series` reports the series cache alone and is available on the
+mock backend too. `CONTOUR_CACHE_TTL=0` disables caching; the default TTL is
+15 minutes.
 
 Worth being clear about the limit: this is **per-process**. Cloud Run runs
 several instances and recycles them, so a cold instance always misses and two

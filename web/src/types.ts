@@ -34,12 +34,17 @@ export interface Factor {
   hi: number | null
   derived: boolean
   note: string
+  /** True where this factor returns real satellite observations. Absent on an
+   *  older backend, which is why the UI treats undefined as "not live" rather
+   *  than as unknown. */
+  real?: boolean
 }
 
 export interface Catalog {
   factors: Factor[]
   bases: Base[]
   groups: string[]
+  real_factor_ids?: string[]
   class_values: Record<string, string[]>
   summary: {
     factor_count: number
@@ -48,6 +53,7 @@ export interface Catalog {
     monthly_base_count: number
     derived_factor_count: number
     group_count: number
+    real_factor_count?: number
   }
   coverage: { name: string; bbox: { west: number; south: number; east: number; north: number } }
   time: { start: string; end: string; steps: string[] }
@@ -80,6 +86,9 @@ export interface Series {
   /** Round-trip cost of the real path, so the price of live queries is visible
    *  rather than guessed at. */
   elapsed_ms?: number
+  /** True when the server answered from its series cache rather than querying
+   *  Earth Engine again. */
+  cached?: boolean
   /** Set when the real path failed and the generator stood in. */
   error?: string
   kind: Kind

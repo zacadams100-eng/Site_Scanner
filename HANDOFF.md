@@ -55,10 +55,30 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
+### Added since
+- **Place search.** A postcode, place name or pasted `lat, lng` moves the map.
+  Until then the only way to reach a field was to pan across England on an
+  unlabelled basemap, which made the drawing tools unreachable for anyone who
+  did not already know where they were. Lookups go to postcodes.io (ONS/OS
+  open data, OGL — notice shown with the results); coordinates are parsed
+  locally and never leave the browser. Searching moves the map and nothing
+  else: guessing a boundary from a place name would be exactly the invented
+  precision this project refuses everywhere else.
+- **Saved sites are workspaces.** Shape, factors and timeline position, with
+  rename, overwrite, and backup/restore to a file. Entries saved before this
+  restore the shape alone, as they always did.
+- **The catalogue says which factors are real.** `/api/catalog` marks each
+  factor `real`, and the browser can filter to just those — the honesty label
+  now arrives before the query rather than after it.
+- **`/api/series` is cached per factor.** Adding a factor used to re-run every
+  Earth Engine query already on screen. One short browsing session against a
+  six-live-factor backend measured 18 hits to 6 misses.
+
 ### Not built
 - No deployment. It runs in Cloud Shell; there is no public URL for the real
   app. `DEPLOY.md` has the Cloud Run and Vercel steps, untried.
-- No accounts, no saved projects, no persistence beyond `localStorage`.
+- No accounts, and no persistence beyond `localStorage` — saved sites are
+  per-browser, which is why they can now be exported to a file.
 - The ingest pipeline (`ingest/`) works on synthetic rasters only. Nothing has
   been ingested for real, so the fast H3 path is unused in production.
 
@@ -181,9 +201,10 @@ separate from the production project, and can be deleted without consequence.
 ## Open decisions, still unanswered
 
 1. **What "project management" means.** Saved workspaces — name a site, reopen
-   it, everything comes back — is about a week and extends what exists.
-   Real PM with tasks, deadlines and assignees is months and a different
-   product. Currently parked; saved workspaces is the safe build either way.
+   it, everything comes back — now exists, in the browser only. Real PM with
+   tasks, deadlines and assignees is months and a different product, and the
+   step in between is accounts and server-side storage, which is what turns a
+   per-browser list into something a team can share. Still parked.
 
 2. **Whether commodity trading belongs in this product at all.** Property and
    construction are things *at places*. Commodity trading is about flows

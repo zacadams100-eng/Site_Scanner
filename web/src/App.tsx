@@ -7,6 +7,7 @@ import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
 import Provenance from './components/Provenance'
+import PlaceSearch from './components/PlaceSearch'
 import Toolbar from './components/Toolbar'
 import Templates from './components/Templates'
 import Compare from './components/Compare'
@@ -172,6 +173,7 @@ export default function App() {
           </span>
           {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
         </div>
+        <PlaceSearch />
         <div className="topbar-right">
           {isMock && (
             <span className="badge badge-mock" title="Generated data — no Earth Engine connected">

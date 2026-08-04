@@ -17,12 +17,34 @@ const DEFAULT_FACTORS = ['ndvi', 'lc_tree_pct', 'precip_total', 'lst_day']
 const MAX_FACTORS = 12
 const SAVED_KEY = 'site-scanner.saved-aois'
 
+/**
+ * A saved site is a whole workspace, not just a shape.
+ *
+ * Reopening a site and finding the default four factors — with the timeline
+ * back at the present — is the same amount of work as drawing it again, which
+ * is to say the feature did not do anything. `factors`, `timeIndex` and
+ * `compareIndex` are optional because entries written before this change do
+ * not have them; those load their geometry and leave the rest of the view
+ * alone, which is exactly what they used to do.
+ */
 export interface SavedAoi {
   id: string
   name: string
   geometry: GeoJSON.Polygon
   area_ha: number
   savedAt: number
+  factors?: string[]
+  timeIndex?: number
+  compareIndex?: number | null
+}
+
+/** What an exported sites file looks like. Versioned so a later format change
+ *  can migrate rather than silently misread. */
+export interface SitesFile {
+  format: 'site-scanner.sites'
+  version: 1
+  exportedAt: string
+  sites: SavedAoi[]
 }
 
 interface State {
@@ -55,6 +77,17 @@ interface State {
   browserOpen: boolean
   templatesOpen: boolean
 
+  /**
+   * A pending map move, consumed by MapCanvas.
+   *
+   * The map instance lives inside MapCanvas and nothing else can reach it, so
+   * "go to this place" travels as state rather than as a call. `nonce` is what
+   * makes searching for the same place twice move the map twice — without it
+   * the second request is an identical object and the effect never re-runs.
+   */
+  flyTo: { lng: number; lat: number; zoom: number; nonce: number } | null
+  goTo: (lng: number, lat: number, zoom?: number) => void
+
   setCatalog: (c: Catalog) => void
   setCatalogError: (e: string) => void
   setMock: (m: boolean) => void
@@ -65,6 +98,9 @@ interface State {
   saveAoi: (name: string) => void
   loadSaved: (id: string) => void
   deleteSaved: (id: string) => void
+  renameSaved: (id: string, name: string) => void
+  updateSaved: (id: string) => void
+  importSites: (sites: SavedAoi[]) => number
   toggleFactor: (id: string) => void
   setSelected: (ids: string[]) => void
   applyTemplate: (t: Template) => void
@@ -140,6 +176,9 @@ export const useStore = create<State>((set, get) => ({
   activeTab: 'table',
   browserOpen: false,
   templatesOpen: false,
+  flyTo: null,
+
+  goTo: (lng, lat, zoom = 14) => set({ flyTo: { lng, lat, zoom, nonce: Date.now() } }),
 
   setCatalog: (c) => {
     // Land on the most recent step: users overwhelmingly want "now" first,
@@ -188,7 +227,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   saveAoi: (name) => {
-    const { aoi, data, saved } = get()
+    const { aoi, data, saved, selected, timeIndex, compareIndex } = get()
     if (!aoi) return
     const entry: SavedAoi = {
       id: String(Date.now()),
@@ -196,6 +235,9 @@ export const useStore = create<State>((set, get) => ({
       geometry: aoi,
       area_ha: data?.area_ha ?? 0,
       savedAt: Date.now(),
+      factors: selected,
+      timeIndex,
+      compareIndex,
     }
     const next = [entry, ...saved].slice(0, 50)
     persistSaved(next)
@@ -204,13 +246,61 @@ export const useStore = create<State>((set, get) => ({
 
   loadSaved: (id) => {
     const entry = get().saved.find((s) => s.id === id)
-    if (entry) get().setAoi(entry.geometry)
+    if (!entry) return
+    // Factors and time go in *before* the geometry, because setAoi fires the
+    // fetch: setting them afterwards would request the old factor list and
+    // then immediately need a second round trip to correct it.
+    const patch: Partial<State> = {}
+    if (entry.factors?.length) patch.selected = entry.factors.slice(0, MAX_FACTORS)
+    if (typeof entry.timeIndex === 'number') patch.timeIndex = entry.timeIndex
+    if (entry.compareIndex !== undefined) patch.compareIndex = entry.compareIndex
+    if (Object.keys(patch).length) set(patch)
+    get().setAoi(entry.geometry)
   },
 
   deleteSaved: (id) => {
     const next = get().saved.filter((s) => s.id !== id)
     persistSaved(next)
     set({ saved: next })
+  },
+
+  renameSaved: (id, name) => {
+    const clean = name.trim()
+    if (!clean) return
+    const next = get().saved.map((s) => (s.id === id ? { ...s, name: clean } : s))
+    persistSaved(next)
+    set({ saved: next })
+  },
+
+  /** Overwrite a saved site with what is on screen now. Without this, refining
+   *  a boundary means saving a near-duplicate and deleting the old one. */
+  updateSaved: (id) => {
+    const { aoi, data, saved, selected, timeIndex, compareIndex } = get()
+    if (!aoi) return
+    const next = saved.map((s) =>
+      s.id === id
+        ? { ...s, geometry: aoi, area_ha: data?.area_ha ?? s.area_ha,
+            savedAt: Date.now(), factors: selected, timeIndex, compareIndex }
+        : s,
+    )
+    persistSaved(next)
+    set({ saved: next })
+  },
+
+  /** Merge an imported list in, keeping both sides. Returns how many arrived,
+   *  so the caller can say. Ids are reissued on collision rather than
+   *  overwriting: two machines both saving at the same millisecond is
+   *  unlikely, but losing a site to it would be silent. */
+  importSites: (sites) => {
+    const { saved } = get()
+    const existing = new Set(saved.map((s) => s.id))
+    const arriving = sites.map((s) => (existing.has(s.id)
+      ? { ...s, id: `${s.id}-${Math.random().toString(36).slice(2, 7)}` }
+      : s))
+    const next = [...arriving, ...saved].slice(0, 50)
+    persistSaved(next)
+    set({ saved: next })
+    return arriving.length
   },
 
   toggleFactor: (id) => {

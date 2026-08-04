@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import {
-  exportAnnualCsv, exportGeoJson, exportMonthlyCsv, exportXml,
-  printReport, readAoiFile,
+  exportAnnualCsv, exportGeoJson, exportMonthlyCsv, exportSites, exportXml,
+  printReport, readAoiFile, readSitesFile,
 } from '../lib/exports'
 import { shareUrl } from '../lib/permalink'
 import { formatArea } from '../lib/format'
@@ -24,13 +24,23 @@ export default function Toolbar() {
   const saveAoi = useStore((s) => s.saveAoi)
   const loadSavedAoi = useStore((s) => s.loadSaved)
   const deleteSaved = useStore((s) => s.deleteSaved)
+  const renameSaved = useStore((s) => s.renameSaved)
+  const updateSaved = useStore((s) => s.updateSaved)
+  const importSites = useStore((s) => s.importSites)
   const setAoi = useStore((s) => s.setAoi)
   const setTemplatesOpen = useStore((s) => s.setTemplatesOpen)
 
   const [menu, setMenu] = useState<'none' | 'export' | 'saved'>('none')
   const [flash, setFlash] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // Naming a site happens inline rather than through window.prompt: a prompt
+  // is blocked outright in some embedded contexts, and it cannot show the user
+  // what is about to be saved with the name.
+  const [naming, setNaming] = useState(false)
+  const [draftName, setDraftName] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const sitesFileRef = useRef<HTMLInputElement>(null)
 
   const cols = useMemo(
     () => selected.map((id) => data?.series[id]).filter((s): s is Series => !!s),
@@ -67,6 +77,25 @@ export default function Toolbar() {
     }
   }
 
+  const onImportSites = async (file: File | undefined) => {
+    if (!file) return
+    setUploadError(null)
+    try {
+      const n = importSites(await readSitesFile(file))
+      say(`${n} site${n === 1 ? '' : 's'} added`)
+      setMenu('saved')
+    } catch (e: any) {
+      setUploadError(e?.message ?? 'Could not read that file.')
+    }
+  }
+
+  const commitName = () => {
+    saveAoi(draftName)
+    setNaming(false)
+    setDraftName('')
+    say('Saved — factors and date included')
+  }
+
   return (
     <div className="toolbar">
       <button className="tb" onClick={() => setTemplatesOpen(true)}
@@ -80,12 +109,33 @@ export default function Toolbar() {
         onChange={(e) => { void onUpload(e.target.files?.[0]); e.target.value = '' }}
       />
 
-      <button className="tb" disabled={!aoi}
-              onClick={() => {
-                const name = prompt('Name this site', 'Untitled site')
-                if (name !== null) { saveAoi(name); say('Saved') }
+      <div className="tb-wrap">
+        <button className={`tb${naming ? ' is-open' : ''}`} disabled={!aoi}
+                onClick={() => { setNaming(!naming); setDraftName('') }}
+                title="Keep this shape, its factors and its date for later">Save</button>
+        {naming && aoi && (
+          <div className="tb-menu tb-naming">
+            <label className="tb-naming-label" htmlFor="site-name">Name this site</label>
+            <input
+              id="site-name" autoFocus className="tb-naming-input"
+              value={draftName} placeholder="Untitled site"
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitName()
+                if (e.key === 'Escape') setNaming(false)
               }}
-              title="Keep this shape for later">Save</button>
+            />
+            <div className="tb-naming-note">
+              Saves the shape, the {selected.length} chosen factor
+              {selected.length === 1 ? '' : 's'} and where the timeline is.
+            </div>
+            <div className="tb-naming-row">
+              <button className="tb tb-small" onClick={commitName}>Save site</button>
+              <button className="tb tb-small" onClick={() => setNaming(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="tb-wrap">
         <button className={`tb${menu === 'saved' ? ' is-open' : ''}`}
@@ -95,20 +145,66 @@ export default function Toolbar() {
         </button>
         {menu === 'saved' && (
           <div className="tb-menu">
-            {saved.length === 0 && <div className="tb-empty">Nothing saved yet.</div>}
+            {saved.length === 0 && (
+              <div className="tb-empty">
+                Nothing saved yet. Draw an area and press Save — the factors and
+                the date come back with it.
+              </div>
+            )}
             {saved.map((s) => (
               <div key={s.id} className="tb-saved">
-                <button className="tb-saved-load"
-                        onClick={() => { loadSavedAoi(s.id); setMenu('none') }}>
-                  <span className="tb-saved-name">{s.name}</span>
-                  <span className="tb-saved-meta">{formatArea(s.area_ha)}</span>
-                </button>
-                <button className="tb-saved-del" title="Delete"
-                        onClick={() => deleteSaved(s.id)}>×</button>
+                {renamingId === s.id ? (
+                  <input
+                    autoFocus className="tb-naming-input tb-rename"
+                    defaultValue={s.name}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        renameSaved(s.id, (e.target as HTMLInputElement).value)
+                        setRenamingId(null)
+                      }
+                      if (e.key === 'Escape') setRenamingId(null)
+                    }}
+                    onBlur={(e) => { renameSaved(s.id, e.target.value); setRenamingId(null) }}
+                  />
+                ) : (
+                  <>
+                    <button className="tb-saved-load"
+                            onClick={() => { loadSavedAoi(s.id); setMenu('none') }}
+                            title={s.factors?.length
+                              ? `Restores ${s.factors.length} factors and the saved date`
+                              : 'Saved before factors were kept — restores the shape only'}>
+                      <span className="tb-saved-name">{s.name}</span>
+                      <span className="tb-saved-meta">
+                        {formatArea(s.area_ha)}
+                        {s.factors?.length ? ` · ${s.factors.length} factors` : ''}
+                      </span>
+                    </button>
+                    <button className="tb-saved-act" title="Rename"
+                            onClick={() => setRenamingId(s.id)}>✎</button>
+                    <button className="tb-saved-act" title="Overwrite with the current view"
+                            disabled={!aoi}
+                            onClick={() => { updateSaved(s.id); say(`Updated ${s.name}`) }}>⟳</button>
+                    <button className="tb-saved-del" title="Delete"
+                            onClick={() => deleteSaved(s.id)}>×</button>
+                  </>
+                )}
               </div>
             ))}
+            <div className="tb-menu-sep" />
+            <button disabled={!saved.length}
+                    onClick={() => { exportSites(saved); say('Sites saved to a file') }}>
+              Back up all sites to a file
+            </button>
+            <button onClick={() => sitesFileRef.current?.click()}>
+              Restore sites from a file…
+            </button>
           </div>
         )}
+        <input
+          ref={sitesFileRef} type="file" accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={(e) => { void onImportSites(e.target.files?.[0]); e.target.value = '' }}
+        />
       </div>
 
       <button className="tb" disabled={!aoi} onClick={onShare}

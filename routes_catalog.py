@@ -23,8 +23,20 @@ import redaction
 
 import catalog
 import series as series_mod
+from cache import build_cache, cache_key
 
 router = APIRouter()
+
+# Real Earth Engine factors cost seconds each. Without a cache that outlives a
+# request, adding a twelfth factor to a report re-runs the eleven already on
+# screen — the user pays eleven Earth Engine calls for one new answer, every
+# time they touch the factor list. Keyed per factor, so a changed selection
+# only ever costs the factors that actually changed.
+#
+# Only the real path is cached: the generator is microseconds, and caching it
+# would just hold memory. Failures are never cached — a flaky call should be
+# retried on the next request, not remembered for fifteen minutes.
+SERIES_CACHE = build_cache()
 
 # Drawing outside the covered area should fail with an explanation, not return
 # plausible-looking nonsense for a field in France.
@@ -46,13 +58,23 @@ class SeriesRequest(BaseModel):
 @router.get("/api/catalog")
 def get_catalog() -> Dict[str, Any]:
     """Everything the UI needs to render the factor browser, with provenance
-    attached. The frontend never hard-codes a factor list."""
+    attached. The frontend never hard-codes a factor list.
+
+    Each factor carries `real`: true where it returns actual satellite
+    observations, false where the generator stands in. Two thirds of the
+    catalogue is demo data, and a user picking factors should be able to see
+    which is which *before* spending a query on one — not afterwards, from a
+    badge on the result.
+    """
+    real_ids = [f["id"] for f in catalog.FACTORS if f["id"] in REAL_SERIES]
+    factors = [{**f, "real": f["id"] in REAL_SERIES} for f in catalog.FACTORS]
     return {
-        "factors": catalog.FACTORS,
+        "factors": factors,
+        "real_factor_ids": real_ids,
         "bases": catalog.BASES,
         "groups": catalog.GROUPS,
         "class_values": catalog.CLASS_VALUES,
-        "summary": catalog.catalogue_summary(),
+        "summary": {**catalog.catalogue_summary(), "real_factor_count": len(real_ids)},
         "coverage": {"name": "England", "bbox": _BBOX},
         "time": {
             "start": catalog.TIME_START,
@@ -97,6 +119,13 @@ def _validate_geometry(geometry: dict) -> tuple:
 REAL_SERIES: Dict[str, Any] = {}
 
 
+@router.get("/api/cache/series")
+def series_cache_info() -> Dict[str, Any]:
+    """Hit/miss counters for the series cache, so its behaviour in a deployed
+    instance is observable rather than assumed. Mounted by both backends."""
+    return SERIES_CACHE.info()
+
+
 def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
                 steps: List[str]) -> Dict[str, Any]:
     """Real data where we have it, generated where we don't.
@@ -109,10 +138,18 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
     fn = REAL_SERIES.get(factor_id)
     if fn is not None:
         t0 = time.perf_counter()
+        key = cache_key("series", factor_id, geometry, steps)
+        hit = SERIES_CACHE.get(key)
+        if hit is not None:
+            # A copy, because the caller decorates the result with `annual`
+            # and `meta` — mutating the cached dict would let one request's
+            # additions leak into the next one's response.
+            return {**hit, "cached": True,
+                    "elapsed_ms": round((time.perf_counter() - t0) * 1000)}
         try:
             points = fn(geometry, steps, area_ha)
             f = catalog.FACTOR_BY_ID[factor_id]
-            return {
+            result = {
                 "factor_id": factor_id,
                 "kind": f["kind"],
                 "cadence": f["cadence"],
@@ -120,7 +157,11 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
                 "points": points,
                 "source": "earth-engine",
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000),
+                "cached": False,
             }
+            # Store a copy for the same reason the hit path returns one.
+            SERIES_CACHE.set(key, dict(result))
+            return result
         except Exception as e:
             s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
             s["source"] = "generated"
@@ -130,11 +171,13 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
             s["error"] = ("Earth Engine failed, showing demo data: "
                           + redaction.safe_message(e))
             s["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
+            s["cached"] = False
             return s
 
     s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
     s["source"] = "generated"
     s["elapsed_ms"] = 0
+    s["cached"] = False
     return s
 
 
