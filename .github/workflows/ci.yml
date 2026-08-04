@@ -1,0 +1,82 @@
+name: CI
+
+# Two jobs with very different jobs to do.
+#
+# `tests` needs no credentials and runs on every push, so a broken refactor is
+# caught in a minute rather than by a human remembering to run pytest.
+#
+# `earth-engine` is the one that matters most here. Every Earth Engine query in
+# this repository was written without being able to reach Earth Engine, and the
+# gap between "the code looks right" and "the numbers are right" has already
+# produced one silent failure that passed its own check. This job closes that
+# gap automatically instead of waiting for someone to run a script.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Python tests
+        run: python -m pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Frontend tests
+        working-directory: web
+        run: |
+          npm ci
+          npm test
+
+      - name: Typecheck
+        working-directory: web
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+  earth-engine:
+    name: Real data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Verify every factor against Earth Engine
+        env:
+          # These come from repository secrets, which are encrypted and are not
+          # readable from a session or a log. A pull request from a fork gets
+          # no secrets at all, which is why the step below skips rather than
+          # fails when they are missing.
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.EE_SERVICE_ACCOUNT_JSON }}
+          EE_PROJECT: ${{ secrets.EE_PROJECT_ID }}
+        run: |
+          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
+            echo "::warning title=Earth Engine not verified::EE_SERVICE_ACCOUNT_JSON is not set, so the real-data check did not run. The factors in this commit are unverified."
+            exit 0
+          fi
+          # One year rather than the full range: enough to catch a wrong band,
+          # a missing scale factor or a broken season, without spending several
+          # minutes of Earth Engine time on every push.
+          python scripts/check_real_factors.py 2024

@@ -26,6 +26,11 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
+# This repository is public and CI logs are public with it. Earth Engine
+# embeds the credentials dict in some errors, so nothing prints an
+# exception from that path raw.
+from redaction import safe_message
+
 # Intensive arable in the Cambridgeshire fens: the strongest seasonal signal
 # in England, so a flat result means something is wrong rather than meaning
 # the land is simply mixed. See the note in check_real_ndvi.py.
@@ -137,7 +142,7 @@ def main() -> int:
         from app import init_earth_engine
         init_earth_engine()
     except BaseException as e:
-        print(f"✗ Earth Engine would not start: {type(e).__name__}: {e}")
+        print(f"✗ Earth Engine would not start: {safe_message(e)}")
         print("  Run `source ./setup.sh` first.")
         return 1
     print("✓ Earth Engine ready")
@@ -168,8 +173,8 @@ def main() -> int:
             try:
                 points = ee_series.REAL_SERIES[factor_id](SITE, steps, AREA_HA)
             except Exception as e:
-                problems.append(f"{factor_id} raised: {e}")
-                print(f"  {meta['name']:26} ✗ {e}")
+                problems.append(f"{factor_id} raised: {safe_message(e)}")
+                print(f"  {meta['name']:26} ✗ {safe_message(e)}")
                 continue
             summarise(meta["name"], str(meta["unit"]), points,
                       time.perf_counter() - t0)

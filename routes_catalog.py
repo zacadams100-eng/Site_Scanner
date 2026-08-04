@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field
 
 import time
 
+import redaction
+
 import catalog
 import series as series_mod
 
@@ -122,7 +124,11 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
         except Exception as e:
             s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
             s["source"] = "generated"
-            s["error"] = f"Earth Engine failed, showing demo data: {e}"
+            # Never format the raw exception into a response. Earth Engine
+            # puts the credentials dict into some of its error messages, and
+            # this string is served straight to the browser.
+            s["error"] = ("Earth Engine failed, showing demo data: "
+                          + redaction.safe_message(e))
             s["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
             return s
 

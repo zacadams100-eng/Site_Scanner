@@ -28,6 +28,11 @@ import time
 # ee_smoke_test.py — put the repo root first.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
+# This repository is public and CI logs are public with it. Earth Engine
+# embeds the credentials dict in some errors, so nothing prints an
+# exception from that path raw.
+from redaction import safe_message
+
 # Intensive arable in the Cambridgeshire fens. Small on purpose: reduceRegion
 # over a county times out, and you want to know the pipeline works before you
 # stress it.
@@ -62,7 +67,7 @@ def main() -> int:
     try:
         import ee  # noqa: F401
     except BaseException as e:
-        print(f"✗ Could not import earthengine-api: {type(e).__name__}: {e}")
+        print(f"✗ Could not import earthengine-api: {safe_message(e)}")
         print("  Fix with:  pip install -r requirements.txt")
         print("  In Cloud Shell make sure the venv is active first: source setup.sh")
         return 1
@@ -72,7 +77,7 @@ def main() -> int:
         from app import init_earth_engine
         init_earth_engine()
     except Exception as e:
-        print(f"✗ Earth Engine would not initialise: {e}")
+        print(f"✗ Earth Engine would not initialise: {safe_message(e)}")
         print("  Check GOOGLE_APPLICATION_CREDENTIALS_JSON and EE_PROJECT are set")
         print("  (that is what `source setup.sh` does).")
         return 1
@@ -81,7 +86,7 @@ def main() -> int:
     try:
         import ee_series
     except BaseException as e:
-        print(f"✗ Could not load ee_series: {type(e).__name__}: {e}")
+        print(f"✗ Could not load ee_series: {safe_message(e)}")
         return 1
 
     print(f"Fetching {len(steps)} months of NDVI for a {AREA_HA:.0f} ha arable site…")
@@ -90,7 +95,7 @@ def main() -> int:
     try:
         points = ee_series.ndvi_series(FIELD, steps, AREA_HA)
     except Exception as e:
-        print(f"✗ The Earth Engine query failed: {e}")
+        print(f"✗ The Earth Engine query failed: {safe_message(e)}")
         return 1
     elapsed = time.perf_counter() - t0
 
