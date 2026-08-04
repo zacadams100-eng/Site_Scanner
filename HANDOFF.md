@@ -72,6 +72,28 @@ promotes them on any machine with open egress. Read `docs/OPEN-DATA.md` before
 quoting any of these numbers as real; it also records why ONS is written but
 deliberately not registered.
 
+### The real/generated split is audited and shown
+
+`scripts/audit_catalogue.py` checks every factor the catalogue calls real:
+that it exists, that it names both a publisher and the host actually queried,
+that it declares whether anyone has ever run that host, and that its licence
+and attribution are recorded. `tests/test_catalogue_audit.py` runs the same
+checks in CI, because a mislabel does not crash — a number just quietly
+acquires authority it has not earned.
+
+It found two things worth fixing. Earth Engine factors named ESA and NASA as
+the source without saying the numbers come through Earth Engine, which does
+the cloud masking and compositing — a user going to the Copernicus Data Space
+would get a different number. And eleven designation factors were attributed
+to Natural England and Historic England while actually being served by
+planning.data.gov.uk. Provenance now carries publisher and endpoint
+separately; all 46 real factors differ between the two.
+
+The factor browser shows the ratio as a bar: real against generated, split
+into verified and written. Today that reads 46 of 269 (17%), of which one —
+NDVI — has been checked against a live service. A written factor's dot is
+hollow rather than filled.
+
 ### The interface was rebranded
 
 It is now a light, quiet, instrument-like interface: paper ground, moss

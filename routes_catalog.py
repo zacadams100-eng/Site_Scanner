@@ -73,9 +73,15 @@ def get_catalog() -> Dict[str, Any]:
     reach a user as "we ran it".
     """
     real_ids = [f["id"] for f in catalog.FACTORS if f["id"] in REAL_SERIES]
+    # Provenance is attached only to factors that are *currently* registered.
+    # The two dicts are filled together but can come apart — a backend that
+    # unregisters a source, or a test that clears one — and a generated factor
+    # carrying a source name would be the exact mislabel this mechanism exists
+    # to prevent.
     factors = [
         {**f, "real": f["id"] in REAL_SERIES,
-         **({"provenance": REAL_SOURCES[f["id"]]} if f["id"] in REAL_SOURCES else {})}
+         **({"provenance": REAL_SOURCES[f["id"]]}
+            if f["id"] in REAL_SERIES and f["id"] in REAL_SOURCES else {})}
         for f in catalog.FACTORS
     ]
     verified = [fid for fid in real_ids

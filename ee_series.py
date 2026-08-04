@@ -730,14 +730,26 @@ _VERIFIED_EE = {"ndvi"}
 
 
 def _ee_provenance(factor_id: str) -> Dict[str, str]:
+    """Who publishes it, and where we actually get it from.
+
+    Those are never the same here: ESA publishes Sentinel-2, NASA publishes
+    MODIS, and every one of them reaches us through Earth Engine's servers.
+    A user told only "Copernicus / ESA" would look for this number in the
+    Copernicus Data Space and find a different one, because the compositing
+    and cloud masking happened in Earth Engine.
+    """
     import catalog
-    base = catalog.FACTOR_BY_ID.get(factor_id, {}).get("base", "")
+    base = catalog.BASE_BY_ID.get(
+        catalog.FACTOR_BY_ID.get(factor_id, {}).get("base", ""), {})
+    verified = factor_id in _VERIFIED_EE
     return {
-        "source": catalog.ATTRIBUTION.get(base, "Google Earth Engine"),
-        "status": "verified" if factor_id in _VERIFIED_EE else "written",
-        "note": "" if factor_id in _VERIFIED_EE else
-                "reduction verified in CI against a stubbed client, not against "
-                "live Earth Engine",
+        "source": base.get("source", "Google Earth Engine"),
+        "endpoint": "earthengine.googleapis.com",
+        "status": "verified" if verified else "written",
+        "note": "served through Earth Engine, which does the cloud masking and "
+                "compositing" + ("" if verified else
+                "; the reduction is verified in CI against a stubbed client, "
+                "not against live Earth Engine"),
     }
 
 

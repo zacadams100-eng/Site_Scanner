@@ -645,11 +645,42 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 }
 .limit-warn { color: var(--warn); }
 
+/* How much of the catalogue is real, drawn to the same scale as the claim.
+   Deliberately quiet — a rule-coloured track with a moss fill, no colour
+   beyond the two the rest of the interface already uses. It is a statement of
+   fact, not a status light. */
+.real-ratio {
+  padding: 10px 12px 9px; border-bottom: 1px solid var(--line);
+}
+.real-ratio-bar {
+  height: 4px; border-radius: 2px; overflow: hidden;
+  background: var(--rule-300); display: flex;
+}
+.real-ratio-bar .seg { display: block; height: 100%; }
+/* Verified is the solid mark; written is the same colour at half strength,
+   because it is the same data path with one thing missing. */
+.real-ratio-bar .seg.is-verified { background: var(--moss-600); }
+.real-ratio-bar .seg.is-written { background: var(--moss-400); opacity: .55; }
+.real-ratio-key {
+  margin-top: 6px; font-size: 10.5px; color: var(--text-faint);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.real-ratio-head { color: var(--text-dim); }
+.real-ratio-detail { display: flex; gap: 5px; flex-wrap: wrap; align-items: baseline; }
+.real-ratio-key b { font-family: var(--font-mono); font-weight: 600; color: var(--text-dim); }
+.real-ratio-key .sep { color: var(--rule-400); }
+
 /* The one mark that means "backed by real observations", used identically in
-   the browser, the layer list and the attribute table. */
+   the browser, the layer list and the attribute table. Hollow where the
+   source is implemented but has never been run against the live service —
+   the same distinction the ratio bar draws, at the scale of one row. */
 .live-dot {
   width: 6px; height: 6px; border-radius: 50%; flex: none;
   background: var(--good); display: inline-block;
+}
+.live-dot.is-unverified {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--good);
 }
 
 .browser-list { overflow-y: auto; padding: 4px 0 10px; }

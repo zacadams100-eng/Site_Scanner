@@ -612,9 +612,15 @@ def ons_series(dataset: str, geometry: dict, steps: List[str],
 SOURCE_STATUS: Dict[str, Dict[str, str]] = {}
 
 
-def _mark(factors, source: str, status: str = "written", note: str = "") -> None:
+def _mark(factors, source: str, status: str = "written", note: str = "",
+          endpoint: str = "") -> None:
+    """`endpoint` is the host actually queried, which is not always the
+    publisher. SSSI boundaries are Natural England's data, but we get them
+    from planning.data.gov.uk, and a user told only "Natural England" cannot
+    reproduce the number they are looking at. Both belong in the answer."""
     for f in factors:
-        SOURCE_STATUS[f] = {"source": source, "status": status, "note": note}
+        SOURCE_STATUS[f] = {"source": source, "status": status, "note": note,
+                            "endpoint": endpoint or source}
 
 
 def _group_installer(fn: Callable, factor_id: str) -> Callable:
@@ -654,9 +660,20 @@ def install(registry: Dict[str, Any],
             continue
         registry[factor_id] = (
             lambda g, s, a, _d=dataset, _m=mode: planning_series(_d, _m, g, s, a))
-    _mark([f for f in PLANNING_DATASETS if f in catalog.FACTOR_BY_ID],
-          "planning.data.gov.uk", "written",
-          "coverage is approximated from intersecting entities, not clipped area")
+    # These eleven come from one host but five publishers — SSSI and AONB
+    # boundaries are Natural England's, listed buildings are Historic
+    # England's, and MHCLG aggregates them. The catalogue already knows who
+    # publishes each, so name the publisher and record the host we actually
+    # queried separately, rather than flattening both into one wrong answer.
+    for factor_id in PLANNING_DATASETS:
+        if factor_id not in catalog.FACTOR_BY_ID:
+            continue
+        base = catalog.BASE_BY_ID[catalog.FACTOR_BY_ID[factor_id]["base"]]
+        _mark([factor_id], base["source"], "written",
+              "served through the Planning Data Platform, not the publisher's "
+              "own API; coverage is approximated from intersecting entities, "
+              "not clipped area",
+              endpoint="planning.data.gov.uk")
 
     for factor_id in ("avg_sale_price", "median_sale_price", "transaction_count",
                       "new_build_share", "flat_share", "price_change_yoy",
@@ -665,17 +682,19 @@ def install(registry: Dict[str, Any],
             registry[factor_id] = _group_installer(ppd_group, factor_id)
     _mark(["avg_sale_price", "median_sale_price", "transaction_count",
            "new_build_share", "flat_share", "price_change_yoy", "price_growth_5yr"],
-          "HM Land Registry Price Paid", "written",
-          "reported for the postcode district containing the AOI, not the AOI itself")
+          "HM Land Registry", "written",
+          "reported for the postcode district containing the AOI, not the AOI itself",
+          endpoint="landregistry.data.gov.uk")
 
     for factor_id in ("crime_density", "burglary_density", "violent_crime_share",
                       "antisocial_share"):
         if factor_id in catalog.FACTOR_BY_ID:
             registry[factor_id] = _group_installer(police_group, factor_id)
     _mark(["crime_density", "burglary_density", "violent_crime_share", "antisocial_share"],
-          "data.police.uk", "written",
+          "Home Office / police forces", "written",
           "one HTTP call per month; anonymised to snap points, so a small "
-          "polygon measures its neighbourhood")
+          "polygon measures its neighbourhood",
+          endpoint="data.police.uk")
 
     if os.environ.get("EPC_API_KEY"):
         for factor_id in ("epc_mean_sap", "epc_band_mode", "epc_below_c_share",
@@ -684,7 +703,9 @@ def install(registry: Dict[str, Any],
                 registry[factor_id] = _group_installer(epc_group, factor_id)
         _mark(["epc_mean_sap", "epc_band_mode", "epc_below_c_share",
                "epc_potential_uplift", "mean_floor_area", "heat_pump_share"],
-              "EPC register", "written", "needs EPC_API_EMAIL and EPC_API_KEY")
+              "Department for Levelling Up / EPC register", "written",
+              "needs EPC_API_EMAIL and EPC_API_KEY",
+              endpoint="epc.opendatacommunities.org")
 
     if provenance is not None:
         for factor_id in registry:

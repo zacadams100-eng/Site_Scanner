@@ -1,8 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { groupFactors, useStore } from '../store'
+import type { Factor } from '../types'
 
 /**
- * An open catalogue of 118 factors is only an asset if it can be searched.
+ * One line saying exactly what stands behind a factor's number.
+ *
+ * Three states, and the middle one is the reason this function exists: a
+ * factor can be real, fetched from a named endpoint, and still never have been
+ * run against that endpoint by anyone. Collapsing that into the same green dot
+ * as a checked source would be the most consequential lie in the interface.
+ */
+export function provenanceLine(f: Factor): string {
+  if (!f.real) return 'Generated demo data — not observed'
+  const p = f.provenance
+  if (!p) return 'Real observations'
+  const via = p.endpoint && !p.source.toLowerCase().includes(p.endpoint.split('.')[0])
+    ? ` via ${p.endpoint}`
+    : ''
+  const head = p.status === 'verified'
+    ? `Real — ${p.source}${via}, checked against the live service`
+    : `Real — ${p.source}${via}, implemented and tested but not yet run live`
+  return p.note ? `${head}\n(${p.note})` : head
+}
+
+/**
+ * An open catalogue of 269 factors is only an asset if it can be searched.
  * A flat list that long is worse than a curated eight, so this leads with a
  * search box and groups everything beneath it.
  *
@@ -22,6 +44,9 @@ export default function FactorBrowser() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const realCount = catalog?.summary.real_factor_count ?? 0
+  const totalCount = catalog?.summary.factor_count ?? 0
+  const verifiedCount = catalog?.summary.verified_factor_count ?? 0
+  const realPct = totalCount ? Math.round((realCount / totalCount) * 100) : 0
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Escape and an outside click both close it. The browser covers a third of
@@ -97,22 +122,57 @@ export default function FactorBrowser() {
                 className={`browser-filter${liveOnly ? ' is-on' : ''}`}
                 onClick={() => setLiveOnly(!liveOnly)}
                 aria-pressed={liveOnly}
-                title="Show only factors backed by real satellite observations. Everything else is demo data."
+                title="Show only factors backed by real observations — satellite or public open data. Everything else is generated demo data."
               >
-                <span className="live-dot" aria-hidden /> Live data only
+                <span className="live-dot" aria-hidden /> Real data only
                 <span className="browser-filter-count">{realCount}</span>
               </button>
               {liveOnly && (
                 <span className="browser-filter-note">
-                  Hiding {catalog.summary.factor_count - realCount} demo factors
+                  Hiding {totalCount - realCount} generated factors
                 </span>
               )}
             </div>
           )}
 
+          {/*
+            The ratio, drawn rather than described. Most of this catalogue is
+            demo data, and a user is entitled to know that at a glance and
+            before choosing — not by counting dots, and not from a paragraph in
+            a README they will never open.
+          */}
+          <div className="real-ratio" title={
+            `${realCount} of ${totalCount} factors return real observations.\n` +
+            `${verifiedCount} have been run against the live service and checked; ` +
+            `${realCount - verifiedCount} are implemented and tested but not yet run for real.\n` +
+            `The remaining ${totalCount - realCount} are generated demo data.`
+          }>
+            <div className="real-ratio-bar" role="img"
+                 aria-label={`${realCount} of ${totalCount} factors real, ${realPct} per cent`}>
+              <span className="seg is-verified" style={{ width: `${(verifiedCount / (totalCount || 1)) * 100}%` }} />
+              <span className="seg is-written" style={{ width: `${((realCount - verifiedCount) / (totalCount || 1)) * 100}%` }} />
+            </div>
+            {/* Two lines on purpose: the headline is the number people need,
+                the breakdown is for anyone who wants to know how solid it is.
+                Letting one long line wrap wherever the panel happens to end
+                puts the break in a different place at every width. */}
+            <div className="real-ratio-key">
+              <span className="real-ratio-head">
+                <b>{realCount}</b> of {totalCount} factors return real data ({realPct}%)
+              </span>
+              <span className="real-ratio-detail">
+                {verifiedCount} verified
+                <span className="sep">·</span>
+                {realCount - verifiedCount} written, not yet run
+                <span className="sep">·</span>
+                {totalCount - realCount} generated
+              </span>
+            </div>
+          </div>
+
           <div className="browser-meta">
-            {catalog.summary.factor_count} factors · {realCount} live · {catalog.summary.stored_base_count} stored
-            datasets · {catalog.summary.derived_factor_count} derived
+            {catalog.summary.stored_base_count} stored datasets ·{' '}
+            {catalog.summary.derived_factor_count} derived
             {atLimit && <span className="limit-warn">12 selected — remove one to add another</span>}
           </div>
 
@@ -145,14 +205,15 @@ export default function FactorBrowser() {
                           disabled={blocked}
                           title={`${f.note}\n\nSource: ${f.base}\nCadence: ${f.cadence}${
                             f.derived ? '\nDerived — computed from the base, not stored separately' : ''
-                          }\n${f.real
-                            ? 'Live — real satellite observations'
-                            : 'Demo data — generated, not observed'}`}
+                          }\n\n${provenanceLine(f)}`}
                         >
                           <span className="factor-check">{on ? '✓' : ''}</span>
                           <span className="factor-name">{f.name}</span>
                           {f.real && (
-                            <span className="live-dot" title="Live — real satellite observations" />
+                            <span
+                              className={`live-dot${f.provenance?.status === 'written' ? ' is-unverified' : ''}`}
+                              title={provenanceLine(f)}
+                            />
                           )}
                           {f.derived && <span className="factor-derived" title="Derived on read">ƒ</span>}
                           {f.kind === 'categorical' && <span className="factor-cat" title="Categorical — never averaged">cat</span>}

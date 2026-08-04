@@ -101,8 +101,14 @@ largest remaining item for lifting the real share past 25%.
 
 Every factor above is marked `status: "written"`, not `"verified"`. That
 distinction is carried through `open_data.SOURCE_STATUS` →
-`routes_catalog.REAL_SOURCES` → each factor's `provenance` in `/api/catalog`,
-so it reaches the interface rather than living in a comment.
+`routes_catalog.REAL_SOURCES` → each factor's `provenance` in `/api/catalog`
+→ the factor browser, where the ratio bar splits real into verified and
+written and a written factor's dot is hollow rather than filled. It reaches
+the user, not just the code.
+
+`python3 scripts/audit_catalogue.py` prints the whole picture and checks it;
+`tests/test_catalogue_audit.py` runs the same checks in CI, so a factor cannot
+quietly acquire a claim nobody backed.
 
 - **written** — implemented against the API's documented shape and covered by
   tests that feed it recorded fixtures. The parsing is proven. The endpoint is

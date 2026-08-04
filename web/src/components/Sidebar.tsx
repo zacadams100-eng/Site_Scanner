@@ -4,6 +4,7 @@ import { exportSites, readAoiFile, readSitesFile } from '../lib/exports'
 import { templatesBySector } from '../lib/permalink'
 import { formatArea } from '../lib/format'
 import { rampColor } from '../lib/format'
+import { provenanceLine } from './FactorBrowser'
 
 /**
  * The working sidebar: what is on the map, and what you can put on it.
@@ -168,7 +169,12 @@ export default function Sidebar() {
                           {series?.meta.base_meta.name
                             ?? catalog?.bases.find((b) => b.id === f?.base)?.name
                             ?? f?.base}
-                          {f?.real && <span className="live-dot" title="Live satellite observations" />}
+                          {f?.real && (
+                            <span
+                              className={`live-dot${f.provenance?.status === 'written' ? ' is-unverified' : ''}`}
+                              title={provenanceLine(f)}
+                            />
+                          )}
                         </span>
                       </span>
 
