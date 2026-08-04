@@ -246,29 +246,59 @@ export function printReport(cols: Series[], area_ha: number,
     return `<tr><th>${r0.year}</th>${cells}</tr>`
   }).join('')
 
+  // The printed report is the copy that leaves and gets forwarded, so it
+  // carries the brand rather than browser defaults: the mark, moss rules,
+  // figures in mono. The font stack degrades to whatever the printing machine
+  // has — a new window cannot see the app's loaded webfonts.
   w.document.write(`<!doctype html><meta charset="utf-8">
 <title>Site Scanner report</title>
 <style>
- body{font:12px/1.5 -apple-system,system-ui,sans-serif;margin:32px;color:#111}
- h1{font-size:18px;margin:0 0 4px} .sub{color:#666;margin-bottom:20px}
+ :root{--moss:#4d6048;--ink:#232323;--slate:#69706a;--rule:#ddd8cf}
+ body{font:12px/1.55 'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+      margin:30px;color:var(--ink)}
+ header{display:flex;align-items:center;gap:12px;padding-bottom:14px;
+        border-bottom:2px solid var(--moss);margin-bottom:18px}
+ h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.01em}
+ .sub{color:var(--slate);font-size:11.5px;margin-top:3px;
+      font-family:'IBM Plex Mono',ui-monospace,monospace}
  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
- th,td{border-bottom:1px solid #ddd;padding:5px 8px;text-align:right}
+ th,td{border-bottom:1px solid var(--rule);padding:6px 9px;text-align:right}
+ td{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px}
  th:first-child,td:first-child{text-align:left}
- thead th{border-bottom:2px solid #333;font-size:11px}
- .src{margin-top:24px;font-size:10px;color:#666}
- .p{color:#c2410c;font-weight:600;margin-left:2px}
+ tbody th{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace}
+ thead th{border-bottom:1.5px solid var(--moss);font-size:11px;color:var(--ink)}
+ tbody tr:nth-child(odd) td,tbody tr:nth-child(odd) th{background:#faf9f6}
+ .src{margin-top:20px;font-size:10px;color:var(--slate);line-height:1.6}
+ .p{color:#8a6520;font-weight:600;margin-left:2px}
  @media print{body{margin:12mm}}
 </style>
-<h1>Site Scanner — site report</h1>
-<div class="sub">${area_ha.toFixed(1)} ha · centred ${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)}
- · generated ${new Date().toLocaleDateString('en-GB')}</div>
+<header>
+ <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
+  <g stroke="#4d6048" stroke-width="2.4" stroke-linecap="round" fill="none">
+   <path d="M10 21.5 6 26"/><path d="M22 21.5 26 26"/>
+   <path d="M12.5 24.5 11.5 29"/><path d="M19.5 24.5 20.5 29"/></g>
+  <g stroke="#4d6048" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".85">
+   <path d="M4 26.6h3.4M9.9 29.4h3.2M18.9 29.4h3.2M24.6 26.6H28"/></g>
+  <path d="M16 8c4.6 0 8.2 3.6 8.6 8.6.4 4.6-2.4 8.6-8.6 8.6s-9-4-8.6-8.6C7.8 11.6 11.4 8 16 8Z" fill="#4d6048"/>
+  <g stroke="#f8f6f2" stroke-width="1.1" fill="none" opacity=".5">
+   <ellipse cx="16" cy="18.2" rx="6" ry="4.2"/><ellipse cx="16" cy="18.2" rx="3.2" ry="2.2"/></g>
+  <circle cx="11.4" cy="9.6" r="4.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="4.1" fill="#4d6048"/>
+  <circle cx="11.4" cy="9.6" r="2.2" fill="#fff"/><circle cx="20.6" cy="9.6" r="2.2" fill="#fff"/>
+  <circle cx="11.4" cy="9.6" r="1.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="1.1" fill="#4d6048"/>
+ </svg>
+ <div>
+  <h1>Site report</h1>
+  <div class="sub">${area_ha.toFixed(1)} ha · ${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)} · EPSG:4326 · ${new Date().toLocaleDateString('en-GB')}</div>
+ </div>
+</header>
 <table><thead><tr><th>Year</th>${cols.map((c) =>
-   `<th>${c.meta.name}<br><span style="font-weight:400;color:#888">${c.unit}</span></th>`).join('')}</tr></thead>
+   `<th>${c.meta.name}<br><span style="font-weight:400;color:#69706a;font-family:'IBM Plex Mono',monospace">${c.unit}</span></th>`).join('')}</tr></thead>
 <tbody>${rows}</tbody></table>
 ${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}
  Hover a marked figure on screen for the exact count.</div>` : ''}
 <div class="src"><strong>Sources.</strong> ${[...new Set(cols.map((c) =>
-  `${c.meta.base_meta.name} (${c.meta.base_meta.licence})`))].join(' · ')}</div>`)
+  `${c.meta.base_meta.name} (${c.meta.base_meta.licence})`))].join(' · ')}</div>
+${attributionsFor(cols).map((a) => `<div class="src">${a}</div>`).join('')}`)
   w.document.close()
   w.focus()
   setTimeout(() => w.print(), 350)

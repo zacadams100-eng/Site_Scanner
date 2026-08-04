@@ -3,106 +3,70 @@
 /*
   Site Scanner — a field instrument, not a document.
 
-  The palette is the product's own: a cool green-cast near-black rather than a
-  neutral grey, one warm amber accent, and semantic colour (good/warn/bad) held
-  separate from that accent so a red cell never reads as "highlighted".
+  The palette and type are the product's own; see BRAND.md. Paper ground, moss
+  structure, ink type, hairline rules, and one instrument blue that only ever
+  means "here, now". Semantic colour (good/warn/bad) is held separate from the
+  accent so a warned cell never reads as "highlighted".
 
-  Two type roles: system-ui runs the interface, ui-monospace runs every number.
-  Data in a proportional face is the single fastest way to make a table look
-  untrustworthy.
+  Three type roles: IBM Plex Sans runs the interface, Inter runs prose, and
+  IBM Plex Mono runs every measurement. Data in a proportional face is the
+  single fastest way to make a table look untrustworthy.
+
+  There is no dark variant. One identity, one set of decisions — a demo that
+  flips palette with the operating system is a second product to keep true.
 */
 :root {
-  /* Ink and coral. Deep navy ground, warm coral accent — the contrast a
-     nautical chart uses, and the reason it reads as a map rather than a
-     dashboard. The neutrals are navy-biased rather than pure grey, so nothing
-     on the page looks like it was left at its default. */
-  --ground: #121822;
-  --surface: #1c2531;
-  --raised: #232d3b;
-  --sunken: #0d1219;
-  --line: rgba(255,255,255,.09);
-  --line-2: rgba(255,255,255,.17);
+  /* Brand palette — see BRAND.md. Paper ground, moss structure, ink type, one
+     instrument blue that only ever means "here, now". The demo is a public
+     face of the same product, so it uses the product's colours rather than a
+     variation on them. */
+  --ground: #f8f6f2;
+  --surface: #fcfbf9;
+  --raised: #ffffff;
+  --sunken: #f1eee8;
+  --line: #ddd8cf;
+  --line-2: #c9c3b7;
 
-  --ink: #e9e5dc;
-  --ink-2: #97a3b3;
-  --ink-3: #6b7a8f;
+  --ink: #232323;
+  --ink-2: #3d403c;
+  --ink-3: #69706a;
 
-  --accent: #d97742;
-  --accent-2: #a8481f;
-  --accent-soft: rgba(217,119,66,.16);
+  --structure: #4d6048;
+  --accent: #176f95;
+  --accent-2: #2fa8d8;
+  --accent-soft: #e2f2f9;
 
-  /* Semantic colour, deliberately not the accent. Copper means "here, now,
-     yours"; these three mean what the data is doing. */
-  --good: #6fb0cd;
-  --warn: #d2a570;
-  --bad:  #c96f80;
-  /* Absence is not badness. A month with no usable observation is a hole in
-     the record, not an error, so gaps read as dim neutral rather than red —
-     which also keeps them from competing with the coral accent. */
-  --absent: #384556;
+  /* Semantic colour, deliberately not the accent. Absence is not badness, so
+     a month with no usable observation reads neutral rather than red. */
+  --good: #72965e;
+  --warn: #8a6520;
+  --bad:  #a84545;
+  --absent: #c9c3b7;
 
-  --sea: #0d1219;
-  --land: #1b243100;
-  --land-fill: #1b2431;
-  --land-line: rgba(217,119,66,.34);
-  --outside-fill: #161d27;
-  --outside-line: rgba(148,163,184,.22);
+  --sea: #eef1ee;
+  --land: #ffffff00;
+  --land-fill: #ffffff;
+  --land-line: rgba(77,96,72,.55);
+  --outside-fill: #f1eee8;
+  --outside-line: rgba(105,112,106,.3);
 
-  --r: 12px;
+  --r: 10px;
   --r-sm: 8px;
-  --shadow: 0 2px 4px rgba(0,0,0,.20), 0 10px 26px rgba(0,0,0,.26);
+  --shadow: 0 1px 2px rgba(35,35,35,.06), 0 2px 6px rgba(35,35,35,.05);
 
-  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+  --ui: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+  --prose: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, "SF Mono", Menlo, monospace;
 
   --panel: 430px;
   --timeline: 104px;
-}
-
-/* Light theme is derived, not inverted: the ground lifts to a cool paper, the
-   coral darkens to hold contrast on it, and land keeps its relationship to
-   sea rather than flipping. */
-@media (prefers-color-scheme: light) {
-  :root {
-    --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
-    --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
-    --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
-    --accent: #c25f2f; --accent-2: #a8481f; --accent-soft: rgba(194,95,47,.13);
-    --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
-    --sea: #cfdae6; --land-fill: #e4e9f0;
-    --land-line: rgba(217,79,46,.5);
-    --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
-    --shadow: 0 10px 30px rgba(15,23,42,.13);
-  }
-}
-:root[data-theme="dark"] {
-  --ground: #121822; --surface: #1c2531; --raised: #232d3b; --sunken: #0d1219;
-  --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.17);
-  --ink: #e9e5dc; --ink-2: #97a3b3; --ink-3: #6b7a8f;
-  --accent: #d97742; --accent-2: #a8481f; --accent-soft: rgba(217,119,66,.16);
-  --good: #6fb0cd; --warn: #d2a570; --bad: #c96f80; --absent: #384556;
-  --sea: #0d1219; --land-fill: #1b2431;
-  --land-line: rgba(217,119,66,.34);
-  --outside-fill: #161d27; --outside-line: rgba(148,163,184,.22);
-  --shadow: 0 2px 4px rgba(0,0,0,.20), 0 10px 26px rgba(0,0,0,.26);
-}
-:root[data-theme="light"] {
-  --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
-  --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
-  --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
-  --accent: #c25f2f; --accent-2: #a8481f; --accent-soft: rgba(194,95,47,.13);
-  --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
-  --sea: #cfdae6; --land-fill: #e4e9f0;
-  --land-line: rgba(217,79,46,.5);
-  --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
-  --shadow: 0 10px 30px rgba(15,23,42,.13);
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
   background: var(--ground); color: var(--ink);
-  font: 14px/1.5 var(--ui); -webkit-font-smoothing: antialiased;
+  font: 14px/1.55 var(--prose); -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -129,12 +93,12 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 }
 .top > * { pointer-events: auto; }
 .brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-.mark {
-  width: 12px; height: 12px; border-radius: 3px; align-self: center; flex: none;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 0 14px var(--accent-soft);
+/* The mark is the frog itself — a gradient chip was standing in for it. */
+.mark { width: 24px; height: 24px; align-self: center; flex: none; }
+.brand h1 {
+  font: 600 13px/1 var(--ui); text-transform: uppercase; letter-spacing: .14em;
+  margin: 0; white-space: nowrap; align-self: center;
 }
-.brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin: 0; white-space: nowrap; }
 .brand span {
   font: 10px/1 var(--mono); color: var(--ink-3); text-transform: uppercase;
   letter-spacing: .08em; border: 1px solid var(--line); border-radius: 20px;
@@ -155,7 +119,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   display: flex; flex-direction: column; gap: 5px; padding: 6px; z-index: 7;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid var(--line); border-radius: 15px;
-  box-shadow: var(--shadow); backdrop-filter: blur(14px);
+  box-shadow: var(--shadow); 
 }
 .tool {
   width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px;
@@ -176,7 +140,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   position: absolute; left: 66px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 88%, transparent);
   border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px;
-  pointer-events: none; z-index: 7; white-space: nowrap; backdrop-filter: blur(8px);
+  pointer-events: none; z-index: 7; white-space: nowrap; 
 }
 
 /* ---- panel ---- */
@@ -381,7 +345,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
 /* ---- overlays ---- */
 .scrim {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 22px;
-  background: color-mix(in srgb, var(--ground) 72%, transparent); backdrop-filter: blur(4px);
+  background: rgba(35,35,35,.28); 
 }
 .sheet {
   width: min(720px, 100%); max-height: 84vh; overflow-y: auto; padding: 18px 20px 22px;
@@ -411,7 +375,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
   display: flex; flex-direction: column; overflow: hidden;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border: 1px solid var(--line-2); border-radius: var(--r);
-  box-shadow: var(--shadow); backdrop-filter: blur(18px);
+  box-shadow: var(--shadow); 
 }
 .browser header { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); }
 .browser input {
@@ -462,7 +426,19 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
 
   <div class="top">
     <div class="brand">
-      <span class="mark"></span>
+      <svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Site Scanner">
+        <g stroke="#4d6048" stroke-width="2.4" stroke-linecap="round" fill="none">
+          <path d="M10 21.5 6 26"/><path d="M22 21.5 26 26"/>
+          <path d="M12.5 24.5 11.5 29"/><path d="M19.5 24.5 20.5 29"/></g>
+        <g stroke="#4d6048" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".85">
+          <path d="M4 26.6h3.4M9.9 29.4h3.2M18.9 29.4h3.2M24.6 26.6H28"/></g>
+        <path d="M16 8c4.6 0 8.2 3.6 8.6 8.6.4 4.6-2.4 8.6-8.6 8.6s-9-4-8.6-8.6C7.8 11.6 11.4 8 16 8Z" fill="#4d6048"/>
+        <g stroke="#f8f6f2" stroke-width="1.1" fill="none" opacity=".5">
+          <ellipse cx="16" cy="18.2" rx="6" ry="4.2"/><ellipse cx="16" cy="18.2" rx="3.2" ry="2.2"/></g>
+        <circle cx="11.4" cy="9.6" r="4.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="4.1" fill="#4d6048"/>
+        <circle cx="11.4" cy="9.6" r="2.2" fill="#fff"/><circle cx="20.6" cy="9.6" r="2.2" fill="#fff"/>
+        <circle cx="11.4" cy="9.6" r="1.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="1.1" fill="#4d6048"/>
+      </svg>
       <h1>Site Scanner</h1>
       <span>England · 2011–2025</span>
     </div>
@@ -933,18 +909,13 @@ const toLngLat = (px, py) => [
 
 /* ---------- colour ---------- */
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-/* Low reads as deep navy (it recedes into the sea), high reads as warm coral
-   (it advances, and ties to the accent). The middle passes through teal and
-   green so vegetation values still look like vegetation. */
-const RAMP_DARK  = [[16,26,42],[28,62,78],[58,104,94],[124,146,102],[198,164,112],[255,166,131]];
-const RAMP_LIGHT = [[214,223,233],[160,192,200],[136,174,150],[186,175,128],[214,138,106],[176,84,58]];
-function isLight() {
-  const t = document.documentElement.getAttribute('data-theme');
-  if (t) return t === 'light';
-  return window.matchMedia('(prefers-color-scheme: light)').matches;
-}
+/* One ramp, matching the product's (web/src/lib/format.ts): it starts near the
+   page so a low value recedes into it and runs through moss to a deep
+   instrument blue. Lightness falls all the way along, so the ordering survives
+   greyscale printing and colour-blind reading. */
+const RAMP = [[246,243,235],[214,220,200],[166,189,158],[109,150,126],[56,111,116],[23,71,97]];
 function ramp(t, alpha = 1) {
-  const R_ = isLight() ? RAMP_LIGHT : RAMP_DARK;
+  const R_ = RAMP;
   const x = Math.max(0, Math.min(0.999, t)) * (R_.length - 1);
   const i = Math.floor(x), fr = x - i;
   const a = R_[i], b = R_[Math.min(R_.length - 1, i + 1)];
@@ -953,7 +924,9 @@ function ramp(t, alpha = 1) {
 }
 /* Coral leads so the primary series matches the accent and the scrubber; the
    rest fan out in hue and stay distinguishable against navy. */
-const SERIES_COLORS = ['#d97742','#6fb0cd','#b9c48f','#8f9fd4','#d99ec4','#d2a570','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
+/* Matches the product's series palette (web/src/lib/format.ts): moss leads,
+   because the first series is the one drawn on the map. */
+const SERIES_COLORS = ['#4d6048','#1f88b4','#a8722c','#7b5ea7','#2f7d6b','#b4534f','#5d7f2f','#8a5a78','#3f6b96','#96742f','#547a5c','#7a4f3a'];
 const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
 
 /** A hex token at a given alpha. Lets the canvas honour the theme's accent
@@ -1013,7 +986,7 @@ function drawMap() {
   const degPerPx = 1 / VIEW.scale;
   const stepDeg = [2, 1, .5, .25, .1, .05, .02, .01, .005, .002, .001]
     .find(d => d / degPerPx > 55) ?? .001;
-  mapCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.075)';
+  mapCtx.strokeStyle = 'rgba(35,35,35,.10)';
   mapCtx.lineWidth = 1;
   const tl = toLngLat(0, 0), br = toLngLat(w, h);
   for (let lat = Math.floor(br[1] / stepDeg) * stepDeg; lat <= tl[1]; lat += stepDeg) {
@@ -1447,7 +1420,7 @@ function svgEl(inner) {
   return `<svg viewBox="0 0 ${CW} ${CH}" preserveAspectRatio="xMidYMid meet" role="img">${inner}</svg>`;
 }
 function axes(yLo, yHi, xLabels) {
-  const gridCol = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.07)';
+  const gridCol = 'rgba(35,35,35,.09)';
   const txt = cssVar('--ink-3');
   let s = '';
   for (let i = 0; i <= 4; i++) {
@@ -1670,7 +1643,7 @@ function drawSpark() {
   if (!w) return;
 
   const stripH = 5, chartH = h - stripH - 3;
-  sparkCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.07)' : 'rgba(255,255,255,.05)';
+  sparkCtx.strokeStyle = 'rgba(35,35,35,.07)';
   sparkCtx.lineWidth = 1;
   STEPS.forEach((s, i) => {
     if (!s.endsWith('-01')) return;
@@ -1688,7 +1661,7 @@ function drawSpark() {
   const Y = v => chartH - ((v - lo) / span) * (chartH - 6) - 3;
 
   // Fill under the line, broken at gaps.
-  sparkCtx.fillStyle = isLight() ? 'rgba(162,112,28,.14)' : 'rgba(221,174,92,.13)';
+  sparkCtx.fillStyle = 'rgba(77,96,72,.12)';
   let run = -1;
   for (let i = 0; i <= vals.length; i++) {
     if (vals[i] !== null && vals[i] !== undefined) { if (run < 0) run = i; continue; }
@@ -1710,7 +1683,7 @@ function drawSpark() {
   sparkCtx.stroke();
 
   if (S.compare !== null) {
-    sparkCtx.strokeStyle = cssVar('--good'); sparkCtx.lineWidth = 1.5;
+    sparkCtx.strokeStyle = cssVar('--accent'); sparkCtx.lineWidth = 1.5;
     sparkCtx.setLineDash([3, 2]);
     sparkCtx.beginPath(); sparkCtx.moveTo(X(S.compare), 0); sparkCtx.lineTo(X(S.compare), chartH); sparkCtx.stroke();
     sparkCtx.setLineDash([]);
@@ -1719,9 +1692,11 @@ function drawSpark() {
   // Availability strip: how much of the area produced a usable observation.
   const bw = Math.max(1, w / STEPS.length);
   ser.points.forEach((p, i) => {
+    // Absence is not badness: a month with no usable observation is a hole in
+    // the record, so it reads neutral rather than red. Same rule as the app.
     sparkCtx.fillStyle = p.value === null
-      ? 'rgba(196,123,114,.6)'
-      : `rgba(127,179,163,${0.18 + 0.62 * p.valid})`;
+      ? 'rgba(216,211,201,.95)'
+      : `rgba(31,136,180,${0.18 + 0.6 * p.valid})`;
     sparkCtx.fillRect(X(i) - bw / 2, chartH + 3, bw, stripH);
   });
 }
@@ -2097,7 +2072,7 @@ function findRing(n) {
 
 /* Repaint on theme change — the canvases read CSS custom properties, so a
    theme flip must be redrawn rather than restyled. */
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawMap(); drawSpark(); render(); });
+/* One identity, no dark variant — nothing to repaint when the OS theme flips. */
 new MutationObserver(() => { drawMap(); drawSpark(); render(); })
   .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
