@@ -493,6 +493,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--text-dim);
 }
 .prov-chip em { color: var(--accent-dim); }
+/* The required licence notice. Recessed a rung — it belongs to the card, not
+   on top of it — and set in mono so it reads as text to be copied exactly. */
+.prov-attrib {
+  margin: 0 0 8px; padding: 7px 9px;
+  background: rgba(0, 0, 0, .18); border-left: 2px solid var(--accent-dim);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px; line-height: 1.5; color: var(--text-dim);
+}
 .prov-link { font-size: 10.5px; color: var(--text-faint); text-decoration: none; }
 .prov-link:hover { color: var(--accent); }
 

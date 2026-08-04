@@ -59,6 +59,13 @@ export default function Provenance() {
               </span>
             ))}
           </div>
+          {/* The notice the licence actually requires, verbatim. Nearly all of
+              these permit commercial use only on condition it is shown, so it
+              is content, not fine print — and it is the line a user must copy
+              if they put these numbers in a report of their own. */}
+          {base.attribution && (
+            <p className="prov-attrib">{base.attribution}</p>
+          )}
           <a className="prov-link" href={base.url} target="_blank" rel="noreferrer">
             {base.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} ↗
           </a>
