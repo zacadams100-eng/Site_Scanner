@@ -104,7 +104,7 @@ function ramp(t, alpha = 1) {
 }
 /* Coral leads so the primary series matches the accent and the scrubber; the
    rest fan out in hue and stay distinguishable against navy. */
-const SERIES_COLORS = ['#ff7a5c','#6fc3d4','#b9c48f','#8f9fd4','#d99ec4','#e3b072','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
+const SERIES_COLORS = ['#d97742','#6fb0cd','#b9c48f','#8f9fd4','#d99ec4','#d2a570','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
 const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
 
 /** A hex token at a given alpha. Lets the canvas honour the theme's accent
