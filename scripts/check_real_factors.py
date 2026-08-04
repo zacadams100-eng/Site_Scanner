@@ -178,6 +178,16 @@ def main() -> int:
                 continue
             summarise(meta["name"], str(meta["unit"]), points,
                       time.perf_counter() - t0)
+
+            # A source that published nothing in this window is not a fault.
+            # WorldCover only ever released 2020 and 2021, so checking 2024
+            # finds nothing and should say so rather than fail.
+            if not ee_series.covers(factor_id, steps):
+                start, end = ee_series.FACTOR_COVERAGE[factor_id]
+                note = f"(published {start} to {end or 'now'})"
+                print(f"  {'':26} {'':8} {note:>20}")
+                continue
+
             problems += check_factor(factor_id, meta, points, catalog)
 
     print("\n" + "=" * 74)

@@ -359,3 +359,39 @@ def test_reanalysis_siblings_share_one_round_trip(ee_series, monkeypatch):
     for factor_id in ee_series.ERA5_MONTHLY_FACTORS:
         ee_series.REAL_SERIES[factor_id](GEOM, steps, 100.0)
     assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Coverage windows
+# ---------------------------------------------------------------------------
+def test_a_source_that_published_nothing_is_not_a_failure(ee_series):
+    """The first CI run failed on this: WorldCover released 2020 and 2021
+    only, the check ran against 2024, and an honest gap was reported as a
+    fault. Empty because the data does not exist is not the same as empty
+    because something is broken."""
+    y2024 = [f"2024-{m:02d}" for m in range(1, 13)]
+    y2020 = [f"2020-{m:02d}" for m in range(1, 13)]
+
+    assert not ee_series.covers("lc_tree_pct", y2024)
+    assert ee_series.covers("lc_tree_pct", y2020)
+
+
+def test_sentinel2_is_not_covered_before_it_launched(ee_series):
+    assert not ee_series.covers("ndvi", [f"2013-{m:02d}" for m in range(1, 13)])
+    assert ee_series.covers("ndvi", [f"2024-{m:02d}" for m in range(1, 13)])
+
+
+def test_full_range_sources_cover_the_whole_catalogue(ee_series):
+    import catalog
+
+    steps = [f"{y}-{m:02d}" for y in (2011, 2025) for m in range(1, 13)]
+    for factor_id in list(ee_series.ERA5_MONTHLY_FACTORS) + list(ee_series.MODIS_FACTORS):
+        assert ee_series.covers(factor_id, steps), factor_id
+    assert catalog.TIME_START >= "2011-01"
+
+
+def test_every_real_factor_declares_a_coverage_window(ee_series):
+    """A factor missing from the table is silently treated as always covered,
+    which reintroduces the failure this table exists to prevent."""
+    for factor_id in ee_series.REAL_SERIES:
+        assert factor_id in ee_series.FACTOR_COVERAGE, factor_id

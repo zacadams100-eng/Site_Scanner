@@ -558,6 +558,32 @@ def modis_lst_group(geometry: dict, steps: List[str],
     return _cached_group(_group_key("modis", geometry, steps), compute)
 
 
+# When each factor's source actually has data, as (first month, last month).
+# `None` for the end means "still publishing".
+#
+# This exists so a checker can tell "empty because the satellite had not
+# launched" apart from "empty because something is broken". The first CI run
+# failed on exactly that confusion: WorldCover published only 2020 and 2021, a
+# check against 2024 found nothing, and an honest gap was reported as a fault.
+FACTOR_COVERAGE: Dict[str, tuple] = {
+    **{fid: (COVERAGE_START, None) for fid in S2_FACTORS},
+    **{fid: ("1950-01", None) for fid in ERA5_MONTHLY_FACTORS},
+    **{fid: ("1950-01", None) for fid in ERA5_DAILY_FACTORS},
+    **{fid: ("2000-02", None) for fid in MODIS_FACTORS},
+    "lc_dominant": ("2020-01", "2021-12"),
+    "lc_tree_pct": ("2020-01", "2021-12"),
+}
+
+
+def covers(factor_id: str, steps: List[str]) -> bool:
+    """Whether the source has any data at all in this window."""
+    window = FACTOR_COVERAGE.get(factor_id)
+    if window is None or not steps:
+        return True
+    start, end = window
+    return any(s >= start and (end is None or s <= end) for s in steps)
+
+
 def _group_factor(group, factor_id: str):
     """One factor's view of a shared group result."""
     def series(geometry: dict, steps: List[str],
