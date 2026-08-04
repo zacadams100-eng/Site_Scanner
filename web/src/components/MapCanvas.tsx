@@ -49,6 +49,30 @@ const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 
+/**
+ * How much of the map is covered by floating chrome, measured rather than
+ * assumed.
+ *
+ * The map spans the whole window with the report panel and the timeline on
+ * top, so a shape fitted to the full viewport centres itself underneath them.
+ * The panel is a right-hand column on a desktop and a bottom sheet on a
+ * phone — reading its actual rectangle handles both, where reading the
+ * `--panel-w` variable handled only the first and left half of every drawn
+ * area behind the sheet.
+ */
+function chromePadding(): { top: number; left: number; right: number; bottom: number } {
+  const timeline = parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue('--timeline-h')) || 0
+  const panel = document.querySelector('.data-panel')?.getBoundingClientRect()
+  const asSheet = !!panel && panel.top > 1
+  return {
+    top: 80,
+    left: asSheet ? 40 : 100,
+    right: asSheet ? 40 : (panel?.width ?? 0) + 60,
+    bottom: (asSheet ? window.innerHeight - panel.top : timeline) + 40,
+  }
+}
+
 export default function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -379,6 +403,7 @@ export default function MapCanvas() {
     let mode: 'move' | 'resize' | null = null
     let anchor: [number, number] = [0, 0]     // the corner held still while resizing
     let start: maplibregl.LngLat | null = null
+    let last: maplibregl.LngLat | null = null
 
     const preview = (g: GeoJSON.Polygon) => {
       aoiSrc?.setData({ type: 'Feature', geometry: g, properties: {} })
@@ -449,13 +474,14 @@ export default function MapCanvas() {
 
     const onMove = (ll: maplibregl.LngLat) => {
       if (!mode) return
+      last = ll
       const g = moved(ll)
       if (g) preview(g)
     }
 
-    const onUp = (ll: maplibregl.LngLat) => {
+    const onUp = (ll: maplibregl.LngLat | null) => {
       if (!mode) return
-      const g = moved(ll)
+      const g = ll ? moved(ll) : null
       mode = null
       start = null
       map.dragPan.enable()
@@ -497,12 +523,20 @@ export default function MapCanvas() {
     }
     const touchEnd = () => { if (lastTouch) onUp(lastTouch) }
 
+    // MapLibre's own mouseup stops at the edge of the canvas, and half of this
+    // map is under a floating panel — releasing the button there would leave
+    // the edit uncommitted and panning switched off. The window sees every
+    // release, and the last position on the canvas is where the shape was.
+    const windowUp = () => { if (mode) onUp(last ?? start) }
+
     map.on('mousedown', mouseDown)
     map.on('mousemove', mouseMove)
     map.on('mouseup', mouseUp)
     map.on('touchstart', touchStart)
     map.on('touchmove', touchMove)
     map.on('touchend', touchEnd)
+    window.addEventListener('mouseup', windowUp)
+    window.addEventListener('touchend', windowUp)
     return () => {
       map.off('mousedown', mouseDown)
       map.off('mousemove', mouseMove)
@@ -510,6 +544,8 @@ export default function MapCanvas() {
       map.off('touchstart', touchStart)
       map.off('touchmove', touchMove)
       map.off('touchend', touchEnd)
+      window.removeEventListener('mouseup', windowUp)
+      window.removeEventListener('touchend', windowUp)
       // React runs this cleanup *after* the drawing effect has re-run, so
       // clearing these unconditionally would undo the crosshair and the
       // pan-lock a freshly selected tool had just set.
@@ -533,14 +569,8 @@ export default function MapCanvas() {
     if (skipFit.current) { skipFit.current = false; return }
     const [w, s, e, n] = turf.bbox({ type: 'Feature', geometry: aoi, properties: {} }) as
       [number, number, number, number]
-    // The map spans the full window, but the data panel and timeline sit on top
-    // of it. Without asymmetric padding the drawn shape centres itself
-    // underneath the panel, which is exactly where the user cannot see it.
-    const css = getComputedStyle(document.documentElement)
-    const panel = parseInt(css.getPropertyValue('--panel-w')) || 0
-    const timeline = parseInt(css.getPropertyValue('--timeline-h')) || 0
     map.fitBounds([[w, s], [e, n]], {
-      padding: { top: 80, left: 100, right: panel + 60, bottom: timeline + 40 },
+      padding: chromePadding(),
       duration: 600,
       maxZoom: 15,
     })
@@ -553,13 +583,13 @@ export default function MapCanvas() {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !flyTo) return
-    const css = getComputedStyle(document.documentElement)
-    const panel = parseInt(css.getPropertyValue('--panel-w')) || 0
-    const timeline = parseInt(css.getPropertyValue('--timeline-h')) || 0
+    const pad = chromePadding()
     map.flyTo({
       center: [flyTo.lng, flyTo.lat],
       zoom: flyTo.zoom,
-      offset: [-panel / 2, -timeline / 2],
+      // Shift the target into the strip of canvas that is actually visible:
+      // sideways past the report column, or upwards past the report sheet.
+      offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2],
       duration: 900,
       essential: true,
     })
