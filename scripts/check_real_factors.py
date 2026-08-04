@@ -75,22 +75,56 @@ def check_continuous(name, points, lo, hi, unit, expect_seasons):
     return problems
 
 
-def show(name, points, unit, limit=6):
+def summarise(name, unit, points, seconds):
+    """One line per factor. With two dozen factors a table each is unreadable,
+    and the thing worth seeing at a glance is the range and the gap count."""
     got = [p for p in points if p["value"] is not None]
     gaps = len(points) - len(got)
-    print(f"\n  {name}")
+
     if not got:
-        print(f"    no data at all across {len(points)} months")
+        print(f"  {name:26} {unit:<8} {'—':>20}   {gaps:>2} gaps   {seconds:>5.1f}s")
         return
-    shown = got[:limit]
-    for p in shown:
-        v = p["value"]
-        v = f"{v:.3f}" if isinstance(v, float) else str(v)
-        print(f"    {p['t']}  {v:>14} {unit:<6} "
-              f"coverage {p['valid_fraction'] * 100:>3.0f}%")
-    if len(got) > limit:
-        print(f"    … {len(got) - limit} more")
-    print(f"    {len(got)} values, {gaps} gaps")
+
+    values = [p["value"] for p in got]
+    if isinstance(values[0], str):
+        distinct = sorted(set(values))
+        span = distinct[0] if len(distinct) == 1 else f"{len(distinct)} classes"
+        print(f"  {name:26} {unit:<8} {span:>20}   {gaps:>2} gaps   {seconds:>5.1f}s")
+        return
+
+    lo, hi = min(values), max(values)
+    print(f"  {name:26} {unit:<8} {lo:>9.2f} to {hi:>7.2f}   "
+          f"{gaps:>2} gaps   {seconds:>5.1f}s")
+
+
+# Factors whose seasonality is a genuine correctness signal. A flat NDVI or a
+# summer colder than winter means the pipeline is wrong, not that the weather
+# was odd — that is exactly the failure the first NDVI run hid behind a tick.
+SEASONAL = {"ndvi", "evi", "savi", "msavi", "gndvi", "chlorophyll_index",
+            "air_temp_mean", "air_temp_max", "air_temp_min",
+            "lst_day", "lst_night", "growing_degree_days"}
+
+
+def check_factor(factor_id, meta, points, catalog) -> List[str]:
+    """Plausibility for one factor, using what the catalogue already declares."""
+    if meta["kind"] == "categorical":
+        allowed = set(catalog.CLASS_VALUES.get(factor_id, []))
+        bad = {p["value"] for p in points
+               if p["value"] is not None and p["value"] not in allowed}
+        if bad:
+            return [f"{factor_id} returned classes the catalogue does not "
+                    f"list: {sorted(bad)}"]
+        return []
+
+    lo = meta.get("lo")
+    hi = meta.get("hi")
+    return check_continuous(
+        meta["name"], points,
+        lo if lo is not None else -1e9,
+        hi if hi is not None else 1e9,
+        str(meta["unit"]),
+        expect_seasons=factor_id in SEASONAL,
+    )
 
 
 def main() -> int:
@@ -111,55 +145,44 @@ def main() -> int:
     import catalog
     import ee_series
 
-    problems: List[str] = []
     print(f"\nChecking {len(ee_series.REAL_SERIES)} real factors over "
           f"{len(steps)} months, {AREA_HA:.0f} ha of fenland arable.")
 
-    for factor_id, fn in ee_series.REAL_SERIES.items():
-        meta = catalog.FACTOR_BY_ID[factor_id]
-        t0 = time.perf_counter()
-        try:
-            points = fn(SITE, steps, AREA_HA)
-        except Exception as e:
-            problems.append(f"{factor_id} raised: {e}")
-            print(f"\n  {meta['name']}\n    ✗ {e}")
-            continue
-        elapsed = time.perf_counter() - t0
+    # Grouped by base, because that is how the queries are actually batched.
+    # Every factor after the first in a group is served from one shared pass,
+    # which is why their timings collapse to nothing — that is the sharing
+    # working, not a measurement error.
+    by_base: Dict[str, List[str]] = {}
+    for factor_id in ee_series.REAL_SERIES:
+        by_base.setdefault(catalog.FACTOR_BY_ID[factor_id]["base"], []).append(factor_id)
 
-        show(meta["name"], points, meta["unit"])
-        print(f"    took {elapsed:.1f}s")
+    problems: List[str] = []
+    for base_id, factor_ids in by_base.items():
+        print(f"\n{catalog.BASE_BY_ID[base_id]['name']}")
+        print(f"  {'factor':26} {'unit':<8} {'range':>20}   gaps    time")
+        print("  " + "-" * 68)
 
-        if meta["kind"] == "categorical":
-            allowed = set(catalog.CLASS_VALUES.get(factor_id, []))
-            bad = {p["value"] for p in points
-                   if p["value"] is not None and p["value"] not in allowed}
-            if bad:
-                problems.append(
-                    f"{factor_id} returned classes the catalogue does not "
-                    f"list: {sorted(bad)}")
-        elif factor_id == "ndvi":
-            problems += check_continuous("NDVI", points, -1.0, 1.0,
-                                         "index", expect_seasons=True)
-        elif factor_id == "air_temp_mean":
-            problems += check_continuous("Air temperature", points, -15.0, 35.0,
-                                         "°C", expect_seasons=True)
-        else:
-            lo = meta.get("lo")
-            hi = meta.get("hi")
-            problems += check_continuous(
-                meta["name"], points,
-                lo if lo is not None else -1e9,
-                hi if hi is not None else 1e9,
-                meta["unit"], expect_seasons=False)
+        for factor_id in factor_ids:
+            meta = catalog.FACTOR_BY_ID[factor_id]
+            t0 = time.perf_counter()
+            try:
+                points = ee_series.REAL_SERIES[factor_id](SITE, steps, AREA_HA)
+            except Exception as e:
+                problems.append(f"{factor_id} raised: {e}")
+                print(f"  {meta['name']:26} ✗ {e}")
+                continue
+            summarise(meta["name"], str(meta["unit"]), points,
+                      time.perf_counter() - t0)
+            problems += check_factor(factor_id, meta, points, catalog)
 
-    print("\n" + "=" * 58)
+    print("\n" + "=" * 74)
     if problems:
         print(f"✗ {len(problems)} problem(s):")
         for p in problems:
             print(f"  · {p}")
         return 1
 
-    print("✓ Every real factor returned plausible values.")
+    print(f"✓ All {len(ee_series.REAL_SERIES)} factors returned plausible values.")
     print("  Start the backend and draw a small shape:")
     print("      uvicorn app:app --port 8000")
     return 0

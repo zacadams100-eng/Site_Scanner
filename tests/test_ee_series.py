@@ -259,3 +259,103 @@ def test_kelvin_conversion_is_the_right_way_round(ee_series):
     """A sign error here gives -270 °C for an English summer, which is
     obviously wrong, or 546, which is not obviously anything."""
     assert round(300.0 - ee_series.KELVIN, 2) == 26.85
+
+
+# ---------------------------------------------------------------------------
+# Reanalysis and thermal groups
+# ---------------------------------------------------------------------------
+def rows(**bands):
+    """One month of raw band means, as _reduce_months returns them."""
+    return [dict(t="2024-07", **bands)]
+
+
+def test_era5_temperature_becomes_celsius(ee_series):
+    out = ee_series._assemble(rows(temperature_2m=290.15,
+                                   dewpoint_temperature_2m=285.15,
+                                   volumetric_soil_water_layer_1=0.31,
+                                   total_evaporation_sum=-0.08),
+                              ee_series.ERA5_MONTHLY_FACTORS)
+    assert out["air_temp_mean"][0]["value"] == pytest.approx(17.0, abs=1e-6)
+
+
+def test_soil_moisture_passes_through_unscaled(ee_series):
+    out = ee_series._assemble(rows(temperature_2m=290.15,
+                                   dewpoint_temperature_2m=285.15,
+                                   volumetric_soil_water_layer_1=0.31,
+                                   total_evaporation_sum=-0.08),
+                              ee_series.ERA5_MONTHLY_FACTORS)
+    assert out["soil_moisture"][0]["value"] == pytest.approx(0.31)
+
+
+def test_evapotranspiration_is_positive_millimetres(ee_series):
+    """ERA5 reports evaporation as negative metres, because the water leaves
+    the surface. Reported as-is it would be a small negative number in a
+    column whose unit is mm."""
+    out = ee_series._assemble(rows(temperature_2m=290.15,
+                                   dewpoint_temperature_2m=285.15,
+                                   volumetric_soil_water_layer_1=0.31,
+                                   total_evaporation_sum=-0.08),
+                              ee_series.ERA5_MONTHLY_FACTORS)
+    assert out["evapotranspiration"][0]["value"] == pytest.approx(80.0)
+
+
+def test_relative_humidity_is_saturated_when_dewpoint_meets_temperature(ee_series):
+    assert ee_series._relative_humidity(290.15, 290.15) == pytest.approx(100.0)
+
+
+def test_relative_humidity_falls_as_air_dries(ee_series):
+    humid = ee_series._relative_humidity(290.15, 289.0)
+    dry = ee_series._relative_humidity(290.15, 275.0)
+    assert 0.0 < dry < humid < 100.0
+
+
+def test_diurnal_range_converts_before_differencing(ee_series):
+    """The trap. MODIS stores kelvin scaled by 0.02, so differencing the raw
+    integers gives a range fifty times too large — 500 °C between day and
+    night, which is obviously wrong, or a plausible-looking 12 when the truth
+    is 0.24."""
+    day_scaled, night_scaled = 15000, 14500     # 300.0 K and 290.0 K
+    out = ee_series._assemble(
+        rows(LST_Day_1km=day_scaled, LST_Night_1km=night_scaled),
+        ee_series.MODIS_FACTORS)
+
+    assert out["lst_day"][0]["value"] == pytest.approx(26.85, abs=1e-6)
+    assert out["lst_night"][0]["value"] == pytest.approx(16.85, abs=1e-6)
+    assert out["lst_diurnal_range"][0]["value"] == pytest.approx(10.0, abs=1e-6)
+    assert out["lst_diurnal_range"][0]["value"] != pytest.approx(
+        day_scaled - night_scaled)
+
+
+def test_a_missing_band_is_a_gap_not_a_zero(ee_series):
+    out = ee_series._assemble(rows(LST_Day_1km=None, LST_Night_1km=14500),
+                              ee_series.MODIS_FACTORS)
+    assert out["lst_day"][0]["value"] is None
+    assert out["lst_day"][0]["valid_fraction"] == 0.0
+    # A derived factor needing both bands cannot be computed from one.
+    assert out["lst_diurnal_range"][0]["value"] is None
+    assert out["lst_night"][0]["value"] is not None
+
+
+def test_full_coverage_groups_are_not_gapped_at_the_sentinel2_boundary(ee_series):
+    """Sentinel-2's March 2017 start must not leak into ERA5 or MODIS, which
+    run from 1950 and 2000. Applying it there would blank two thirds of the
+    table for no reason."""
+    import catalog
+
+    for factor_id in list(ee_series.ERA5_MONTHLY_FACTORS) + list(ee_series.MODIS_FACTORS):
+        assert catalog.FACTOR_BY_ID[factor_id]["base"] != "sentinel2_sr"
+        assert factor_id not in ee_series.S2_FACTORS
+
+
+def test_reanalysis_siblings_share_one_round_trip(ee_series, monkeypatch):
+    calls = []
+
+    def fake_reduce(ee, geom, steps, month_image, bands, scale):
+        calls.append(len(steps))
+        return [{"t": s, **{b: 290.0 for b in bands}} for s in steps]
+
+    monkeypatch.setattr(ee_series, "_reduce_months", fake_reduce)
+    steps = months(2015, 2015)
+    for factor_id in ee_series.ERA5_MONTHLY_FACTORS:
+        ee_series.REAL_SERIES[factor_id](GEOM, steps, 100.0)
+    assert len(calls) == 1

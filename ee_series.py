@@ -6,8 +6,16 @@ This is the bridge between the working Earth Engine backend and the frontend's
 the app cannot tell the difference except by reading the `source` field — which
 is the point: one factor becomes real without touching the frontend.
 
-Scope is deliberately narrow. NDVI only, for now. Land cover is the same
-pattern and is stubbed at the bottom with what it needs.
+Factors are served in **groups** that share one pass over the same data:
+eleven Sentinel-2 indices, four ERA5-Land monthly variables, four more from
+ERA5 daily aggregates, three MODIS thermal, and land cover. Loading and
+masking imagery is nearly all of the cost, so asking six questions of the same
+scenes must not fetch them six times — see the note above `_GROUP_CACHE`.
+
+Coverage differs sharply between groups and this is deliberately visible
+rather than smoothed over. Sentinel-2 starts in March 2017; ERA5 runs from
+1950 and MODIS from 2000, so those fill the whole catalogue range. A blank
+column before 2017 is the honest answer, not a bug.
 
 **This module is only imported when Earth Engine is available.** `app.py`
 registers it; `mock_ee_backend.py` does not, so the mock keeps working with no
@@ -25,6 +33,7 @@ which measured the alternative at 1–50 ms). Every response carries
 """
 
 import json
+import math
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional
 
@@ -313,13 +322,80 @@ ndvi_series = _s2_factor("ndvi")
 
 
 # ---------------------------------------------------------------------------
-# ERA5-Land air temperature
+# Monthly reduction, shared by the reanalysis and thermal groups
 # ---------------------------------------------------------------------------
-# Already aggregated to months upstream, and running since 1950, so unlike
-# NDVI this fills the whole 2011-2025 table rather than starting part way in.
-ERA5_COLLECTION = "ECMWF/ERA5_LAND/MONTHLY_AGGR"
-ERA5_BAND = "temperature_2m"
 KELVIN = 273.15
+
+
+def _reduce_months(ee, geom, steps: List[str], month_image,
+                   band_names: List[str], scale_m: int) -> List[Dict[str, Any]]:
+    """Reduce a per-month image to band means, one round trip per chunk.
+
+    `month_image(ee, geom, start, end)` returns the image for one month with
+    exactly `band_names` on it, and is responsible for substituting a fully
+    masked image when its collection is empty — reducing a collection with no
+    bands errors server-side rather than returning null.
+    """
+    first = ee.Date(steps[0] + "-01")
+
+    def month_feature(i):
+        i = ee.Number(i)
+        m_start = first.advance(i, "month")
+        img = month_image(ee, geom, m_start, m_start.advance(1, "month"))
+        stats = img.reduceRegion(
+            reducer=ee.Reducer.mean(), geometry=geom,
+            scale=scale_m, maxPixels=1e9, bestEffort=True)
+        props: Dict[str, Any] = {"t": m_start.format("YYYY-MM")}
+        for b in band_names:
+            props[b] = stats.get(b)
+        return ee.Feature(None, props)
+
+    fc = ee.FeatureCollection(ee.List.sequence(0, len(steps) - 1).map(month_feature))
+    return [row["properties"] for row in fc.getInfo()["features"]]
+
+
+def _blank(ee, names: List[str]):
+    """A fully masked image with the expected bands, for an empty month."""
+    return (ee.Image.constant([0] * len(names)).rename(names)
+            .updateMask(ee.Image.constant(0)))
+
+
+def _assemble(rows: List[Dict[str, Any]], factors: Dict[str, Any],
+              digits: int = 3) -> Dict[str, List[Dict[str, Any]]]:
+    """Turn raw band means into the point shape, applying each conversion.
+
+    Reanalysis and thermal composites have no cloud gaps in the way optical
+    imagery does: a month is either present in full or absent, so coverage is
+    1.0 rather than a fraction of observed pixels.
+    """
+    out: Dict[str, List[Dict[str, Any]]] = {fid: [] for fid in factors}
+    for p in rows:
+        for fid, (band, convert) in factors.items():
+            raw = p.get(band) if isinstance(band, str) else None
+            value = None
+            if isinstance(band, str):
+                if raw is not None:
+                    value = convert(float(raw))
+            else:                      # tuple of bands -> combined
+                vals = [p.get(b) for b in band]
+                if all(v is not None for v in vals):
+                    value = convert(*[float(v) for v in vals])
+            out[fid].append({
+                "t": p["t"],
+                "value": None if value is None else round(value, digits),
+                "valid_fraction": 0.0 if value is None else 1.0,
+                "interpolated": False,
+            })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# ERA5-Land reanalysis
+# ---------------------------------------------------------------------------
+# Aggregated to months upstream and running since 1950, so unlike Sentinel-2
+# this fills the whole 2011-2025 table rather than starting part way in.
+ERA5_COLLECTION = "ECMWF/ERA5_LAND/MONTHLY_AGGR"
+ERA5_DAILY_COLLECTION = "ECMWF/ERA5_LAND/DAILY_AGGR"
 
 # ERA5-Land is roughly 11 km, far coarser than any AOI someone will draw here,
 # so "mean over the AOI" is really "the value of the grid cell containing it".
@@ -328,59 +404,170 @@ KELVIN = 273.15
 # contain no pixel centre at all and come back empty.
 ERA5_SCALE_M = 100
 
+# Monthly aggregate bands, and what each catalogue factor takes from them.
+_ERA5_MONTHLY_BANDS = ["temperature_2m", "dewpoint_temperature_2m",
+                       "volumetric_soil_water_layer_1", "total_evaporation_sum"]
 
-def air_temp_series(geometry: dict, steps: List[str],
-                    area_ha: float) -> List[Dict[str, Any]]:
-    """Monthly mean 2 m air temperature in °C, one point per step."""
+
+def _era5_monthly_image(ee, geom, start, end):
+    coll = (ee.ImageCollection(ERA5_COLLECTION)
+            .select(_ERA5_MONTHLY_BANDS).filterDate(start, end))
+    return ee.Image(ee.Algorithms.If(
+        coll.size().gt(0), coll.first(), _blank(ee, _ERA5_MONTHLY_BANDS)))
+
+
+def _relative_humidity(t_k: float, td_k: float) -> float:
+    """Magnus-Tetens, the standard approximation.
+
+    ERA5 gives temperature and dewpoint, not humidity, so this is derived
+    rather than measured — which is why it is computed from two bands here
+    instead of being read from one.
+    """
+    t, td = t_k - KELVIN, td_k - KELVIN
+    ratio = math.exp(17.625 * td / (243.04 + td) - 17.625 * t / (243.04 + t))
+    return max(0.0, min(100.0, 100.0 * ratio))
+
+
+ERA5_MONTHLY_FACTORS: Dict[str, Any] = {
+    "air_temp_mean": ("temperature_2m", lambda k: k - KELVIN),
+    "soil_moisture": ("volumetric_soil_water_layer_1", lambda v: v),
+    # Metres of water equivalent, negative because it leaves the surface.
+    "evapotranspiration": ("total_evaporation_sum", lambda m: abs(m) * 1000.0),
+    "humidity": (("temperature_2m", "dewpoint_temperature_2m"),
+                 _relative_humidity),
+}
+
+
+def era5_monthly_group(geometry: dict, steps: List[str],
+                       area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
     import ee
 
-    geom = ee.Geometry(geometry)
-    points: List[Dict[str, Any]] = []
-    for i in range(0, len(steps), CHUNK_MONTHS):
-        points.extend(_era5_chunk(ee, geom, steps[i:i + CHUNK_MONTHS]))
-    return points
+    def compute():
+        geom = ee.Geometry(geometry)
+        rows: List[Dict[str, Any]] = []
+        for i in range(0, len(steps), CHUNK_MONTHS):
+            rows.extend(_reduce_months(
+                ee, geom, steps[i:i + CHUNK_MONTHS], _era5_monthly_image,
+                _ERA5_MONTHLY_BANDS, ERA5_SCALE_M))
+        return _assemble(rows, ERA5_MONTHLY_FACTORS)
+
+    return _cached_group(_group_key("era5m", geometry, steps), compute)
 
 
-def _era5_chunk(ee, geom, steps: List[str]) -> List[Dict[str, Any]]:
-    first = ee.Date(steps[0] + "-01")
+# Daily aggregates, for the things a monthly mean cannot express. A month's
+# hottest day and its mean are different questions, and frost is a count of
+# days rather than an average of anything.
+_ERA5_DAILY_BANDS = ["temperature_2m_max", "temperature_2m_min",
+                     "frost_days", "growing_degree_days"]
 
-    def month_feature(i):
-        i = ee.Number(i)
-        m_start = first.advance(i, "month")
-        coll = (ee.ImageCollection(ERA5_COLLECTION)
-                .select(ERA5_BAND)
-                .filterDate(m_start, m_start.advance(1, "month")))
 
-        blank = (ee.Image.constant(0).rename(ERA5_BAND)
-                 .updateMask(ee.Image.constant(0)))
-        img = ee.Image(ee.Algorithms.If(coll.size().gt(0), coll.first(), blank))
+def _era5_daily_image(ee, geom, start, end):
+    coll = ee.ImageCollection(ERA5_DAILY_COLLECTION).filterDate(start, end)
 
-        stats = img.reduceRegion(
-            reducer=ee.Reducer.mean(), geometry=geom,
-            scale=ERA5_SCALE_M, maxPixels=1e9, bestEffort=True)
+    def build():
+        t_max = coll.select("temperature_2m_max").max().rename("temperature_2m_max")
+        t_min = coll.select("temperature_2m_min").min().rename("temperature_2m_min")
+        frost = (coll.select("temperature_2m_min")
+                 .map(lambda img: img.lt(KELVIN))
+                 .sum().rename("frost_days"))
+        # Growing degree days: warmth accumulated above the 5 °C base at which
+        # most temperate crops start growing. Summed over days, never averaged.
+        gdd = (coll.select("temperature_2m")
+               .map(lambda img: img.subtract(KELVIN + 5.0).max(0))
+               .sum().rename("growing_degree_days"))
+        return ee.Image.cat([t_max, t_min, frost, gdd])
 
-        return ee.Feature(None, {
-            "t": m_start.format("YYYY-MM"),
-            "kelvin": stats.get(ERA5_BAND),
-        })
+    return ee.Image(ee.Algorithms.If(
+        coll.size().gt(0), build(), _blank(ee, _ERA5_DAILY_BANDS)))
 
-    fc = ee.FeatureCollection(ee.List.sequence(0, len(steps) - 1).map(month_feature))
-    rows = fc.getInfo()["features"]
 
-    out: List[Dict[str, Any]] = []
-    for row in rows:
-        p = row["properties"]
-        k = p.get("kelvin")
-        if k is None:
-            out.append({"t": p["t"], "value": None,
-                        "valid_fraction": 0.0, "interpolated": False})
-            continue
-        # Reanalysis has no clouds and no gaps: a month either exists in full
-        # or does not exist at all, so coverage is 1.0 rather than a fraction
-        # of observed pixels.
-        out.append({"t": p["t"], "value": round(float(k) - KELVIN, 3),
-                    "valid_fraction": 1.0, "interpolated": False})
-    return out
+ERA5_DAILY_FACTORS: Dict[str, Any] = {
+    "air_temp_max": ("temperature_2m_max", lambda k: k - KELVIN),
+    "air_temp_min": ("temperature_2m_min", lambda k: k - KELVIN),
+    "frost_days": ("frost_days", lambda d: d),
+    "growing_degree_days": ("growing_degree_days", lambda g: g),
+}
+
+
+def era5_daily_group(geometry: dict, steps: List[str],
+                     area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    import ee
+
+    def compute():
+        geom = ee.Geometry(geometry)
+        rows: List[Dict[str, Any]] = []
+        for i in range(0, len(steps), CHUNK_MONTHS):
+            rows.extend(_reduce_months(
+                ee, geom, steps[i:i + CHUNK_MONTHS], _era5_daily_image,
+                _ERA5_DAILY_BANDS, ERA5_SCALE_M))
+        return _assemble(rows, ERA5_DAILY_FACTORS)
+
+    return _cached_group(_group_key("era5d", geometry, steps), compute)
+
+
+# ---------------------------------------------------------------------------
+# MODIS land surface temperature
+# ---------------------------------------------------------------------------
+# Skin temperature, not air temperature — what a thermal sensor sees looking
+# at the ground. On a clear summer day a bare field reads far hotter than the
+# air above it, which is the point: this is the factor that shows heat
+# retention, and it is why it sits beside ERA5 rather than replacing it.
+#
+# Eight-day composites since 2000, so the full catalogue range is covered.
+MODIS_LST_COLLECTION = "MODIS/061/MOD11A2"
+MODIS_LST_SCALE = 0.02          # stored as scaled integers, in kelvin
+MODIS_SCALE_M = 250             # native 1 km; see the ERA5 note on sub-pixel AOIs
+
+_MODIS_BANDS = ["LST_Day_1km", "LST_Night_1km"]
+
+
+def _modis_lst_image(ee, geom, start, end):
+    coll = (ee.ImageCollection(MODIS_LST_COLLECTION)
+            .select(_MODIS_BANDS).filterDate(start, end))
+    return ee.Image(ee.Algorithms.If(
+        coll.size().gt(0), coll.mean(), _blank(ee, _MODIS_BANDS)))
+
+
+def _to_celsius(scaled: float) -> float:
+    return scaled * MODIS_LST_SCALE - KELVIN
+
+
+MODIS_FACTORS: Dict[str, Any] = {
+    "lst_day": ("LST_Day_1km", _to_celsius),
+    "lst_night": ("LST_Night_1km", _to_celsius),
+    # Day minus night. Both are converted from kelvin first; differencing the
+    # raw scaled integers would give a number 50x too large.
+    "lst_diurnal_range": (("LST_Day_1km", "LST_Night_1km"),
+                          lambda d, n: _to_celsius(d) - _to_celsius(n)),
+}
+
+
+def modis_lst_group(geometry: dict, steps: List[str],
+                    area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    import ee
+
+    def compute():
+        geom = ee.Geometry(geometry)
+        rows: List[Dict[str, Any]] = []
+        for i in range(0, len(steps), CHUNK_MONTHS):
+            rows.extend(_reduce_months(
+                ee, geom, steps[i:i + CHUNK_MONTHS], _modis_lst_image,
+                _MODIS_BANDS, MODIS_SCALE_M))
+        return _assemble(rows, MODIS_FACTORS)
+
+    return _cached_group(_group_key("modis", geometry, steps), compute)
+
+
+def _group_factor(group, factor_id: str):
+    """One factor's view of a shared group result."""
+    def series(geometry: dict, steps: List[str],
+               area_ha: float) -> List[Dict[str, Any]]:
+        return group(geometry, steps, area_ha)[factor_id]
+    series.__name__ = f"{factor_id}_series"
+    return series
+
+
+air_temp_series = _group_factor(era5_monthly_group, "air_temp_mean")
 
 
 # ---------------------------------------------------------------------------
@@ -500,7 +687,10 @@ REAL_SERIES: Dict[str, Callable[[dict, List[str], float], List[Dict[str, Any]]]]
     # Eleven indices off one Sentinel-2 pass. Selecting several of them costs
     # the same as selecting one.
     **{fid: _s2_factor(fid) for fid in S2_FACTORS},
-    "air_temp_mean": air_temp_series,
+    # Reanalysis and thermal, both covering the full catalogue range.
+    **{fid: _group_factor(era5_monthly_group, fid) for fid in ERA5_MONTHLY_FACTORS},
+    **{fid: _group_factor(era5_daily_group, fid) for fid in ERA5_DAILY_FACTORS},
+    **{fid: _group_factor(modis_lst_group, fid) for fid in MODIS_FACTORS},
     "lc_dominant": lc_dominant_series,
     "lc_tree_pct": lc_tree_pct_series,
 }
