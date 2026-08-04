@@ -257,7 +257,11 @@ is not the same as meeting its condition, and the app was doing the former.
 | --- | --- |
 | `catalog.py` | Single source of truth: 20 bases, ~118 factors, licences, attribution |
 | `ee_series.py` | Real Earth Engine queries, grouped so siblings share one pass |
-| `routes_catalog.py` | API contract, mounted by both real and mock backends |
+| `routes_catalog.py` | API contract and the per-factor series cache, mounted by both backends |
+| `web/src/store.ts` | One store; `timeIndex` is the only source of truth for "when" |
+| `web/src/lib/places.ts` | Postcode, place-name and coordinate lookup, with its OGL notice |
+| `web/src/lib/exports.ts` | Every way data leaves: CSV, Excel, GeoJSON, print, saved-site files |
+| `web/src/components/MapCanvas.tsx` | Drawing, editing, cell painting — and every MapLibre trap |
 | `series.py` | The generator that stands in for unbuilt factors |
 | `mock_ee_backend.py` | Credential-free backend; keeps frontend work unblocked |
 | `web/src/index.css` | Three-layer token system and the elevation ladder |
