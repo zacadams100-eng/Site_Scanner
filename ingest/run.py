@@ -2,12 +2,21 @@
 The ingest runner.
 
 One command executes any manifest. Stages are idempotent and keyed by
-(dataset, timestep, resolution), so a backfill that dies at month 140 of 180
-resumes rather than restarts — which matters when a full backfill is 180 jobs
-that each take minutes.
+(dataset, timestep, tile, resolution), so a backfill that dies at tile 300 of
+400 resumes rather than restarts — which matters when a national run at 10 m
+is 180 timesteps x 48 tiles x 2 resolutions and takes hours.
 
+    python3 -m ingest.migrate --dsn postgresql://…        # once, first
     python3 -m ingest.run ingest/manifests/ndvi_s2.yaml --dry-run
     python3 -m ingest.run ingest/manifests/ndvi_s2.yaml --synthetic --limit 3
+
+Tiling is automatic: an extent larger than the pixel budget is cut into a grid
+(see ingest/tiling.py) and each tile is fetched, written and aggregated on its
+own. An extent that already fits runs in one pass exactly as it did before,
+and records itself as the untiled tile '-'.
+
+Resuming is per tile and it is the default. `--restart` ignores existing
+progress; nothing else does.
 
 `--synthetic` runs the entire pipeline against generated rasters instead of a
 real source. That is how this was developed and tested without cloud access,
@@ -18,37 +27,19 @@ Earth Engine quota.
 import argparse
 import sys
 import time
+import zlib
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from ingest import tiling
 from ingest.aggregate import CellStat, aggregate_array, aggregate_cog
 from ingest.cog import synthetic_raster, write_categorical_cog, write_cog
 from ingest.manifest import Manifest
+from ingest.progress import FileProgress, PostgresProgress, Progress
 
-DDL = """
-CREATE TABLE IF NOT EXISTS cell_stats_r{res} (
-  dataset_id     text     NOT NULL,
-  h3             bigint   NOT NULL,
-  t              text     NOT NULL,
-  mean           real,
-  min            real,
-  max            real,
-  stddev         real,
-  valid_fraction real     NOT NULL,
-  PRIMARY KEY (dataset_id, h3, t)
-);
-
--- Which (dataset, timestep, resolution) triples are already done. This is what
--- makes a resumed backfill skip work rather than redo it.
-CREATE TABLE IF NOT EXISTS ingest_progress (
-  dataset_id text NOT NULL,
-  t          text NOT NULL,
-  h3_res     int  NOT NULL,
-  n_cells    int  NOT NULL,
-  done_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (dataset_id, t, h3_res)
-);
-"""
+# The schema lives in ingest/migrations/, applied by ingest/migrate.py. It used
+# to be inline CREATE TABLE IF NOT EXISTS here, which works exactly once and
+# cannot add a column — and adding a column is what tiling needed.
 
 
 DEFAULT_BBOX = [-6.42, 49.86, 1.77, 55.81]          # England
@@ -80,7 +71,8 @@ def raster_shape(bbox, resolution_m: float) -> tuple:
 
 
 def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
-                 out_dir: Path, window: Optional[tuple] = None):
+                 out_dir: Path, window: Optional[tuple] = None,
+                 shape: Optional[tuple] = None):
     """Produce a raster for one timestep.
 
     With `--synthetic` this generates one **at the manifest's declared extent
@@ -101,17 +93,36 @@ def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
         )
 
     window = tuple(window or manifest.spatial.bbox or DEFAULT_BBOX)
-    width, height = raster_shape(window, manifest.spatial.resolution_m)
+    # A tile passes its own pixel dimensions rather than letting them be
+    # recomputed from its bbox. Recomputing rounds independently, which puts a
+    # tile's pixel grid a fraction of a pixel off the grid its neighbours and
+    # the untiled run use — and a shifted grid moves which cell each pixel
+    # centre falls in, so cells near tile edges end up with different pixel
+    # counts and different means. Caught by
+    # test_a_tiled_run_and_an_untiled_run_reach_the_same_table.
+    width, height = shape or raster_shape(window, manifest.spatial.resolution_m)
     if width * height > MAX_PIXELS:
+        # A backstop, not the tiling boundary: run_manifest cuts the extent to
+        # ingest.tiling.TILE_PIXEL_BUDGET, which is well under this. Reaching
+        # here means something asked for an untiled window directly.
         raise SystemExit(
             f"{width:,}×{height:,} = {width * height / 1e6:,.0f} M pixels for one "
             f"timestep of {manifest.id} at {manifest.spatial.resolution_m} m.\n"
-            f"That will not fit in memory. Use --window to ingest a sub-extent, "
-            f"or tile the manifest — which is what a national run at 10 m needs "
-            f"regardless (see docs/INGEST-BENCHMARK.md)."
+            f"That will not fit in memory. Run it through run_manifest, which "
+            f"tiles anything this large, or pass a smaller --window."
         )
 
-    seed = abs(hash((manifest.id, timestep))) % (2 ** 31)
+    # Seeded on the dataset and timestep only — deliberately not on the
+    # window. `synthetic_raster` samples a global surface, so one month is one
+    # surface and a tile is a view of it. Seeding per tile would make every
+    # tile an unrelated random field, which looks fine and makes it impossible
+    # to check a tiled run against an untiled one.
+    #
+    # `source.seed` lets two manifests share a surface, which is how a tiled
+    # run is compared against an untiled one: they need different dataset ids
+    # to sit in the table together, and identical pixels to be comparable.
+    surface = manifest.source.get("seed", manifest.id)
+    seed = zlib.crc32(f"{surface}:{timestep}".encode()) % (2 ** 31)
     data, transform = synthetic_raster(
         window, width, height, seed=seed, kind=manifest.kind,
         lo=-0.2, hi=0.9, nodata=manifest.nodata,
@@ -123,32 +134,51 @@ def fetch_raster(manifest: Manifest, timestep: str, synthetic: bool,
 def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
                  out_dir: Path, dsn: Optional[str], dry_run: bool,
                  window: Optional[tuple] = None,
-                 stats_out: Optional[dict] = None) -> int:
+                 stats_out: Optional[dict] = None,
+                 tile_pixels: int = tiling.TILE_PIXEL_BUDGET,
+                 restart: bool = False) -> int:
     steps = manifest.timesteps()
     if limit:
         steps = steps[:limit]
 
     extent = tuple(window or manifest.spatial.bbox or DEFAULT_BBOX)
     px_w, px_h = raster_shape(extent, manifest.spatial.resolution_m)
+    tiles = tiling.plan(extent, px_w, px_h, tile_pixels)
+
     print(f"{manifest.id}: {len(steps)} timestep(s), "
           f"H3 res {manifest.h3_resolutions}, kind={manifest.kind}")
-    print(f"  extent {extent}  →  {px_w:,}×{px_h:,} px at "
+    print(f"  extent {extent}  ->  {px_w:,}x{px_h:,} px at "
           f"{manifest.spatial.resolution_m} m ({px_w * px_h / 1e6:.1f} M/timestep)")
+    print(f"  {tiling.describe(tiles)}, "
+          f"{len(steps) * len(tiles):,} tile-timesteps to do")
+
     if dry_run:
-        for s in steps[:5]:
-            print(f"  would write {manifest.asset_key(s)}")
-        if len(steps) > 5:
-            print(f"  … and {len(steps) - 5} more")
+        for step in steps[:3]:
+            for tile in tiles[:3]:
+                print(f"  would write {manifest.asset_key(step, tile.id)}")
+        remaining = len(steps) * len(tiles) - min(3, len(steps)) * min(3, len(tiles))
+        if remaining > 0:
+            print(f"  ... and {remaining:,} more")
         return 0
 
     conn = None
+    progress: Progress
     if dsn:
         import psycopg
         conn = psycopg.connect(dsn, autocommit=False)
-        with conn.cursor() as cur:
-            for res in manifest.h3_resolutions:
-                cur.execute(DDL.format(res=res))
-        conn.commit()
+        # The schema is migrations' job, but a runner that fails with
+        # "column tile does not exist" three hours into a backfill is a bad
+        # trade against applying two idempotent files at startup.
+        from ingest import migrate
+        migrate.apply(conn, manifest.h3_resolutions, verbose=False)
+        progress = PostgresProgress(conn)
+    else:
+        progress = FileProgress(out_dir / f".{manifest.id}.progress.json")
+
+    # Tile ids are positions in a grid, so resuming a 8x6 run against 12x9
+    # progress would skip work that was never done. Refuse instead.
+    if not restart:
+        tiling.check_grid(tiles, progress.grid_for(manifest.id))
 
     total_cells = 0
     t_start = time.perf_counter()
@@ -156,52 +186,68 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
     # only reports a total tells you it is too slow and nothing about why.
     stage = {"fetch": 0.0, "cog": 0.0, "aggregate": 0.0, "load": 0.0}
     cog_bytes = 0
-    done = 0
+    done_units = 0
+    skipped = 0
 
     for step in steps:
-        if conn and _already_done(conn, manifest, step):
-            print(f"  {step}: already ingested, skipping")
-            continue
+        for tile in tiles:
+            pending = [r for r in manifest.h3_resolutions
+                       if restart or not progress.done(manifest.id, step, tile.id, r)]
+            if not pending:
+                skipped += 1
+                continue
 
-        t0 = time.perf_counter()
-        data, transform, bounds = fetch_raster(manifest, step, synthetic,
-                                               out_dir, window=extent)
-        stage["fetch"] += time.perf_counter() - t0
+            t0 = time.perf_counter()
+            data, transform, bounds = fetch_raster(
+                manifest, step, synthetic, out_dir, window=tile.bbox,
+                shape=(tile.width, tile.height))
+            stage["fetch"] += time.perf_counter() - t0
 
-        # 1. COG to object storage (local dir stands in for it here).
-        t1 = time.perf_counter()
-        cog_path = out_dir / manifest.asset_key(step)
-        if manifest.kind == "categorical":
-            # Class codes are already integers and must never be scaled — a
-            # scaled land-cover code is not a land-cover code.
-            write_categorical_cog(cog_path, data, transform, "EPSG:4326",
-                                  nodata=manifest.nodata)
-        else:
-            write_cog(cog_path, data, transform, "EPSG:4326",
-                      nodata=manifest.nodata,
-                      scale=manifest.storage.write_scale,
-                      offset=manifest.storage.offset)
-        stage["cog"] += time.perf_counter() - t1
-        cog_bytes += cog_path.stat().st_size
+            # 1. COG to object storage (local dir stands in for it here).
+            t1 = time.perf_counter()
+            cog_path = out_dir / manifest.asset_key(step, tile.id)
+            if manifest.kind == "categorical":
+                # Class codes are already integers and must never be scaled —
+                # a scaled land-cover code is not a land-cover code.
+                write_categorical_cog(cog_path, data, transform, "EPSG:4326",
+                                      nodata=manifest.nodata)
+            else:
+                write_cog(cog_path, data, transform, "EPSG:4326",
+                          nodata=manifest.nodata,
+                          scale=manifest.storage.write_scale,
+                          offset=manifest.storage.offset)
+            stage["cog"] += time.perf_counter() - t1
+            cog_bytes += cog_path.stat().st_size
 
-        # 2. Aggregate to every declared H3 tier.
-        for res in manifest.h3_resolutions:
-            t2 = time.perf_counter()
-            stats = list(aggregate_array(
-                data, transform, bounds, dataset_id=manifest.id, t=step,
-                res=res, kind=manifest.kind, nodata=manifest.nodata,
-            ))
-            stage["aggregate"] += time.perf_counter() - t2
-            total_cells += len(stats)
-            if conn:
-                t3 = time.perf_counter()
-                _load(conn, res, stats)
-                _mark_done(conn, manifest, step, res, len(stats))
-                stage["load"] += time.perf_counter() - t3
+            # 2. Aggregate to every declared H3 tier that still needs it.
+            for res in pending:
+                t2 = time.perf_counter()
+                stats = list(aggregate_array(
+                    data, transform, bounds, dataset_id=manifest.id, t=step,
+                    res=res, kind=manifest.kind, nodata=manifest.nodata,
+                ))
+                stage["aggregate"] += time.perf_counter() - t2
+                total_cells += len(stats)
+                if conn:
+                    t3 = time.perf_counter()
+                    # The rows and the progress mark commit together. A tile is
+                    # either fully merged and recorded or neither — anything
+                    # in between would let a retry double-count a cell that
+                    # spans two tiles.
+                    _load(conn, res, stats)
+                    progress.mark(manifest.id, step, tile.id, res,
+                                  len(stats), tile.grid)
+                    conn.commit()
+                    stage["load"] += time.perf_counter() - t3
+                else:
+                    progress.mark(manifest.id, step, tile.id, res,
+                                  len(stats), tile.grid)
 
-        done += 1
-        print(f"  {step}: {cog_path.stat().st_size // 1024} KiB COG, "
-              f"{total_cells:,} cells cumulative, {time.perf_counter() - t0:.2f}s")
+            done_units += 1
+            label = step if tile.untiled else f"{step} {tile.id}"
+            print(f"  {label}: {cog_path.stat().st_size // 1024} KiB COG, "
+                  f"{total_cells:,} cells cumulative, "
+                  f"{time.perf_counter() - t0:.2f}s")
 
     if conn:
         conn.commit()
@@ -209,58 +255,92 @@ def run_manifest(manifest: Manifest, *, synthetic: bool, limit: Optional[int],
 
     elapsed = time.perf_counter() - t_start
     print(f"{manifest.id}: done in {elapsed:.1f}s, {total_cells:,} cell-rows")
-    if done:
-        print("  per timestep: " + "  ".join(
-            f"{k} {v / done:.2f}s" for k, v in stage.items() if v))
-        print(f"  {elapsed / done:.2f}s/timestep, "
-              f"{cog_bytes / done / 1e6:.1f} MB COG/timestep, "
-              f"{total_cells / done:,.0f} cells/timestep")
+    if skipped:
+        print(f"  {skipped:,} tile-timestep(s) already ingested, skipped")
+    if done_units:
+        print("  per tile: " + "  ".join(
+            f"{k} {v / done_units:.2f}s" for k, v in stage.items() if v))
+        print(f"  {elapsed / done_units:.2f}s/tile, "
+              f"{cog_bytes / done_units / 1e6:.1f} MB COG/tile, "
+              f"{total_cells / done_units:,.0f} cells/tile")
     if stats_out is not None:
-        stats_out.update(steps=done, seconds=elapsed, cells=total_cells,
+        stats_out.update(steps=done_units, seconds=elapsed, cells=total_cells,
                          cog_bytes=cog_bytes, stage=stage,
-                         pixels=px_w * px_h, extent=extent)
+                         pixels=px_w * px_h, extent=extent,
+                         tiles=len(tiles), grid=tiles[0].grid, skipped=skipped)
     return 0
 
 
-def _already_done(conn, manifest: Manifest, step: str) -> bool:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT count(*) FROM ingest_progress "
-            "WHERE dataset_id = %s AND t = %s AND h3_res = ANY(%s)",
-            (manifest.id, step, manifest.h3_resolutions),
-        )
-        return cur.fetchone()[0] == len(manifest.h3_resolutions)
-
-
 def _load(conn, res: int, stats: Iterable[CellStat]) -> None:
+    """Merge a tile's statistics into the fast tier.
+
+    Not an overwrite. An H3 cell on a tile boundary arrives once per tile it
+    touches, each time covering only that tile's pixels, so the old
+    `DO UPDATE SET mean = EXCLUDED.mean` left such a cell holding whichever
+    sliver happened to be written last — a wrong number, on every tile edge in
+    the country, with nothing to notice it by.
+
+    This is Chan's parallel variance merge in SQL, and it matches
+    `aggregate.merge_stats` line for line. `m2` is the sum of squared
+    deviations, so combining two partial aggregations is exact rather than
+    approximate: the merged row is indistinguishable from one produced by
+    aggregating the whole raster in a single pass, which is what
+    `test_ingest.py` asserts.
+
+    Re-running a tile that already committed would double-count. That is
+    prevented upstream — a committed tile is a recorded tile, and a recorded
+    tile is skipped — not here.
+    """
     rows = [s.as_row() for s in stats]
     if not rows:
         return
     with conn.cursor() as cur:
-        # ON CONFLICT rather than plain INSERT so a partial rerun overwrites
-        # cleanly instead of failing on the primary key.
         cur.executemany(
             f"""INSERT INTO cell_stats_r{res}
-                  (dataset_id, h3, t, mean, min, max, stddev, valid_fraction)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                  (dataset_id, h3, t, mean, min, max, stddev, valid_fraction,
+                   n_valid, n_total, m2)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (dataset_id, h3, t) DO UPDATE SET
-                  mean = EXCLUDED.mean, min = EXCLUDED.min, max = EXCLUDED.max,
-                  stddev = EXCLUDED.stddev,
-                  valid_fraction = EXCLUDED.valid_fraction""",
+                  mean = CASE
+                    WHEN cell_stats_r{res}.n_valid + EXCLUDED.n_valid = 0 THEN NULL
+                    WHEN cell_stats_r{res}.n_valid = 0 THEN EXCLUDED.mean
+                    WHEN EXCLUDED.n_valid = 0 THEN cell_stats_r{res}.mean
+                    ELSE (cell_stats_r{res}.mean * cell_stats_r{res}.n_valid
+                          + EXCLUDED.mean * EXCLUDED.n_valid)
+                         / (cell_stats_r{res}.n_valid + EXCLUDED.n_valid)
+                  END,
+                  min = LEAST(cell_stats_r{res}.min, EXCLUDED.min),
+                  max = GREATEST(cell_stats_r{res}.max, EXCLUDED.max),
+                  m2 = CASE
+                    WHEN cell_stats_r{res}.n_valid = 0 THEN EXCLUDED.m2
+                    WHEN EXCLUDED.n_valid = 0 THEN cell_stats_r{res}.m2
+                    ELSE cell_stats_r{res}.m2 + EXCLUDED.m2
+                         + power(EXCLUDED.mean - cell_stats_r{res}.mean, 2)
+                           * cell_stats_r{res}.n_valid * EXCLUDED.n_valid
+                           / (cell_stats_r{res}.n_valid + EXCLUDED.n_valid)
+                  END,
+                  stddev = CASE
+                    WHEN cell_stats_r{res}.n_valid + EXCLUDED.n_valid = 0 THEN NULL
+                    ELSE sqrt(
+                      (CASE
+                        WHEN cell_stats_r{res}.n_valid = 0 THEN EXCLUDED.m2
+                        WHEN EXCLUDED.n_valid = 0 THEN cell_stats_r{res}.m2
+                        ELSE cell_stats_r{res}.m2 + EXCLUDED.m2
+                             + power(EXCLUDED.mean - cell_stats_r{res}.mean, 2)
+                               * cell_stats_r{res}.n_valid * EXCLUDED.n_valid
+                               / (cell_stats_r{res}.n_valid + EXCLUDED.n_valid)
+                       END)
+                      / (cell_stats_r{res}.n_valid + EXCLUDED.n_valid))
+                  END,
+                  n_valid = cell_stats_r{res}.n_valid + EXCLUDED.n_valid,
+                  n_total = cell_stats_r{res}.n_total + EXCLUDED.n_total,
+                  valid_fraction = CASE
+                    WHEN cell_stats_r{res}.n_total + EXCLUDED.n_total = 0 THEN 0
+                    ELSE (cell_stats_r{res}.n_valid + EXCLUDED.n_valid)::real
+                         / (cell_stats_r{res}.n_total + EXCLUDED.n_total)
+                  END""",
             rows,
         )
-
-
-def _mark_done(conn, manifest: Manifest, step: str, res: int, n: int) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """INSERT INTO ingest_progress (dataset_id, t, h3_res, n_cells)
-               VALUES (%s, %s, %s, %s)
-               ON CONFLICT (dataset_id, t, h3_res)
-               DO UPDATE SET n_cells = EXCLUDED.n_cells, done_at = now()""",
-            (manifest.id, step, res, n),
-        )
-    conn.commit()
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -274,14 +354,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--window", type=float, nargs=4,
                     metavar=("W", "S", "E", "N"),
-                    help="ingest a sub-extent of the manifest's bbox; the way "
-                         "a national run at 10 m is tiled")
+                    help="ingest a sub-extent of the manifest's bbox")
+    ap.add_argument("--tile-pixels", type=int, default=tiling.TILE_PIXEL_BUDGET,
+                    help="pixels per tile; the extent is cut into a grid so no "
+                         "tile exceeds this (default %(default)s)")
+    ap.add_argument("--restart", action="store_true",
+                    help="ignore recorded progress and redo every tile")
     args = ap.parse_args(argv)
 
     manifest = Manifest.load(args.manifest)
     return run_manifest(manifest, synthetic=args.synthetic, limit=args.limit,
                         out_dir=args.out, dsn=args.dsn, dry_run=args.dry_run,
-                        window=tuple(args.window) if args.window else None)
+                        window=tuple(args.window) if args.window else None,
+                        tile_pixels=args.tile_pixels, restart=args.restart)
 
 
 if __name__ == "__main__":

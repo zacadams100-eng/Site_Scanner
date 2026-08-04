@@ -138,9 +138,15 @@ class Manifest:
                     m, y = 1, y + 1
         return out
 
-    def asset_key(self, timestep: str) -> str:
-        """Where this timestep's COG lives in object storage."""
-        if timestep == "static":
-            return f"{self.id}/static.tif"
-        year, month = timestep.split("-")
-        return f"{self.id}/{year}/{month}.tif"
+    def asset_key(self, timestep: str, tile: str = "-") -> str:
+        """Where this timestep's COG lives in object storage.
+
+        A tiled run gets one file per tile, keyed by the tile's grid position,
+        so the layout stays browsable and a tile can be re-fetched on its own.
+        An untiled run keeps the flat path it always had — the tile id '-'
+        means "the whole extent", and adding a '-' to those filenames would
+        invalidate every path already written.
+        """
+        stem = f"{self.id}/static" if timestep == "static" else \
+            "{}/{}/{}".format(self.id, *timestep.split("-"))
+        return f"{stem}.tif" if tile == "-" else f"{stem}/{tile}.tif"

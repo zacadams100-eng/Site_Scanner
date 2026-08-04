@@ -72,6 +72,31 @@ promotes them on any machine with open egress. Read `docs/OPEN-DATA.md` before
 quoting any of these numbers as real; it also records why ONS is written but
 deliberately not registered.
 
+### The ingest tier tiles, resumes and stores int16
+
+A national run at 10 m is 3.6 billion pixels per timestep and could not happen
+in one pass. `ingest/tiling.py` cuts any extent over 25 M pixels into a grid —
+England is 154 tiles, 27,720 tile-timesteps — and progress is recorded per
+`(dataset, timestep, tile, h3_res)` in the same transaction as that tile's
+rows, so a killed backfill resumes at the tile it reached. The schema now lives
+in `ingest/migrations/` with a small runner (`python3 -m ingest.migrate`),
+because the old inline CREATE TABLE IF NOT EXISTS could not add a column.
+
+Tiling's real hazard is not memory, it is the seams: a cell on a tile boundary
+is aggregated once per tile it touches, and overwriting rather than merging
+would leave every tile edge in the country holding a sliver's average. Cell
+rows carry pixel counts and a sum of squared deviations so partials combine
+exactly; a merged row is indistinguishable from a single pass, checked in
+Python, in SQL, and end to end through a real database.
+
+Continuous rasters are stored as int16 scaled by the manifest's `storage.scale`
+rather than float32 — 0.29x the bytes, and the scale is written into the COG so
+QGIS and GDAL unscale it themselves. `ingest/cog.py:read_band` is the only way
+anything here reads a band; calling `src.read(1)` on a quantised COG gets
+values 10,000x too large with no error.
+
+`docs/INGEST-BENCHMARK.md` is re-measured against all of this.
+
 ### The real/generated split is audited and shown
 
 `scripts/audit_catalogue.py` checks every factor the catalogue calls real:
