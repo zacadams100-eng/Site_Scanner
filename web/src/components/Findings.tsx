@@ -1,3 +1,4 @@
+import Ask from './Ask'
 import { useStore } from '../store'
 import { isReal } from '../lib/format'
 import type { Insight } from '../types'
@@ -60,6 +61,7 @@ export default function Findings() {
   if (!findings.length) {
     return (
       <div className="findings">
+        <Ask />
         <p className="empty-note">
           Nothing stood out in these factors over this window — no significant
           trend, no seasonal anomaly, no step change.
@@ -74,6 +76,7 @@ export default function Findings() {
 
   return (
     <div className="findings">
+      <Ask />
       <ol className="finding-list">
         {findings.map((f, i) => {
           const real = isReal(f.source)

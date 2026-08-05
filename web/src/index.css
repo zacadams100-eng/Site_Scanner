@@ -1198,3 +1198,59 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   Ask — natural-language questions about the drawn area.
+
+   Sits above the findings because it answers the same question the findings
+   do ("is there anything here I should care about?"), just directed. The
+   evidence row underneath the sentence is load-bearing, not decoration: an
+   English answer with no figures is indistinguishable from a fabricated one,
+   so the numbers it was computed from are always on screen beside it.
+   --------------------------------------------------------------------------- */
+.ask { padding: 14px 16px 4px; border-bottom: 1px solid var(--line); }
+
+.ask-form { display: flex; gap: 8px; }
+.ask-input {
+  flex: 1; min-width: 0;
+  padding: 8px 11px;
+  font: inherit; font-size: 12.5px;
+  color: var(--text);
+  background: var(--paper-000);
+  border: 1px solid var(--rule-400);
+  border-radius: var(--radius-sm);
+}
+.ask-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-input::placeholder { color: var(--text-dim); }
+
+.ask-error { margin: 10px 0 6px; font-size: 12px; color: var(--bad); }
+
+.ask-answer { margin: 12px 0 10px; }
+.ask-text { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text); }
+
+.ask-evidence { list-style: none; margin: 11px 0 0; padding: 0; }
+.ask-fact {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 0;
+  font-size: 11.5px;
+  border-top: 1px solid var(--line);
+}
+.ask-fact-label { flex: 1; min-width: 0; color: var(--text); }
+.ask-fact-value { font-variant-numeric: tabular-nums; color: var(--text); }
+/* Same rule as the findings list: demo figures stay legible and never look
+   like observations. */
+.ask-fact.is-demo .ask-fact-label,
+.ask-fact.is-demo .ask-fact-value { color: var(--text-dim); }
+.ask-fact-src {
+  flex: 0 0 auto; font-size: 10.5px; letter-spacing: .02em;
+  color: var(--text-dim);
+}
+
+.ask-foot { margin: 9px 0 0; font-size: 10.5px; color: var(--text-dim); }
+
+.ask-suggestions { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.ask-suggestion {
+  padding: 0; font: inherit; font-size: 11.5px; text-align: left;
+  color: var(--accent); background: none; border: none; cursor: pointer;
+}
+.ask-suggestion:hover { text-decoration: underline; }

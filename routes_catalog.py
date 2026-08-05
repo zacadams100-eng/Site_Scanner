@@ -23,6 +23,7 @@ import redaction
 
 import catalog
 import insights
+import nlq
 import series as series_mod
 from cache import build_cache, cache_key
 
@@ -359,3 +360,76 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # next to the labelling they depend on. See insights.py.
         **insights.summarise({"series": out}),
     }
+
+
+class AskRequest(BaseModel):
+    geometry: dict
+    question: str = Field(..., min_length=3, max_length=400)
+
+
+@router.post("/api/ask")
+def ask(req: AskRequest) -> Dict[str, Any]:
+    """Answer a plain-English question about the drawn area.
+
+    The route does three things in a fixed order, and the order is the point:
+    read the question, fetch the series it names, then compute the answer from
+    those series. A language model is involved in neither the first step nor
+    the third — it may only rephrase the finished sentence, and only when a key
+    exists, which on the public deployment it does not.
+
+    That means the answer here is arithmetic on the same numbers the table and
+    the charts show. It can be wrong about *which* factor you meant; it cannot
+    be wrong about what that factor did.
+    """
+    try:
+        centroid, area_ha = _validate_geometry(req.geometry)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    first_year = int(catalog.TIME_START[:4])
+    last_year = int(catalog.TIME_END[:4])
+    interpretation = nlq.interpret(req.question, first_year, last_year)
+
+    if not interpretation["factor_ids"]:
+        # No guess is better than a wrong one: naming a factor the question
+        # never mentioned would produce a confident answer about something the
+        # user did not ask.
+        return {
+            **nlq.ask(req.question, {}, interpretation),
+            "area_ha": round(area_ha, 2),
+            "suggestions": _ask_suggestions(),
+        }
+
+    # Only the months the question covers — asking about 2019 onward should not
+    # pay for 2011.
+    steps = series_mod.month_steps(f"{interpretation['from_year']}-01",
+                                   f"{interpretation['to_year']}-12")
+
+    out: Dict[str, Any] = {}
+    for fid in interpretation["factor_ids"]:
+        s = _series_for(fid, req.geometry, centroid, area_ha, steps)
+        s["annual"] = series_mod.annual_rollup(s)
+        s["meta"] = catalog.resolve(fid)
+        out[fid] = s
+
+    answer = nlq.rephrase(nlq.ask(req.question, out, interpretation))
+    return {
+        **answer,
+        "area_ha": round(area_ha, 2),
+        "centroid": {"lng": round(centroid[0], 5), "lat": round(centroid[1], 5)},
+        "series": out,
+    }
+
+
+def _ask_suggestions() -> List[str]:
+    """Shown when nothing matched. Drawn from the catalogue rather than written
+    out, so they cannot drift from the factors that actually exist."""
+    picks = ["lc_tree_pct", "ndvi", "avg_sale_price", "air_temp_mean"]
+    out = []
+    for fid in picks:
+        f = catalog.FACTOR_BY_ID.get(fid)
+        if f:
+            out.append(f"How has {f['name'].split('(')[0].strip().lower()} changed since 2019?")
+    return out

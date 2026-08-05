@@ -500,9 +500,11 @@ is not the same as meeting its condition, and the app was doing the former.
 | `open_data.py` | 22 live open-data factors, and what each source cannot answer |
 | `ons/` + `ons_store.py` | The scheduled spreadsheet ingest and the store it writes |
 | `insights.py` | What the numbers say, in sentences — and the guards that keep it honest |
+| `nlq.py` | Plain-English questions. Parses the question, computes the answer from the series; a model may only rephrase |
 | `ingest/` | The raster pipeline: manifests, tiling, migrations, H3 aggregation |
 | `scripts/audit_catalogue.py` | Checks every claim of "real"; runs in CI |
 | `BLOCKERS.md` | Everything that needs a human, and why |
+| `PROGRESS.md` | Running session log: what changed, what is real, what is next |
 | `series.py` | The generator that stands in for unbuilt factors |
 | `mock_ee_backend.py` | Credential-free backend; keeps frontend work unblocked |
 | `web/src/index.css` | Three-layer token system, the frame, every component rule |

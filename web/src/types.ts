@@ -197,3 +197,45 @@ export interface Marker {
   lng: number
   lat: number
 }
+
+/**
+ * A natural-language answer.
+ *
+ * `answered_from: 'series'` is the contract that matters: every figure in
+ * `answer` was computed from `series`, not written by a model. A model may
+ * have rephrased the sentence — `phrased_by` says so — but it is never given
+ * the question without the computed answer, so it cannot introduce a number.
+ */
+export interface AskFinding {
+  factor_id: string
+  label: string
+  unit: string
+  source: string
+  observed: boolean
+  verdict: 'trend' | 'flat' | 'level' | 'extreme' | 'no-data'
+  text: string
+  from?: number
+  to?: number
+  from_value?: number
+  to_value?: number
+  change?: number
+  change_pct?: number | null
+}
+
+export interface AskResponse {
+  question: string
+  understood: {
+    factor_ids: string[]
+    scores: Record<string, number>
+    from_year: number
+    to_year: number
+    intent: string
+  }
+  findings: AskFinding[]
+  answer: string
+  answered_from: 'series'
+  phrased_by?: 'claude'
+  suggestions?: string[]
+  series?: Record<string, Series>
+  area_ha?: number
+}

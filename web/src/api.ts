@@ -1,4 +1,4 @@
-import type { Catalog, CellsResponse, SeriesResponse } from './types'
+import type { AskResponse, Catalog, CellsResponse, SeriesResponse } from './types'
 
 /**
  * The backend returns a plain-language `detail` for anything a user can fix
@@ -70,4 +70,12 @@ export async function detectMock(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+export function ask(
+  geometry: GeoJSON.Polygon,
+  question: string,
+  signal?: AbortSignal,
+): Promise<AskResponse> {
+  return post<AskResponse>('/api/ask', { geometry, question }, signal)
 }
