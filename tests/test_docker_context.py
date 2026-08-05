@@ -98,29 +98,48 @@ def test_dockerfile_copies_every_module_the_app_imports():
     )
 
 
-def test_vercelignore_excludes_every_python_module():
-    """The frontend deploy carries no Python, and drifts the same way.
-
-    This lives beside the Dockerfile check because it is the same failure:
-    a hand-maintained list of modules that nobody updates when a module is
-    added. `.vercelignore` had fallen two behind — `ee_series` and
-    `redaction` were being uploaded to Vercel.
-
-    The consequence is milder than the Dockerfile's (Vercel ignores the
-    stray files rather than crashing), but excluding `requirements.txt` is
-    what stops Vercel's framework detection deciding this is a Python
-    project, and a half-excluded backend muddies that signal.
-    """
-    ignored = {
+def _vercel_ignored_modules() -> set:
+    return {
         line.strip()[: -len(".py")]
         for line in (REPO_ROOT / ".vercelignore").read_text().splitlines()
         if line.strip().endswith(".py") and not line.strip().startswith("#")
     }
-    leaked = _root_modules() - ignored
-    assert not leaked, (
-        ".vercelignore does not exclude: "
-        + ", ".join(sorted(f"{m}.py" for m in leaked))
+
+
+def test_vercel_uploads_what_the_serverless_function_imports():
+    """api/index.py serves the mock backend from Vercel, so its imports have
+    to survive .vercelignore.
+
+    Same failure mode as the Dockerfile's, with the same cause and a worse
+    symptom: the function bundles fine and 500s on first request instead of
+    failing at deploy time.
+    """
+    known = _root_modules()
+    seen, queue = set(), ["mock_ee_backend"]
+    while queue:
+        module = queue.pop()
+        if module in seen:
+            continue
+        seen.add(module)
+        queue.extend(_local_imports(module, known) - seen)
+
+    excluded = seen & _vercel_ignored_modules()
+    assert not excluded, (
+        ".vercelignore excludes modules the serverless function imports: "
+        + ", ".join(sorted(f"{m}.py" for m in excluded))
     )
+
+
+def test_vercel_does_not_upload_the_earth_engine_backend():
+    """`app.py` and `ee_series.py` import `ee`, and api/requirements.txt does
+    not install earthengine-api. Uploading them would put code in the bundle
+    that cannot import, for a path the function never serves."""
+    ignored = _vercel_ignored_modules()
+    for module in ("app", "ee_series"):
+        assert module in ignored, (
+            f"{module}.py imports earthengine-api and must stay out of the "
+            "Vercel bundle"
+        )
 
 
 # Everything Vercel needs in order to build the frontend. If any of these is

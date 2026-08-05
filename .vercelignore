@@ -12,15 +12,17 @@
 # be uploaded, because Vercel runs the build. Only the build's inputs and
 # outputs are dropped below.
 
+# api/index.py serves the mock backend as a serverless function, so the
+# modules it imports have to be uploaded: mock_ee_backend -> summary, geometry,
+# routes_catalog -> catalog, series, redaction. They stay at the repo root
+# because the Cloud Run image and the tests both expect them there;
+# vercel.json's includeFiles puts them in the function bundle.
+#
+# Excluded below is everything only the *real* backend needs. app.py and
+# ee_series.py import `ee`, and pulling earthengine-api into a serverless
+# bundle for code that never runs is pure weight.
 app.py
-mock_ee_backend.py
-routes_catalog.py
-catalog.py
-series.py
 ee_series.py
-redaction.py
-summary.py
-geometry.py
 cache.py
 requirements.txt
 requirements-dev.txt

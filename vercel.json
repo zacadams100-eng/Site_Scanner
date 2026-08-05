@@ -7,10 +7,16 @@
   "framework": null,
   "trailingSlash": false,
 
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{mock_ee_backend,routes_catalog,catalog,series,summary,geometry,redaction}.py"
+    }
+  },
+
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE-WITH-CLOUD-RUN-URL.a.run.app/api/:path*"
+      "destination": "/api/index"
     },
     { "source": "/demo", "destination": "/demo.html" },
     { "source": "/(.*)", "destination": "/index.html" }

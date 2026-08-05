@@ -1,0 +1,5 @@
+# Only what the mock backend imports. Deliberately not requirements.txt from
+# the repo root: that carries earthengine-api, which this function never
+# touches and which would bloat the bundle for nothing.
+fastapi==0.115.0
+pydantic==2.9.2
