@@ -14,12 +14,16 @@ number here is real.
 | | Factors | Share of 269 |
 | --- | --- | --- |
 | Earth Engine (needs a service account) | 24 | 8.9% |
-| Open data (needs nothing) | 22 | 8.2% |
-| **Real, together** | **46** | **17.1%** |
-| Generated, and labelled as such | 223 | 82.9% |
+| Open data, live (needs nothing) | 22 | 8.2% |
+| ONS, from the scheduled job | 8 | 3.0% |
+| Derived from the above | 2 | 0.7% |
+| **Real, together** | **56** | **20.8%** |
+| Generated, and labelled as such | 213 | 79.2% |
 
-The brief was ~9% → ~25%. This lands at 17%. The gap is ONS and EPC, and both
-reasons are recorded below rather than rounded away.
+The ONS rows count only once `python3 -m ons.job` has been run somewhere with
+open egress; until then those factors keep saying "generated", which is the
+whole point of registering on what the store holds rather than on what the
+specs hope for. BLOCKERS.md §2 has the arithmetic for getting past this.
 
 ## What each source answers
 
@@ -82,20 +86,41 @@ no such account exists yet, and creating one is a registration in someone's
 name, which is not a call to make unilaterally. Set the two variables and the
 six factors register themselves at startup with no code change.
 
-### ONS — written, not registered
+### ONS — a scheduled spreadsheet job, not an API client
 
-`ons_series()` queries the ONS Beta API for a dataset over the AOI's local
-authority. It is not wired to any factor, and that is deliberate: ONS publishes
-private rents, workplace earnings and the affordability ratio as **spreadsheets
-on a release page**, not as Beta API datasets with stable per-area endpoints.
-Registering a factor against a guessed dataset ID would put it in
-`real_factor_ids` — a real-data promise made in the UI, before the query — and
-then fail on every request. A factor that is going to fall back should not
-claim to be real first.
+ONS publishes private rents, workplace earnings, the affordability ratio and
+the census as **spreadsheets on a release page**, not as API datasets with
+stable per-area endpoints. There is nothing for a live client to call, which is
+why these factors stayed generated while the rest of this module went real.
 
-The real fix is a scheduled job that downloads each release, parses it, and
-stores it by local authority. That is the ingest tier, and it is the single
-largest remaining item for lifting the real share past 25%.
+`ons/` is the fix the earlier version of this document called for: a scheduled
+job (`.github/workflows/ons-refresh.yml`, monthly) downloads each release,
+parses it, and writes `data/ons/<dataset>.json`. `ons_store.py` reads those
+files at request time — no network, no database, so it works in the serverless
+deployment exactly as it does locally.
+
+| Dataset | Publisher | Factors |
+| --- | --- | --- |
+| Price Index of Private Rents | ONS | `rental_median` |
+| House price to earnings ratio | ONS | `affordability_ratio` |
+| ASHE place-of-work earnings | ONS | `earnings_median` |
+| Census 2021 first results | ONS | `households`, `age_median`, `age_under16_pct`, `age_over65_pct` |
+| Indices of Deprivation 2019 | MHCLG | `imd_score` |
+
+Two more are derived from what that puts in the process and are published by
+nobody: `rental_growth_yoy`, and `gross_yield` — annual rent over sale price,
+combining the stored ONS rent with the live Land Registry median.
+
+**Three limitations that matter.** These are **local authority** figures, so a
+5-hectare AOI reports its district; that is real data and it is not a
+measurement of the site. Some are **years old** — the census is 2021,
+deprivation 2019 — and every value carried across months is flagged
+`interpolated` so a chart cannot imply it was measured monthly. And **the URLs
+are unverified**: ONS rotates its `/current/` links on each release, and
+nothing here has ever been fetched. Run `python3 -m ons.job --check` first.
+
+See BLOCKERS.md §2 for why this reaches 21% real rather than the 50% asked for,
+and which eight sources would actually close that gap.
 
 ## Verification status: read this
 

@@ -1,0 +1,98 @@
+# The scheduled ONS spreadsheet ingest.
+#
+# ONS publishes rents, earnings, affordability and the census as spreadsheets
+# on a release page rather than through a per-area API, so the only way to
+# serve them is to download each release on a schedule, parse it, and commit
+# what we parsed. `ons/job.py` does the work; this decides when.
+#
+# Committing data into the repository is a deliberate choice, not laziness.
+# The app deploys as a static bundle plus one serverless function with no
+# database attached — `data/ons/*.json` is the only storage that exists in
+# that deployment, and it is small (a few hundred KB), append-mostly, and
+# genuinely worth having in version control: a diff shows exactly which
+# authorities moved between releases.
+#
+# GitHub Actions is what this repository already uses (ci.yml, deploy.yml), so
+# this is its cron rather than a new piece of infrastructure.
+
+name: ONS refresh
+
+on:
+  schedule:
+    # 04:20 UTC on the 20th. ONS publishes the rents release mid-month, so
+    # this lands a few days after and re-runs monthly regardless — the annual
+    # and one-off datasets simply produce no change most of the time.
+    - cron: "20 4 20 * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "One dataset id (private_rents, affordability, earnings, census_2021, imd_2019). Blank for all."
+        required: false
+      check_only:
+        description: "Resolve the URLs and report, without parsing or committing"
+        type: boolean
+        default: false
+
+# Needed to push the refreshed data back.
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      # Run this first when something looks wrong. ONS rotates `/current/`
+      # links on each release, and a dead URL is by far the most likely
+      # failure — far more likely than a parsing bug.
+      - name: Check the release URLs
+        run: python -m ons.job --check
+        continue-on-error: true
+
+      - name: Refresh
+        if: ${{ inputs.check_only != true }}
+        run: |
+          if [ -n "${{ inputs.only }}" ]; then
+            python -m ons.job --only "${{ inputs.only }}"
+          else
+            python -m ons.job
+          fi
+
+      # The parser is what turns a spreadsheet into a number a user sees, so a
+      # refresh that breaks it must not be committed.
+      - name: Test
+        if: ${{ inputs.check_only != true }}
+        run: python -m pytest tests/test_ons.py -q
+
+      # And the catalogue must still be internally consistent afterwards —
+      # newly registered factors need provenance like every other real factor.
+      - name: Audit the catalogue
+        if: ${{ inputs.check_only != true }}
+        run: python scripts/audit_catalogue.py
+
+      - name: Commit whatever changed
+        if: ${{ inputs.check_only != true }}
+        run: |
+          if git diff --quiet -- data/ons; then
+            echo "No change — every release is already current."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ons
+          # The message names what moved, so the history is readable without
+          # opening the diff.
+          git commit -m "Refresh ONS data
+
+          $(git diff --cached --stat -- data/ons | tail -n +1)
+
+          Automated by .github/workflows/ons-refresh.yml."
+          git push

@@ -553,50 +553,104 @@ def epc_group(geometry: dict, steps: List[str],
 # ---------------------------------------------------------------------------
 # ONS — earnings, rents, affordability
 # ---------------------------------------------------------------------------
-def ons_series(dataset: str, geometry: dict, steps: List[str],
-               area_ha: float) -> List[Dict[str, Any]]:
+def ons_stored_series(factor_id: str, geometry: dict, steps: List[str],
+                      area_ha: float) -> List[Dict[str, Any]]:
     """One ONS indicator for the local authority containing the AOI.
 
-    A caveat that matters: ONS publishes most housing and earnings series as
-    spreadsheets on a release page, not through an API with a stable per-area
-    endpoint. The Beta API covers a subset. This queries the Beta API for the
-    dataset asked for, and raises when it does not carry it — at which point
-    the factor stays generated and says so.
+    Read from what `ons/job.py` downloaded and parsed, not from an API. ONS
+    publishes rents, earnings, affordability and the census as **spreadsheets
+    on a release page**, so there is no per-area endpoint to call — which is
+    why these factors stayed generated while the rest of this module went
+    real, and why the fix had to be a scheduled job.
 
-    The right fix is a scheduled job that downloads each release and stores it,
-    which is the ingest tier again, and is recorded as such in
-    `docs/OPEN-DATA.md` rather than pretended away here.
+    Two consequences travel with every number and are recorded in the factor's
+    provenance rather than smoothed over:
+
+    * It is a **local authority** figure. A 5-hectare AOI reports its
+      district's rent, not its own. Real data; not a measurement of the site.
+    * It may be **years old**. The census is 2021 and deprivation is 2019.
+      Values carried across months are flagged `interpolated`, so a chart
+      cannot imply they were measured monthly.
     """
+    import ons_store
+
+    loc = locate(geometry)
+    code = loc.get("admin_district_code")
+    if not code:
+        raise OpenDataError("no local authority code for this area")
+    try:
+        return ons_store.series(factor_id, code, steps)
+    except ons_store.OnsStoreError as exc:
+        raise OpenDataError(str(exc)) from exc
+
+
+def rental_growth_series(geometry: dict, steps: List[str],
+                         area_ha: float) -> List[Dict[str, Any]]:
+    """Year-on-year change in the local authority's median rent.
+
+    Derived from the stored monthly series rather than published, so it needs
+    thirteen months of data to produce its first point. Months without a
+    comparison twelve months back are gaps — an unanchored percentage is worse
+    than no percentage.
+    """
+    import ons_store
+
     loc = locate(geometry)
     code = loc.get("admin_district_code")
     if not code:
         raise OpenDataError("no local authority code for this area")
 
-    data = _get(f"https://api.beta.ons.gov.uk/v1/datasets/{dataset}/editions/"
-                f"time-series/versions/1/observations",
-                {"geography": code, "time": "*"})
-    obs = (data or {}).get("observations")
-    if not obs:
-        raise OpenDataError(f"ONS dataset {dataset!r} returned no observations")
+    # Ask for each step and its anniversary in one pass.
+    wanted = sorted({s for s in steps} | {_year_before(s) for s in steps})
+    try:
+        points = ons_store.series("rental_median", code, wanted)
+    except ons_store.OnsStoreError as exc:
+        raise OpenDataError(str(exc)) from exc
 
-    by_year: Dict[str, float] = {}
-    for o in obs:
-        t = ((o.get("dimensions") or {}).get("time") or {}).get("id", "")
-        try:
-            by_year[t[:4]] = float(o.get("observation"))
-        except (TypeError, ValueError):
-            continue
-
+    by_month = {p["t"]: p["value"] for p in points}
     out = []
-    for s in steps:
-        v = by_year.get(s[:4])
-        if v is None:
-            out.append(_gap(s))
+    for step in steps:
+        now, then = by_month.get(step), by_month.get(_year_before(step))
+        if now is None or not then:
+            out.append(_gap(step))
         else:
-            p = _point(s, round(v, 2))
-            p["interpolated"] = not s.endswith("-01")
-            out.append(p)
+            out.append(_point(step, round((now - then) / then * 100.0, 2)))
     return out
+
+
+def gross_yield_series(geometry: dict, steps: List[str],
+                       area_ha: float) -> List[Dict[str, Any]]:
+    """Annual rent as a percentage of purchase price.
+
+    The one number a residential investor actually asks for, and it exists
+    here only because two separate sources are already in the process: ONS
+    rents from the stored release, Land Registry sale prices from the live
+    SPARQL query. Neither publishes it.
+
+    Both sides are district-level, so this is the yield of the area rather
+    than of the site — stated in the factor's provenance, because a yield
+    quoted to four significant figures invites more precision than it has.
+    """
+    rents = ons_stored_series("rental_median", geometry, steps, area_ha)
+    prices = ppd_group(geometry, steps, area_ha)["median_sale_price"]
+
+    by_month = {p["t"]: p["value"] for p in prices}
+    out = []
+    for rent in rents:
+        price = by_month.get(rent["t"])
+        if rent["value"] is None or not price:
+            out.append(_gap(rent["t"]))
+            continue
+        point = _point(rent["t"], round(rent["value"] * 12 / price * 100.0, 2))
+        # Inherits the rent's carried-forward flag: a yield computed from a
+        # held annual figure is itself held.
+        point["interpolated"] = rent.get("interpolated", False)
+        out.append(point)
+    return out
+
+
+def _year_before(step: str) -> str:
+    return f"{int(step[:4]) - 1:04d}-{step[5:]}"
 
 
 # ---------------------------------------------------------------------------
@@ -706,6 +760,47 @@ def install(registry: Dict[str, Any],
               "Department for Levelling Up / EPC register", "written",
               "needs EPC_API_EMAIL and EPC_API_KEY",
               endpoint="epc.opendatacommunities.org")
+
+    # ONS and MHCLG spreadsheets, via the scheduled job. Registered only for
+    # factors the store can actually answer: until `python3 -m ons.job` has run
+    # once there is no data, and a factor with nothing behind it must keep
+    # saying "generated" rather than promising a number it cannot produce.
+    try:
+        import ons_store
+
+        for factor_id in ons_store.available_factors():
+            if factor_id not in catalog.FACTOR_BY_ID:
+                continue
+            registry[factor_id] = (
+                lambda g, s, a, _f=factor_id: ons_stored_series(_f, g, s, a))
+            meta = ons_store.factor_meta(factor_id)
+            retrieved = (meta.get("retrieved") or "")[:10]
+            _mark([factor_id], meta.get("publisher") or "ONS", "written",
+                  f"published for the local authority containing the AOI, not "
+                  f"the AOI itself; {meta.get('title', 'release')} "
+                  f"({meta.get('latest_period') or 'unknown period'}), "
+                  f"downloaded {retrieved or 'unknown date'}",
+                  endpoint=f"ons.gov.uk (stored release, {meta.get('dataset')})")
+        # Two factors nobody publishes, derived from what is now in the
+        # process. They register only when their inputs do.
+        if "rental_median" in ons_store.available_factors():
+            if "rental_growth_yoy" in catalog.FACTOR_BY_ID:
+                registry["rental_growth_yoy"] = rental_growth_series
+                _mark(["rental_growth_yoy"], "Office for National Statistics",
+                      "written",
+                      "derived from the stored rent series; needs thirteen "
+                      "months of data before its first point",
+                      endpoint="ons.gov.uk (stored release, private_rents)")
+            if "gross_yield" in catalog.FACTOR_BY_ID:
+                registry["gross_yield"] = gross_yield_series
+                _mark(["gross_yield"], "ONS and HM Land Registry", "written",
+                      "annual rent over sale price, both district-level — the "
+                      "yield of the area, not of the site",
+                      endpoint="ons.gov.uk + landregistry.data.gov.uk")
+    except Exception:                                   # pragma: no cover
+        # A missing store must not stop the backend booting; it is the normal
+        # state before the job has ever run.
+        pass
 
     if provenance is not None:
         for factor_id in registry:
