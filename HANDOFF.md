@@ -1,26 +1,32 @@
 # Handoff — Site Scanner
 
-Branch: `claude/site-scanner-improvements-pfiz4b`
+Branch: `claude/handoff-md-review-e6zlvw`
 Repo: `zacadams100-eng/Site_Scanner` (public)
-Tests: 391 passing, 10 skipped (they need a Postgres server) · 46 frontend
+Tests: 426 passing, 10 skipped (they need a Postgres server) · 59 frontend
+
+**Live: https://site-scanner-pi.vercel.app**
 
 ---
 
 ## Read this first
 
-**Three things need you, not another coding session.** Each is minutes of
+**Two things need you, not another coding session.** Each is minutes of
 work and each unblocks something no amount of code can:
 
 1. **Send the ESA/Copernicus email** — `docs/licensing/email-copernicus-sentinel-2.md`.
    Fill in a name and send. It is the cheaper of the two licence questions and
    it may make the Google one unnecessary.
-2. **Run `vercel login && vercel deploy --prod`.** Everything else is built and
-   verified locally; this is one command and then the site has a URL.
-3. **Run the two check scripts anywhere with normal internet:**
+2. **Run the two check scripts anywhere with normal internet:**
    `python3 scripts/check_open_data.py` and `python3 -m ons.job --check`. The
    first promotes 22 factors from "written" to "verified" — or tells us which
    integrations are wrong. The second finds which ONS release URLs have moved,
    which some of them will have.
+
+**The deploy is done.** The frontend and the credential-free API are live on
+Vercel at the URL above; `npx vercel deploy --prod` from the repo root ships a
+new build. Earth Engine is the one piece still not deployed, and it is blocked
+on Google requiring a billing account before Cloud Run can be enabled at all —
+`DEPLOY.md §0` has the exact error. Nothing in this repo can work around it.
 
 `BLOCKERS.md` has the detail on all of these, plus the honest arithmetic on
 why real coverage is 21% rather than the 50% that was asked for, and which
@@ -30,7 +36,20 @@ eight sources would actually close that gap.
 
 ## What changed in the last session
 
-Nine commits, in order:
+Deployed the app, then added natural-language querying. The deploy took four
+rounds of configuration failures, all of one shape: an exclude list written
+for the repository root, applied by a matcher that ignores depth. `scripts/`
+also matched `web/scripts/` and dropped the MapLibre worker copier;
+`requirements.txt` also matched `api/requirements.txt`, so Vercel installed no
+Python dependencies at all and every API call returned
+`ModuleNotFoundError: No module named 'fastapi'`. All three ignore files now
+have tests. The close-range basemap also moved from OSM raster tiles to
+OpenFreeMap vector tiles styled in this app's palette — see
+`web/src/lib/basemapStyle.ts`.
+
+`PROGRESS.md` carries the running log from here on.
+
+Before that, nine commits:
 
 | | |
 | --- | --- |
