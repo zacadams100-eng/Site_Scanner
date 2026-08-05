@@ -8,6 +8,7 @@ import { rampColor, rampPosition } from '../lib/format'
 import {
   GLYPHS,
   VECTOR_SOURCE_ID,
+  belowVectorBasemap,
   resolveVectorSource,
   vectorBasemapLayers,
 } from '../lib/basemapStyle'
@@ -261,13 +262,18 @@ export default function MapCanvas() {
         },
       })
 
-      // The bundled basemap goes underneath everything of ours. It is added
-      // before the raster so the raster covers it as it fades in.
+      // The bundled basemap goes underneath everything of ours, and underneath
+      // the vector basemap. Anchoring it to the first vector layer rather than
+      // to 'cells-fill' is what makes that true regardless of which of the two
+      // fetches resolves first — see belowVectorBasemap.
       void fetch(BASEMAP_URL)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
         .then((b: BasemapData) => {
           if (!map.style || map.getSource('bm-land')) return
-          const first = map.getLayer('cells-fill') ? 'cells-fill' : undefined
+          const first = belowVectorBasemap(
+            (id) => !!map.getLayer(id),
+            map.getLayer('cells-fill') ? 'cells-fill' : undefined,
+          )
 
           const add = (id: string, data: GeoJSON.FeatureCollection,
                        layer: Omit<maplibregl.LayerSpecification, 'id' | 'source'>) => {

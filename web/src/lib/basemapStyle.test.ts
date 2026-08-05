@@ -3,8 +3,10 @@ import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec'
 
 import {
   GLYPHS,
+  VECTOR_LAYER_IDS,
   VECTOR_SOURCE,
   VECTOR_SOURCE_ID,
+  belowVectorBasemap,
   resolveVectorSource,
   vectorBasemapLayers,
 } from './basemapStyle'
@@ -56,6 +58,32 @@ describe('resolveVectorSource', () => {
     }) as unknown as typeof fetch
     expect(await resolveVectorSource(rejecting)).toEqual(VECTOR_SOURCE)
     expect(await resolveVectorSource(styleResponse({}, false))).toEqual(VECTOR_SOURCE)
+  })
+})
+
+/**
+ * The bundled basemap and the vector basemap are both added from async
+ * callbacks. When both anchored on 'cells-fill', whichever resolved last sat
+ * on top — and the bundled land layer is an opaque fill over all of England,
+ * so when it won the race every vector layer was painted over and the map
+ * looked precisely as though the tiles had never loaded. Silent, intermittent,
+ * and indistinguishable from a broken tile source.
+ */
+describe('belowVectorBasemap', () => {
+  it('anchors to the first vector layer present', () => {
+    const present = new Set(['ofm-water', 'ofm-road', 'cells-fill'])
+    expect(belowVectorBasemap((id) => present.has(id), 'cells-fill')).toBe('ofm-water')
+  })
+
+  it('falls back when the vector basemap has not arrived yet', () => {
+    expect(belowVectorBasemap(() => false, 'cells-fill')).toBe('cells-fill')
+    expect(belowVectorBasemap(() => false, undefined)).toBeUndefined()
+  })
+
+  it('lists exactly the layers that get added', () => {
+    // A drifted list silently reintroduces the race for whichever layer is
+    // missing from it.
+    expect([...VECTOR_LAYER_IDS]).toEqual(vectorBasemapLayers().map((l) => l.id))
   })
 })
 

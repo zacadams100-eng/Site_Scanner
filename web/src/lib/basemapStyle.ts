@@ -27,6 +27,41 @@ import type {
 
 export const VECTOR_SOURCE_ID = 'ofm'
 
+/** Every layer id this module adds, in draw order. Exported so MapCanvas can
+ *  anchor the bundled basemap beneath them without knowing the ids. */
+export const VECTOR_LAYER_IDS = [
+  'ofm-landcover',
+  'ofm-landuse',
+  'ofm-park',
+  'ofm-water',
+  'ofm-waterway',
+  'ofm-building',
+  'ofm-rail',
+  'ofm-road-casing',
+  'ofm-road',
+  'ofm-road-label',
+] as const
+
+/**
+ * Where a layer must be inserted to sit *below* the vector basemap.
+ *
+ * Both basemaps are added from async callbacks and both used to anchor on
+ * `cells-fill`, so the one whose fetch resolved last ended up on top. That is
+ * a race with a silent loser: the bundled `bm-land` is an opaque fill covering
+ * all of England, so when it won, every vector layer beneath it was painted
+ * over and the map looked exactly as though the tiles had never loaded.
+ *
+ * Anchoring the bundled layers to the first vector layer that exists — and the
+ * vector layers to `cells-fill` — makes the stack the same either way:
+ * sea, bundled basemap, vector basemap, then our data.
+ */
+export function belowVectorBasemap(
+  hasLayer: (id: string) => boolean,
+  fallback: string | undefined,
+): string | undefined {
+  return VECTOR_LAYER_IDS.find(hasLayer) ?? fallback
+}
+
 /** ODbL requires the OSM credit; OpenFreeMap asks for its own. This project
  *  carries the notice every licence actually requires rather than just naming
  *  the licence, so both appear. */
