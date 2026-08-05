@@ -3,6 +3,8 @@ import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec'
 
 import {
   GLYPHS,
+  PLACE_HANDOVER_ZOOM,
+  placeCutoff,
   VECTOR_LAYER_IDS,
   VECTOR_SOURCE,
   VECTOR_SOURCE_ID,
@@ -127,10 +129,23 @@ describe('vector basemap style', () => {
     expect(VECTOR_SOURCE.attribution).toMatch(/OpenFreeMap/)
   })
 
-  it('keeps labels above the zoom where place markers are drawn', () => {
-    // Place names are DOM markers below ~z10.5; street labels starting any
-    // earlier would collide with them.
-    const label = vectorBasemapLayers().find((l) => l.type === 'symbol')
-    expect(label?.minzoom).toBeGreaterThanOrEqual(13)
+  it('holds street names back until the map is local', () => {
+    const label = vectorBasemapLayers().find((l) => l.id === 'ofm-road-label')
+    expect(label?.minzoom).toBeGreaterThanOrEqual(14)
+  })
+
+  it('starts naming places exactly where the DOM markers stop', () => {
+    // Drawing both is the failure this handover exists to prevent: every town
+    // labelled twice, once from Natural Earth and once from OSM.
+    const major = vectorBasemapLayers().find((l) => l.id === 'ofm-place-major')
+    expect(major?.minzoom).toBe(PLACE_HANDOVER_ZOOM)
+    expect(placeCutoff(PLACE_HANDOVER_ZOOM)).toBe(Infinity)
+    expect(placeCutoff(PLACE_HANDOVER_ZOOM - 0.1)).toBeLessThan(Infinity)
+  })
+
+  it('names the places Natural Earth has never heard of', () => {
+    const minor = vectorBasemapLayers().find((l) => l.id === 'ofm-place-minor')
+    expect(JSON.stringify(minor)).toMatch(/village/)
+    expect(JSON.stringify(minor)).toMatch(/suburb/)
   })
 })

@@ -40,7 +40,41 @@ export const VECTOR_LAYER_IDS = [
   'ofm-road-casing',
   'ofm-road',
   'ofm-road-label',
+  'ofm-place-major',
+  'ofm-place-minor',
 ] as const
+
+/**
+ * Where place naming hands over from the bundled basemap to the vector tiles.
+ *
+ * The bundled places are Natural Earth populated points — cities and larger
+ * towns, a few hundred across England. That is the right dataset for finding a
+ * site and the wrong one for looking at it: zoom into a village and there is
+ * simply no point in the file, so the labels stop exactly when you arrive.
+ * OSM's `place` layer has villages, hamlets, suburbs and neighbourhoods.
+ *
+ * Both must not draw at once or every town gets named twice, so this is the
+ * single zoom that switches one off and the other on.
+ */
+export const PLACE_HANDOVER_ZOOM = 11
+
+/** Which bundled places are worth naming at this zoom.
+ *
+ *  A map with every town on it at national zoom is unreadable, and one with
+ *  only London on it at county zoom is useless. The threshold falls as you
+ *  come in, which is how a paper atlas does it too — until the handover, where
+ *  an unreachable cutoff switches the bundled markers off entirely. Returning
+ *  0 there drew every Natural Earth town on top of the vector label for the
+ *  same town. */
+export function placeCutoff(zoom: number): number {
+  if (zoom < 6) return 700_000
+  if (zoom < 7) return 400_000
+  if (zoom < 8) return 200_000
+  if (zoom < 9) return 90_000
+  if (zoom < 10.5) return 40_000
+  if (zoom >= PLACE_HANDOVER_ZOOM) return Infinity
+  return 0
+}
 
 /**
  * Where a layer must be inserted to sit *below* the vector basemap.
@@ -144,6 +178,7 @@ const ROAD_MAJOR = '#8a9a7e'
 const ROAD_MINOR = '#c2bcae'
 const RAIL = '#a9a396'
 const LABEL = '#6b6559'
+const PLACE_LABEL = '#4a463d'
 const LABEL_HALO = '#fdfcfa'
 
 /** Road classes, widest first — the order they must be drawn in. */
@@ -308,6 +343,57 @@ export function vectorBasemapLayers(): LayerSpecification[] {
         'text-color': LABEL,
         'text-halo-color': LABEL_HALO,
         'text-halo-width': 1.4,
+      },
+    },
+    {
+      // Towns and cities, taking over from the DOM markers at the handover
+      // zoom. Sized by class so a city does not read as a hamlet.
+      id: 'ofm-place-major',
+      type: 'symbol',
+      source: s,
+      'source-layer': 'place',
+      minzoom: PLACE_HANDOVER_ZOOM,
+      filter: ['match', ['get', 'class'], ['city', 'town'], true, false],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': [
+          'match', ['get', 'class'], 'city', 15, 13,
+        ] as ExpressionSpecification,
+        'text-max-width': 8,
+        'text-padding': 6,
+      } as LayerSpecification['layout'],
+      paint: {
+        'text-color': PLACE_LABEL,
+        'text-halo-color': LABEL_HALO,
+        'text-halo-width': 1.8,
+      },
+    },
+    {
+      // Villages, suburbs and neighbourhoods — the ones Natural Earth has
+      // never heard of, and the whole reason close-up naming was empty. Held
+      // back to z13 so they arrive as the map becomes local rather than
+      // crowding the towns.
+      id: 'ofm-place-minor',
+      type: 'symbol',
+      source: s,
+      'source-layer': 'place',
+      minzoom: 13,
+      filter: [
+        'match', ['get', 'class'],
+        ['village', 'hamlet', 'suburb', 'neighbourhood', 'quarter'], true, false,
+      ],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 13, 11, 17, 13],
+        'text-max-width': 8,
+        'text-padding': 4,
+      } as LayerSpecification['layout'],
+      paint: {
+        'text-color': LABEL,
+        'text-halo-color': LABEL_HALO,
+        'text-halo-width': 1.6,
       },
     },
   ]

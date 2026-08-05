@@ -7,6 +7,7 @@ import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
 import {
   GLYPHS,
+  placeCutoff,
   VECTOR_SOURCE_ID,
   belowVectorBasemap,
   resolveVectorSource,
@@ -98,20 +99,6 @@ interface BasemapData {
   roads: GeoJSON.FeatureCollection
   rail: GeoJSON.FeatureCollection
   places: GeoJSON.FeatureCollection
-}
-
-/** Which places are worth naming at this zoom.
- *
- *  A map with every town on it at national zoom is unreadable, and one with
- *  only London on it at county zoom is useless. The threshold falls as you
- *  come in, which is how a paper atlas does it too. */
-function placeCutoff(zoom: number): number {
-  if (zoom < 6) return 700_000
-  if (zoom < 7) return 400_000
-  if (zoom < 8) return 200_000
-  if (zoom < 9) return 90_000
-  if (zoom < 10.5) return 40_000
-  return 0
 }
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
