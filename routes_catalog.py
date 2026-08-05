@@ -22,6 +22,7 @@ import time
 import redaction
 
 import catalog
+import insights
 import series as series_mod
 from cache import build_cache, cache_key
 
@@ -186,13 +187,22 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
         try:
             points = fn(geometry, steps, area_ha)
             f = catalog.FACTOR_BY_ID[factor_id]
+            # Which real source, not just "real". Half the real catalogue now
+            # comes from planning.data.gov.uk and the Land Registry rather
+            # than from a satellite, and labelling those "earth-engine" was a
+            # mislabel of exactly the kind scripts/audit_catalogue.py exists
+            # to catch.
+            provenance = REAL_SOURCES.get(factor_id) or {}
+            endpoint = provenance.get("endpoint", "")
             result = {
                 "factor_id": factor_id,
                 "kind": f["kind"],
                 "cadence": f["cadence"],
                 "unit": f["unit"],
                 "points": points,
-                "source": "earth-engine",
+                "source": ("earth-engine" if "earthengine" in endpoint
+                           else "open-data"),
+                "provenance": provenance or None,
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000),
                 "cached": False,
             }
@@ -336,8 +346,16 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # be retrofitted for it.
         "precision": "approx",
         # Which factors came back real, so the UI can say so per column rather
-        # than implying the whole report is one thing or the other.
-        "real_factors": [k for k, v in out.items() if v.get("source") == "earth-engine"],
+        # than implying the whole report is one thing or the other. Both real
+        # sources count; only "generated" does not.
+        "real_factors": [k for k, v in out.items()
+                         if v.get("source") in ("earth-engine", "open-data")],
         "steps": steps,
         "series": out,
+        # What the numbers say, in sentences. Computed here rather than in the
+        # browser because it is arithmetic over data the server already has in
+        # hand, and because the rules that keep it honest — no claims from
+        # generated data, no trends through carried-forward values — belong
+        # next to the labelling they depend on. See insights.py.
+        **insights.summarise({"series": out}),
     }

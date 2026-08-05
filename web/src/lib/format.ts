@@ -151,3 +151,10 @@ const SERIES_COLORS = [
 export function seriesColor(i: number): string {
   return SERIES_COLORS[i % SERIES_COLORS.length]
 }
+
+/** Both real sources count. Half the real catalogue now comes from
+ *  planning.data.gov.uk and the Land Registry rather than from a satellite,
+ *  and only "generated" means demo data. */
+export function isReal(source?: string): boolean {
+  return source === 'earth-engine' || source === 'open-data'
+}

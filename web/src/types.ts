@@ -85,6 +85,29 @@ export interface Catalog {
   time: { start: string; end: string; steps: string[] }
 }
 
+/** One thing the server noticed in the series. See insights.py — every field
+ *  is arithmetic over observations already on screen, never a prediction. */
+export interface Insight {
+  factor: string
+  kind: 'trend' | 'anomaly' | 'step' | 'static' | 'coverage'
+  /** The finding as a sentence. Carries its own "demo data" caveat when it
+   *  came from generated numbers — deliberately in the text rather than in a
+   *  sibling field, so no layout can drop it. */
+  text: string
+  /** 0–1. Used for ranking only; not a probability. */
+  notability: number
+  source?: 'earth-engine' | 'open-data' | 'generated'
+  r2?: number
+  t?: number | null
+  n?: number
+  z?: number
+  effect_size?: number
+  missing?: number
+  total?: number
+  at?: string
+  period?: string
+}
+
 /** A single observation. `value: null` is a real gap — never interpolate it. */
 export interface Point {
   t: string
@@ -108,7 +131,10 @@ export interface Series {
   factor_id: string
   /** Where this column's numbers came from. A half-real catalogue is fine —
    *  pretending it is uniformly one or the other is not. */
-  source?: 'earth-engine' | 'generated'
+  source?: 'earth-engine' | 'open-data' | 'generated'
+  /** Which service answered, and whether anyone has run it for real. Present
+   *  on real columns only; mirrors the catalogue's per-factor provenance. */
+  provenance?: Provenance | null
   /** Round-trip cost of the real path, so the price of live queries is visible
    *  rather than guessed at. */
   elapsed_ms?: number
@@ -132,6 +158,15 @@ export interface SeriesResponse {
   real_factors?: string[]
   steps: string[]
   series: Record<string, Series>
+  /** What the server noticed, most notable first. Absent on an older backend,
+   *  which is why the panel treats undefined as "nothing to show". */
+  insights?: Insight[]
+  counts?: {
+    total: number
+    shown: number
+    from_real_data: number
+    from_generated_data: number
+  }
 }
 
 export interface Cell {

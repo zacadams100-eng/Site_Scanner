@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
 import type { Series } from '../types'
+import { isReal } from '../lib/format'
 
 /**
  * Every number traces back to a source, a resolution and a licence.
@@ -18,7 +19,7 @@ import type { Series } from '../types'
  * eleven identical timings would imply eleven.
  */
 function queryCost(factors: Series[]): string {
-  const live = factors.filter((f) => f.source === 'earth-engine')
+  const live = factors.filter((f) => isReal(f.source))
   const fresh = live.filter((f) => !f.cached)
   const slowest = Math.max(0, ...fresh.map((f) => f.elapsed_ms ?? 0))
   if (!fresh.length) return 'Served from cache — no Earth Engine call'
@@ -63,7 +64,7 @@ export default function Provenance() {
             <span>{base.stored ? 'Yes — served from our storage' : 'No — queried live'}</span>
             <span>This report</span>
             <span>
-              {factors.some((f) => f.source === 'earth-engine')
+              {factors.some((f) => isReal(f.source))
                 ? 'Live Earth Engine observations'
                 : 'Demo data — generated, not observed'}
             </span>
@@ -71,7 +72,7 @@ export default function Provenance() {
                 compute and a cached one is nothing, and the difference is the
                 entire argument for the ingest-then-store architecture — so it
                 belongs on screen rather than in a benchmark file. */}
-            {factors.some((f) => f.source === 'earth-engine') && (
+            {factors.some((f) => isReal(f.source)) && (
               <>
                 <span>Query cost</span>
                 <span>{queryCost(factors)}</span>

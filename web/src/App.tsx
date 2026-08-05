@@ -6,6 +6,7 @@ import Timeline from './components/Timeline'
 import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
+import Findings from './components/Findings'
 import Provenance from './components/Provenance'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
@@ -226,10 +227,15 @@ export default function App() {
             </button>
           </div>
           <div className="tabs" role="tablist">
-            {(['table', 'charts', 'sources'] as const).map((t) => (
+            {(['findings', 'table', 'charts', 'sources'] as const).map((t) => (
               <button key={t} role="tab" aria-selected={tab === t}
                       className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'table' ? 'Table' : t === 'charts' ? 'Charts' : 'Sources'}
+                {t === 'findings' ? 'Findings'
+                  : t === 'table' ? 'Table'
+                  : t === 'charts' ? 'Charts' : 'Sources'}
+                {t === 'findings' && !!data?.insights?.length && (
+                  <span className="tab-count">{data.insights.length}</span>
+                )}
               </button>
             ))}
           </div>
@@ -290,6 +296,7 @@ export default function App() {
 
           {!loading && !error && data && (
             <>
+              {tab === 'findings' && <Findings />}
               {tab === 'table' && <AttributeTable />}
               {tab === 'charts' && <><Compare /><ChartStack /></>}
               {tab === 'sources' && <Provenance />}
