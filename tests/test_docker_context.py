@@ -96,6 +96,31 @@ def test_dockerfile_copies_every_module_the_app_imports():
     )
 
 
+def test_vercelignore_excludes_every_python_module():
+    """The frontend deploy carries no Python, and drifts the same way.
+
+    This lives beside the Dockerfile check because it is the same failure:
+    a hand-maintained list of modules that nobody updates when a module is
+    added. `.vercelignore` had fallen two behind — `ee_series` and
+    `redaction` were being uploaded to Vercel.
+
+    The consequence is milder than the Dockerfile's (Vercel ignores the
+    stray files rather than crashing), but excluding `requirements.txt` is
+    what stops Vercel's framework detection deciding this is a Python
+    project, and a half-excluded backend muddies that signal.
+    """
+    ignored = {
+        line.strip()[: -len(".py")]
+        for line in (REPO_ROOT / ".vercelignore").read_text().splitlines()
+        if line.strip().endswith(".py") and not line.strip().startswith("#")
+    }
+    leaked = _root_modules() - ignored
+    assert not leaked, (
+        ".vercelignore does not exclude: "
+        + ", ".join(sorted(f"{m}.py" for m in leaked))
+    )
+
+
 def test_dockerfile_copies_nothing_that_is_not_imported():
     """A stale name is a smaller problem than a missing one, but it still
     misleads: it implies the module is part of the served app when it is not,

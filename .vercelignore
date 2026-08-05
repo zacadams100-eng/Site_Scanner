@@ -9,6 +9,8 @@ mock_ee_backend.py
 routes_catalog.py
 catalog.py
 series.py
+ee_series.py
+redaction.py
 summary.py
 geometry.py
 cache.py
@@ -34,7 +36,12 @@ site-scanner.html
 # demo/ is NOT excluded: vercel.json's buildCommand copies
 # demo/site-scanner-demo.html into the build so it is served at /demo.
 
+# Credentials. `vercel deploy` uploads the working directory, so the same
+# reasoning as .dockerignore applies: a real service account key is named
+# <project>-<16 hex chars>.json and matches neither literal name below.
 service-account-key.json
 *.key.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
+**/ee-backend/
 .env
 .env.*
