@@ -98,58 +98,276 @@ export function shareUrl(s: UrlState): string {
   return `${location.origin}${location.pathname}#${encodeState(s)}`
 }
 
-/** Guided starting points. The target user knows GIS but not this interface;
- *  a template is a worked example that produces their answer on first visit,
- *  which solves onboarding without a tutorial. */
+/**
+ * Guided starting points, grouped by the profession that asks for them.
+ *
+ * The target user knows their own trade but not this interface, and a
+ * catalogue of 260 factors is a filing cabinet until something tells you
+ * which drawer is yours. A template is a worked example that produces a real
+ * answer on the first visit — and, read as a list, it is also the honest
+ * statement of who this tool is for.
+ *
+ * Each one picks factors that genuinely belong together in that trade's
+ * screen. None of them draws the area for you; the shape is still the user's.
+ */
 export interface Template {
   id: string
   name: string
   blurb: string
+  sector: string
   factors: string[]
   tool: DrawMode
 }
 
 export const TEMPLATES: Template[] = [
+  // --- Property & development -------------------------------------------
+  {
+    id: 'site-appraisal',
+    name: 'Development appraisal',
+    blurb: 'Is this site worth pursuing — value, constraints and consent history?',
+    sector: 'Property & development',
+    factors: ['median_sale_price', 'land_value_residential', 'planning_approval_rate',
+              'flood_zone3_pct', 'green_belt_pct', 'developable_area'],
+    tool: 'rect',
+  },
+  {
+    id: 'planning-risk',
+    name: 'Planning risk',
+    blurb: 'What would stand in the way of a permission here?',
+    sector: 'Property & development',
+    factors: ['conservation_area_pct', 'listed_building_density', 'article4_pct',
+              'tpo_density', 'scheduled_monument_pct', 'planning_decision_days'],
+    tool: 'freehand',
+  },
+  {
+    id: 'residential-market',
+    name: 'Residential market',
+    blurb: 'What sells here, at what price, and how fast?',
+    sector: 'Property & development',
+    factors: ['median_sale_price', 'price_growth_5yr', 'sales_velocity',
+              'rental_median', 'gross_yield', 'affordability_ratio'],
+    tool: 'rect',
+  },
+  {
+    id: 'ground-conditions',
+    name: 'Ground conditions',
+    blurb: 'What is under the site, and what will it cost to build on?',
+    sector: 'Property & development',
+    factors: ['subsidence_risk', 'shrink_swell_score', 'coal_mining_pct',
+              'historic_landfill_pct', 'radon_potential', 'earthworks_volume'],
+    tool: 'rect',
+  },
+  {
+    id: 'retrofit',
+    name: 'Retrofit and EPC',
+    blurb: 'How poor is the stock, and what would fixing it take?',
+    sector: 'Property & development',
+    factors: ['epc_mean_sap', 'epc_below_c_share', 'epc_potential_uplift',
+              'retrofit_cost_index', 'heat_demand_density', 'heat_pump_share'],
+    tool: 'rect',
+  },
+
+  // --- Infrastructure & energy ------------------------------------------
+  {
+    id: 'grid-connection',
+    name: 'Grid connection',
+    blurb: 'Can this site get power, and what would it cost?',
+    sector: 'Infrastructure & energy',
+    factors: ['grid_headroom', 'distance_substation', 'grid_connection_cost',
+              'curtailment_risk', 'slope_mean', 'distance_a_road'],
+    tool: 'rect',
+  },
+  {
+    id: 'solar-farm',
+    name: 'Solar farm',
+    blurb: 'Would an array work here, and would it connect?',
+    sector: 'Infrastructure & energy',
+    factors: ['solar_ghi', 'solar_farm_suitability', 'slope_mean',
+              'shading_horizon_loss', 'grid_headroom', 'bmv_land_pct'],
+    tool: 'circle',
+  },
+  {
+    id: 'wind-site',
+    name: 'Wind resource',
+    blurb: 'Is there enough wind, and is the ground exposed enough?',
+    sector: 'Infrastructure & energy',
+    factors: ['wind_speed_100m', 'wind_capacity_factor', 'wind_power_density',
+              'elevation_mean', 'distance_substation', 'aonb_pct'],
+    tool: 'circle',
+  },
+  {
+    id: 'battery-storage',
+    name: 'Battery storage',
+    blurb: 'Flat ground, spare capacity, and a road a lorry can use.',
+    sector: 'Infrastructure & energy',
+    factors: ['battery_site_suitability', 'grid_headroom', 'slope_mean',
+              'flood_zone3_pct', 'distance_substation', 'hgv_access_class'],
+    tool: 'rect',
+  },
+  {
+    id: 'digital-infra',
+    name: 'Digital infrastructure',
+    blurb: 'What connectivity does this area already have?',
+    sector: 'Infrastructure & energy',
+    factors: ['broadband_gigabit_pct', 'broadband_median_speed', 'mobile_5g_coverage',
+              'broadband_notspot_pct', 'population_density', 'households'],
+    tool: 'rect',
+  },
+
+  // --- Land & rural ------------------------------------------------------
+  {
+    id: 'farm-appraisal',
+    name: 'Farm appraisal',
+    blurb: 'What will this land grow, and how many days can you work it?',
+    sector: 'Land & rural',
+    factors: ['alc_grade', 'bmv_land_pct', 'yield_potential_wheat',
+              'workable_days', 'soil_organic_carbon', 'field_size_mean'],
+    tool: 'freehand',
+  },
+  {
+    id: 'crop-season',
+    name: 'Crop performance',
+    blurb: 'How has this field performed season by season?',
+    sector: 'Land & rural',
+    factors: ['ndvi', 'soil_moisture', 'growing_degree_days',
+              'crop_stress_days', 'irrigation_demand', 'precip_total'],
+    tool: 'freehand',
+  },
+  {
+    id: 'bng',
+    name: 'Biodiversity net gain',
+    blurb: 'What is here now, and what could the habitat be worth?',
+    sector: 'Land & rural',
+    factors: ['bng_units_available', 'bng_uplift_potential', 'lc_dominant',
+              'priority_habitat_pct', 'ancient_woodland_pct', 'lc_diversity'],
+    tool: 'freehand',
+  },
+  {
+    id: 'woodland-creation',
+    name: 'Woodland creation',
+    blurb: 'Could this be planted, and what would it sequester?',
+    sector: 'Land & rural',
+    factors: ['woodland_creation_suitability', 'canopy_cover_pct', 'sequestration_rate',
+              'bmv_land_pct', 'soil_ph', 'windthrow_risk'],
+    tool: 'freehand',
+  },
   {
     id: 'vegetation',
     name: 'Vegetation change',
     blurb: 'Is this land getting greener or browner over 15 years?',
+    sector: 'Land & rural',
     factors: ['ndvi', 'lc_tree_pct', 'lc_grass_pct', 'precip_total'],
     tool: 'freehand',
   },
+
+  // --- Risk & insurance --------------------------------------------------
   {
     id: 'flood',
     name: 'Flood exposure',
     blurb: 'How exposed is this site to water, and is that changing?',
+    sector: 'Risk & insurance',
     factors: ['flood_zone3_pct', 'hand', 'water_occurrence', 'max_daily_precip'],
     tool: 'rect',
   },
   {
-    id: 'urban',
-    name: 'Urban growth',
-    blurb: 'How fast is this area being built on?',
-    factors: ['lc_built_pct', 'built_volume', 'population_density', 'nightlight_radiance'],
+    id: 'peril-screen',
+    name: 'Multi-peril screen',
+    blurb: 'Flood, subsidence and wind in one pass, for underwriting.',
+    sector: 'Risk & insurance',
+    factors: ['insurance_peril_score', 'flood_zone3_pct', 'shrink_swell_score',
+              'storm_gust_50yr', 'ground_risk_score', 'coal_mining_pct'],
     tool: 'rect',
   },
   {
-    id: 'solar',
-    name: 'Solar suitability',
-    blurb: 'Would a solar array work here?',
-    factors: ['solar_ghi', 'slope_mean', 'solar_aspect_score', 'lc_built_pct'],
+    id: 'contamination',
+    name: 'Contamination screen',
+    blurb: 'What was here before, and does it need investigating?',
+    sector: 'Risk & insurance',
+    factors: ['historic_landfill_pct', 'landfill_distance', 'contamination_flag',
+              'built_change_rate', 'lc_change_rate', 'sar_coherence'],
+    tool: 'rect',
+  },
+
+  // --- Siting & operations -----------------------------------------------
+  {
+    id: 'logistics',
+    name: 'Logistics siting',
+    blurb: 'Can lorries reach it, and who lives within a shift of it?',
+    sector: 'Siting & operations',
+    factors: ['warehouse_suitability', 'distance_motorway_junction', 'hgv_access_class',
+              'drive_time_pop_30', 'labour_pool_30', 'aadt_nearest'],
+    tool: 'rect',
+  },
+  {
+    id: 'retail-siting',
+    name: 'Retail catchment',
+    blurb: 'Who is nearby, what do they earn, and can they get here?',
+    sector: 'Siting & operations',
+    factors: ['drive_time_pop_30', 'retail_catchment_spend', 'earnings_median',
+              'transit_access_score', 'aadt_nearest', 'walk_score'],
     tool: 'circle',
+  },
+  {
+    id: 'data-centre',
+    name: 'Data centre screen',
+    blurb: 'Power, water, fibre and flood risk, in that order.',
+    sector: 'Siting & operations',
+    factors: ['data_centre_suitability', 'grid_headroom', 'water_stress_class',
+              'broadband_gigabit_pct', 'flood_zone3_pct', 'slope_mean'],
+    tool: 'rect',
+  },
+  {
+    id: 'residential-quality',
+    name: 'Neighbourhood quality',
+    blurb: 'What is it like to live here — schools, crime, green space?',
+    sector: 'Siting & operations',
+    factors: ['school_good_pct', 'crime_rate', 'greenspace_access',
+              'transit_access_score', 'imd_score', 'gp_within_2km'],
+    tool: 'rect',
+  },
+
+  // --- Environment -------------------------------------------------------
+  {
+    id: 'urban',
+    name: 'Urban growth',
+    blurb: 'How fast is this area being built on?',
+    sector: 'Environment & climate',
+    factors: ['lc_built_pct', 'built_volume', 'population_density', 'nightlight_radiance'],
+    tool: 'rect',
   },
   {
     id: 'heat',
     name: 'Urban heat',
     blurb: 'How much hotter is this area than its surroundings?',
+    sector: 'Environment & climate',
     factors: ['lst_day', 'heat_anomaly', 'lc_tree_pct', 'impervious_pct'],
     tool: 'rect',
   },
   {
-    id: 'agriculture',
-    name: 'Crop performance',
-    blurb: 'How has this field performed season by season?',
-    factors: ['ndvi', 'soil_organic_carbon', 'soil_moisture', 'growing_degree_days'],
+    id: 'carbon',
+    name: 'Carbon and canopy',
+    blurb: 'What is standing here, and what is it holding?',
+    sector: 'Environment & climate',
+    factors: ['canopy_height_mean', 'canopy_cover_pct', 'carbon_stock',
+              'above_ground_biomass', 'sequestration_rate', 'lc_tree_pct'],
     tool: 'freehand',
   },
+  {
+    id: 'air-quality',
+    name: 'Air quality',
+    blurb: 'What is in the air here, and where does it come from?',
+    sector: 'Environment & climate',
+    factors: ['no2', 'pm25', 'pm10', 'road_density', 'population_density', 'lc_tree_pct'],
+    tool: 'rect',
+  },
 ]
+
+/** Templates in the order the sidebar shows them, grouped by sector. */
+export function templatesBySector(): [string, Template[]][] {
+  const out = new Map<string, Template[]>()
+  for (const t of TEMPLATES) {
+    if (!out.has(t.sector)) out.set(t.sector, [])
+    out.get(t.sector)!.push(t)
+  }
+  return [...out.entries()]
+}

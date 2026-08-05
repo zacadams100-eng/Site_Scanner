@@ -34,6 +34,13 @@ jobs:
       - name: Python tests
         run: python -m pytest -q
 
+      # Prints the real/generated split and every factor's provenance into the
+      # build log, so the ratio is visible in CI history rather than only in
+      # the interface. tests/test_catalogue_audit.py already enforces it; this
+      # is the human-readable record.
+      - name: Catalogue audit
+        run: python scripts/audit_catalogue.py
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

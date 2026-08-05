@@ -1,13 +1,52 @@
 # Handoff — Site Scanner
 
-Written at the end of the session that took the app from 4 real Earth Engine
-factors to 24, repalletted the interface, and set up automated verification.
-
-Branch: `claude/handoff-md-review-e6zlvw`
+Branch: `claude/site-scanner-improvements-pfiz4b`
 Repo: `zacadams100-eng/Site_Scanner` (public)
+Tests: 391 passing, 10 skipped (they need a Postgres server) · 46 frontend
 
-**Live at https://site-scanner-pi.vercel.app** — the frontend is deployed. The
-backend is not. See "Deployment" below before sending that link to anyone.
+---
+
+## Read this first
+
+**Three things need you, not another coding session.** Each is minutes of
+work and each unblocks something no amount of code can:
+
+1. **Send the ESA/Copernicus email** — `docs/licensing/email-copernicus-sentinel-2.md`.
+   Fill in a name and send. It is the cheaper of the two licence questions and
+   it may make the Google one unnecessary.
+2. **Run `vercel login && vercel deploy --prod`.** Everything else is built and
+   verified locally; this is one command and then the site has a URL.
+3. **Run the two check scripts anywhere with normal internet:**
+   `python3 scripts/check_open_data.py` and `python3 -m ons.job --check`. The
+   first promotes 22 factors from "written" to "verified" — or tells us which
+   integrations are wrong. The second finds which ONS release URLs have moved,
+   which some of them will have.
+
+`BLOCKERS.md` has the detail on all of these, plus the honest arithmetic on
+why real coverage is 21% rather than the 50% that was asked for, and which
+eight sources would actually close that gap.
+
+---
+
+## What changed in the last session
+
+Nine commits, in order:
+
+| | |
+| --- | --- |
+| `5183237` | 22 factors made real from UK open data — planning designations, Land Registry prices, police.uk crime. No key, no quota. |
+| `1c79289` | Both licence emails drafted, with the architectural consequence of every possible reply decided in advance. |
+| `912ebc5` | The ingest pipeline run for real over Surrey and benchmarked end to end. |
+| `993c5ed` | Every claim of "real" audited, two mislabels fixed, and the ratio drawn in the factor browser. |
+| `e4c7377` | Continuous rasters stored as scaled int16 rather than float32 — 0.29x the bytes. |
+| `408c778` | The ingest runner tiles, and a national backfill resumes per tile. |
+| `6e9abd5` | ONS spreadsheets ingested on a schedule and served from disk. |
+| `b03ef80` | The app now reads the report for you, and refuses to overclaim doing it. |
+| `df9b07d` | The printed report became a document you could send to a client. |
+
+The two at the end were not asked for. They are what I would build next if it
+were my product, and they are described under "Findings" and "The printed
+report" below.
 
 ---
 
@@ -27,15 +66,22 @@ whole architecture.
 
 ## The single most important thing to know
 
-**Roughly two thirds of the catalogue is still generated demo data, and the
-app says so on every screen.** 24 of ~118 factors return real satellite
-observations. The rest are plausible-looking numbers from `series.py`.
+**Most of the catalogue is still generated demo data, and the app says so on
+every screen.** 46 of 269 factors return real observations — 17% today, 21%
+once the ONS job has run. Exactly one of them, NDVI, has ever been checked
+against a live service. The rest are plausible-looking numbers from
+`series.py`.
 
-This is deliberate and must stay visible. Every response carries a `source`
-field of `earth-engine` or `generated`, the Sources tab says *"Demo data —
-generated, not observed"* where it applies, and the badge in the top bar
-counts live factors. A half-real catalogue is honest; pretending it is
-uniformly one or the other is not.
+This is deliberate and it must stay visible. Every response carries a `source`
+of `earth-engine`, `open-data` or `generated`; real factors carry provenance
+naming the service that answered and whether anyone has run it; the factor
+browser draws the ratio as a bar; and every automatically generated sentence
+about a demo factor says "demo data — generated, not observed" **inside the
+sentence**, so no layout can drop it.
+
+`scripts/audit_catalogue.py` and `tests/test_catalogue_audit.py` enforce all
+of that in CI. A mislabel does not crash — a number just quietly acquires
+authority it has not earned — so a test is the only thing that catches one.
 
 Do not "tidy this up" by removing the labels.
 
@@ -58,33 +104,219 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
-### Deployment — half done
+### 22 more factors are real without any credentials
 
-The frontend is on Vercel at **https://site-scanner-pi.vercel.app**. Two pages:
+`open_data.py` reads UK government open data over plain HTTPS: 11 planning
+designations from planning.data.gov.uk, 7 market factors from one Land
+Registry Price Paid SPARQL query, 4 from data.police.uk. No key, no quota, no
+Earth Engine — so they work in the credential-free backend and in the
+serverless deployment too. Six EPC factors register themselves as soon as
+`EPC_API_EMAIL` and `EPC_API_KEY` exist.
 
-| URL | State |
-| --- | --- |
-| `/demo` | **Works completely.** Self-contained, no backend, no network. This is the link to send someone. It cannot break. |
-| `/` | The real app. Map, drawing and permalinks all work; the data panel says "Can't reach the API" because there is no backend. |
+That takes the catalogue to 46 real of 269 (17%). **None of the 22 have been
+run against the live endpoints** — this environment's proxy denies all five
+hosts — so they are marked `written`, not `verified`, and that distinction is
+carried through `/api/catalog` into the UI. `scripts/check_open_data.py`
+promotes them on any machine with open egress. Read `docs/OPEN-DATA.md` before
+quoting any of these numbers as real.
 
-The backend is **not** deployed, and is blocked on something no code change can
-fix: Google Cloud requires a billing account on the project before Cloud Run,
-Cloud Build or Artifact Registry can be enabled at all — free tier included.
-`sitescanner-504112` has none, so `gcloud run deploy` fails with
-`UREQ_PROJECT_BILLING_NOT_FOUND` before it builds anything.
+### ONS comes from a scheduled spreadsheet job
 
-Everything else about the backend deploy is proven: the image builds, the
-container starts, and it served `/api/catalog` in Cloud Shell. Once billing
-exists the remaining work is `gcloud run deploy`, then pasting the resulting
-URL over the placeholder in `vercel.json`'s `/api/:path*` rewrite. No code
-changes — the frontend asks its own origin for `/api/*` and Vercel proxies it.
+ONS publishes rents, earnings, affordability and the census as spreadsheets on
+a release page, not as an API with per-area endpoints — so there was nothing
+for a live client to call. `ons/job.py` downloads each release, `ons/parse.py`
+reads it, `ons_store.py` serves it from disk at request time, and
+`.github/workflows/ons-refresh.yml` runs it monthly and commits what changed.
+No network and no database on the request path, so it works in the serverless
+deployment too.
 
-Worth knowing: `/` in production is what finally proved the MapLibre worker fix
-holds. That bug only manifests behind an SPA catch-all rewrite and could never
-be reproduced locally.
+Most of the work is in the parsing, because these files are laid out for a
+person and change shape between releases: the header row is found by a label,
+the area column by looking for `E07000209` in its values (ONS names that
+column four different ways across five files), and `:`, `x`, `..` and `#` are
+all read as gaps rather than zeros. A file that parses to nothing raises —
+that is the one outcome that looks like a successful refresh while emptying a
+factor.
+
+Eight factors, plus two nobody publishes: `rental_growth_yoy`, and
+`gross_yield` — annual rent over sale price, combining the stored ONS rent
+with the live Land Registry median, which is the number a residential investor
+actually asks for.
+
+**The release URLs have never been fetched** and ONS rotates them. Run
+`python3 -m ons.job --check` first and expect to fix some.
+
+### The ingest tier tiles, resumes and stores int16
+
+A national run at 10 m is 3.6 billion pixels per timestep and could not happen
+in one pass. `ingest/tiling.py` cuts any extent over 25 M pixels into a grid —
+England is 154 tiles, 27,720 tile-timesteps — and progress is recorded per
+`(dataset, timestep, tile, h3_res)` in the same transaction as that tile's
+rows, so a killed backfill resumes at the tile it reached. The schema now lives
+in `ingest/migrations/` with a small runner (`python3 -m ingest.migrate`),
+because the old inline CREATE TABLE IF NOT EXISTS could not add a column.
+
+Tiling's real hazard is not memory, it is the seams: a cell on a tile boundary
+is aggregated once per tile it touches, and overwriting rather than merging
+would leave every tile edge in the country holding a sliver's average. Cell
+rows carry pixel counts and a sum of squared deviations so partials combine
+exactly; a merged row is indistinguishable from a single pass, checked in
+Python, in SQL, and end to end through a real database.
+
+Continuous rasters are stored as int16 scaled by the manifest's `storage.scale`
+rather than float32 — 0.29x the bytes, and the scale is written into the COG so
+QGIS and GDAL unscale it themselves. `ingest/cog.py:read_band` is the only way
+anything here reads a band; calling `src.read(1)` on a quantised COG gets
+values 10,000x too large with no error.
+
+`docs/INGEST-BENCHMARK.md` is re-measured against all of this.
+
+### The real/generated split is audited and shown
+
+`scripts/audit_catalogue.py` checks every factor the catalogue calls real:
+that it exists, that it names both a publisher and the host actually queried,
+that it declares whether anyone has ever run that host, and that its licence
+and attribution are recorded. `tests/test_catalogue_audit.py` runs the same
+checks in CI, because a mislabel does not crash — a number just quietly
+acquires authority it has not earned.
+
+It found two things worth fixing. Earth Engine factors named ESA and NASA as
+the source without saying the numbers come through Earth Engine, which does
+the cloud masking and compositing — a user going to the Copernicus Data Space
+would get a different number. And eleven designation factors were attributed
+to Natural England and Historic England while actually being served by
+planning.data.gov.uk. Provenance now carries publisher and endpoint
+separately; all 46 real factors differ between the two.
+
+The factor browser shows the ratio as a bar: real against generated, split
+into verified and written. Today that reads 46 of 269 (17%), of which one —
+NDVI — has been checked against a live service. A written factor's dot is
+hollow rather than filled.
+
+### The app reads the report for you
+
+`insights.py` turns 2,160 numbers into a handful of sentences, ranked, and the
+report opens on them:
+
+> Land surface temp in November 2025 was 28.2 °C, 3.1 standard deviations
+> above the usual November of 23.2 °C — the highest November in the record.
+
+It looks for trends, seasonal anomalies, step changes, static designations and
+poor coverage. Most of the work is in what it refuses to say, and those guards
+are the part to preserve if this is ever refactored:
+
+- **Generated data never produces an unlabelled claim.** The caveat is in the
+  sentence, not a sibling field.
+- **Carried-forward values never produce a trend.** A census figure held
+  across 144 months is a perfectly flat, perfectly significant series.
+- **Noise never gets narrated.** A trend needs |t| ≥ 2; a test runs 60
+  pure-noise series and asserts at most 8 are narrated.
+- **A step change must beat a straight line,** not merely split the data —
+  otherwise every trending factor collects a spurious "shifted up around 2018".
+- **Trends are quoted from the fitted line, not the end points.** On a
+  seasonal series those are a March and a November, which produced "rose 122%"
+  for a temperature series with no trend in it at all.
+
+None of it is a model and none of it predicts. Every statement is arithmetic
+over observations already on screen, and each carries the numbers it came from.
+
+### The printed report is a document, not a table
+
+Export → *Printable report / PDF* now produces something you could send to a
+client: the site as a map image captured from the live canvas with the
+boundary and markers drawn on it, the findings, the annual figures, and the
+licence notices.
+
+It also carries an **About this report** panel stating how many factors are
+real, how many findings came from demo data, and which service answered each
+real factor. This is the copy that leaves the building — the last place the
+real-versus-generated split can be allowed to go missing.
+
+Two details make the map work and are easy to lose:
+`canvasContextAttributes.preserveDrawingBuffer` on the map (without it
+`toDataURL` returns a blank image), and the 3:2 crop around the boundary in
+`lib/mapImage.ts` (without it the page is mostly empty countryside with the
+site the size of a stamp).
+
+### The interface was rebranded
+
+It is now a light, quiet, instrument-like interface: paper ground, moss
+sidebar, one instrument blue used only for "here, now", IBM Plex Sans / Inter /
+IBM Plex Mono with mono reserved for measurement, and a proper frame — 64px top
+bar, 280px collapsible sidebar, map, report panel, 28px status bar carrying
+coordinates, scale, zoom, CRS, cell count and connection state.
+
+`BRAND.md` records the specification and where each rule lives. The old dark
+canvas with copper accents and backdrop blur is gone; do not reintroduce blur,
+heavy shadows or gradients, and keep colour at roughly 95% neutral.
+
+### The catalogue now serves more than one profession
+
+269 factors across 25 groups and 44 bases. The first half is what the land is
+like — vegetation, terrain, climate, water, habitat. The second half is what
+can be done with it and at what risk: planning and consents, property market,
+buildings and fabric, infrastructure, transport and access, community and
+services, ground risk, energy, agriculture, forestry and carbon, siting and
+logistics.
+
+Every new base carries the same provenance, licence and attribution as the
+old ones, and almost all of them are `stored=False` — a planning register or
+an EPC lookup is an API call, not a raster we hold, so the storage argument in
+TECHNICAL_PLAN.md §8.2 is untouched (22 stored bases, 7 monthly).
+
+46 of the 269 are real today and every one of the rest is labelled. Do not
+remove the labels; the answer is to implement more of them, and BLOCKERS.md §2
+lists the eight sources that would take it past half.
+
+### The map has its own cartography
+
+`scripts/build_basemap.py` bundles coastline, urban areas, water, motorways,
+railways and place names from Natural Earth (public domain) into
+`web/public/basemap/england.json` — 600 KB, styled to the brand, no network
+needed. The OSM raster now fades in above zoom 10 for detail rather than being
+the only thing on the canvas.
+
+Place labels are DOM markers, not a symbol layer: MapLibre needs a glyph server
+to render text, and standing one up to write "Guildford" on a map is the wrong
+trade.
+
+### Added since
+- **Place search.** A postcode, place name or pasted `lat, lng` moves the map.
+  Until then the only way to reach a field was to pan across England on an
+  unlabelled basemap, which made the drawing tools unreachable for anyone who
+  did not already know where they were. Lookups go to postcodes.io (ONS/OS
+  open data, OGL — notice shown with the results); coordinates are parsed
+  locally and never leave the browser. Searching moves the map and nothing
+  else: guessing a boundary from a place name would be exactly the invented
+  precision this project refuses everywhere else.
+- **Saved sites are workspaces.** Shape, factors and timeline position, with
+  rename, overwrite, and backup/restore to a file. Entries saved before this
+  restore the shape alone, as they always did.
+- **The catalogue says which factors are real.** `/api/catalog` marks each
+  factor `real`, and the browser can filter to just those — the honesty label
+  now arrives before the query rather than after it.
+- **A drawn area can be moved and resized.** Drag inside it, or drag a corner.
+  Redrawing was the only adjustment before, which is cheap for a rectangle and
+  destroys a hand-traced outline. The camera deliberately does not refit after
+  an edit; it still does after a fresh draw.
+- **Comparison is reachable and exportable.** "vs a year ago" pins the same
+  month twelve steps back — shift-clicking the track, the only route before,
+  is not something anyone discovers — and the change table exports as CSV
+  carrying the panel's rules with it.
+- **Dead ends removed.** A failed query offers to retry rather than requiring
+  the area to be redrawn, and the timeline date is clickable as a month field.
+- **The layout was driven on a tablet and a phone for the first time**, which
+  found the drawing tools sitting underneath the report sheet on a phone —
+  the entire point of the app, behind a panel.
+- **`/api/series` is cached per factor.** Adding a factor used to re-run every
+  Earth Engine query already on screen. One short browsing session against a
+  six-live-factor backend measured 18 hits to 6 misses.
 
 ### Not built
-- No accounts, no saved projects, no persistence beyond `localStorage`.
+- No deployment. It runs in Cloud Shell; there is no public URL for the real
+  app. `DEPLOY.md` has the Cloud Run and Vercel steps, untried.
+- No accounts, and no persistence beyond `localStorage` — saved sites are
+  per-browser, which is why they can now be exported to a file.
 - The ingest pipeline (`ingest/`) works on synthetic rasters only. Nothing has
   been ingested for real, so the fast H3 path is unused in production.
 
@@ -175,21 +407,6 @@ dependency graph.
 `.map-canvas`, collapsing the container to zero height and swallowing every
 pointer event. The `.app .map-canvas` selector is load-bearing.
 
-**Every ignore file had drifted, and all three broke the first deploy.** The
-Dockerfile copied 3 of the 10 modules the app imports, so the container died on
-`import` before serving anything — and a missing module produces no application
-logs, so Cloud Run reports it exactly like a credentials problem.
-`.vercelignore` shipped 244 MB of `node_modules`, which killed the upload with a
-bare `Error: fetch failed`. Then it excluded `web/scripts/` — because
-`.vercelignore` uses gitignore syntax where a bare `scripts/` matches at *any*
-depth — so the MapLibre worker copier never reached the builder.
-
-That last one is the one to remember: had it excluded the worker output instead
-of the script, the build would have **passed** and deployed a blank map with no
-console error. `tests/test_docker_context.py` now checks all three lists
-against reality, using `git check-ignore` for the gitignore-syntax ones rather
-than reimplementing the matching.
-
 **AOI size limit is 250,000 ha** (`routes_catalog.py`). Larger returns 400.
 Earth Engine would time out long before that anyway.
 
@@ -222,9 +439,10 @@ separate from the production project, and can be deleted without consequence.
 ## Open decisions, still unanswered
 
 1. **What "project management" means.** Saved workspaces — name a site, reopen
-   it, everything comes back — is about a week and extends what exists.
-   Real PM with tasks, deadlines and assignees is months and a different
-   product. Currently parked; saved workspaces is the safe build either way.
+   it, everything comes back — now exists, in the browser only. Real PM with
+   tasks, deadlines and assignees is months and a different product, and the
+   step in between is accounts and server-side storage, which is what turns a
+   per-browser list into something a team can share. Still parked.
 
 2. **Whether commodity trading belongs in this product at all.** Property and
    construction are things *at places*. Commodity trading is about flows
@@ -246,6 +464,16 @@ mitigation is the ingest-then-store architecture, where Earth Engine derives
 products in batch and users are served from our own storage. That path is built
 but unused.
 
+Both licence questions now have emails drafted and waiting to be sent, in
+`docs/licensing/` — one to Google about the batch-derivation pattern, one to
+ESA about which licence Sentinel-2 actually carries. Send the ESA one first;
+it is cheaper and it may make the Google one unnecessary.
+`docs/licensing/DECISION-LOG.md` decides in advance what to do for every
+possible reply, so nobody re-argues the architecture when one arrives. The
+standing conclusion across all six branches: ingest-then-store is mandatory in
+four of them and merely advisable in the other two, so `ingest/` is the real
+architecture and the on-request Earth Engine path is a prototype that survived.
+
 **Sentinel-2's licence is recorded as CC BY-SA 3.0 IGO and flagged
 `commercial="verify"`** in `catalog.py`. Share-alike on a commercial derived
 product would be a real constraint, but Copernicus data is generally
@@ -262,12 +490,23 @@ is not the same as meeting its condition, and the app was doing the former.
 
 | File | What it holds |
 | --- | --- |
-| `catalog.py` | Single source of truth: 20 bases, ~118 factors, licences, attribution |
+| `catalog.py` | Single source of truth: 44 bases, 269 factors, licences, attribution |
 | `ee_series.py` | Real Earth Engine queries, grouped so siblings share one pass |
-| `routes_catalog.py` | API contract, mounted by both real and mock backends |
+| `routes_catalog.py` | API contract and the per-factor series cache, mounted by both backends |
+| `web/src/store.ts` | One store; `timeIndex` is the only source of truth for "when" |
+| `web/src/lib/places.ts` | Postcode, place-name and coordinate lookup, with its OGL notice |
+| `web/src/lib/exports.ts` | Every way data leaves: CSV, Excel, GeoJSON, print, saved-site files |
+| `web/src/components/MapCanvas.tsx` | Drawing, editing, cell painting — and every MapLibre trap |
+| `open_data.py` | 22 live open-data factors, and what each source cannot answer |
+| `ons/` + `ons_store.py` | The scheduled spreadsheet ingest and the store it writes |
+| `insights.py` | What the numbers say, in sentences — and the guards that keep it honest |
+| `ingest/` | The raster pipeline: manifests, tiling, migrations, H3 aggregation |
+| `scripts/audit_catalogue.py` | Checks every claim of "real"; runs in CI |
+| `BLOCKERS.md` | Everything that needs a human, and why |
 | `series.py` | The generator that stands in for unbuilt factors |
 | `mock_ee_backend.py` | Credential-free backend; keeps frontend work unblocked |
-| `web/src/index.css` | Three-layer token system and the elevation ladder |
+| `web/src/index.css` | Three-layer token system, the frame, every component rule |
+| `BRAND.md` | The brand spec and where each rule lives in the code |
 | `TECHNICAL_PLAN.md` | Architecture and the reasoning behind it |
 | `BENCHMARK.md` | The measurements the design rests on |
 | `DESIGN_SPEC.md` | Feature spec and UI plan, with the open questions in §0 and §8 |

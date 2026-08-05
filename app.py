@@ -169,7 +169,14 @@ app.include_router(catalog_router)
 import routes_catalog  # noqa: E402
 import ee_series  # noqa: E402
 
-ee_series.install(routes_catalog.REAL_SERIES)
+ee_series.install(routes_catalog.REAL_SERIES, routes_catalog.REAL_SOURCES)
+
+# Public open data — designations, prices, crime, energy performance. Needs no
+# credentials, so it is registered here and in the serverless function alike.
+# See open_data.py for what each source can and cannot answer.
+import open_data  # noqa: E402
+
+open_data.install(routes_catalog.REAL_SERIES, routes_catalog.REAL_SOURCES)
 
 
 @app.get("/")
@@ -181,7 +188,11 @@ def health():
 def cache_info():
     """Hit/miss counters, so cache behaviour is observable in a deployed
     instance rather than guessed at."""
-    return {"tiles": TILE_CACHE.info(), "stats": STATS_CACHE.info()}
+    return {
+        "tiles": TILE_CACHE.info(),
+        "stats": STATS_CACHE.info(),
+        "series": routes_catalog.SERIES_CACHE.info(),
+    }
 
 
 class PriceRequest(BaseModel):

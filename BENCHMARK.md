@@ -152,6 +152,11 @@ this system remains the imagery, exactly as `TECHNICAL_PLAN.md` §8.2 predicted.
   service under load but not for the first query after a deploy.
 - Concurrency. Single-client throughout; no contention measured.
 - Ingest cost. This measures reads. Populating the aggregates from real
-  rasters is the other half, and it is what `ingest/` addresses.
+  rasters is the other half, and it is what `ingest/` addresses. **Now
+  measured** — NDVI over Surrey, 12 months, end to end, in
+  `docs/INGEST-BENCHMARK.md`. It confirms the national backfill is a weekend
+  of compute, and it qualifies Result 3 below: two tiers are nearly free to
+  store and query, but cost +85% CPU to ingest, because each tier is a full
+  pass over the raster.
 - Real spatial autocorrelation. Synthetic values are uniform random, so
   aggregate *values* are meaningless here — only timings are meaningful.

@@ -1,4 +1,5 @@
-import type { Factor, Series } from '../types'
+import type { SavedAoi, SitesFile } from '../store'
+import type { Factor, Insight, Marker, Series } from '../types'
 import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
 
 /** Explains the months-observed columns wherever a file has room to say it. */
@@ -103,9 +104,53 @@ export function exportMonthlyCsv(cols: Series[]): void {
            'site-scanner-monthly.csv')
 }
 
+/**
+ * The two-date change table, as rows.
+ *
+ * Shared by the CSV file and its tests so the file cannot drift from what the
+ * Compare panel shows. Categorical factors report changed/no change rather
+ * than a difference, and a gap at either end reports no delta at all — the
+ * same rules the panel applies, because a spreadsheet is exactly where an
+ * invented zero would be mistaken for a measurement of no change.
+ */
+export function compareRows(cols: Series[], a: number, b: number): { header: string[]; rows: string[][] } {
+  const [lo, hi] = a <= b ? [a, b] : [b, a]
+  const stepA = cols[0]?.points[lo]?.t ?? ''
+  const stepB = cols[0]?.points[hi]?.t ?? ''
+  const header = ['Factor', 'Unit', stepA, stepB, 'Change', 'Change %']
+
+  const rows = cols.map((c) => {
+    const va = c.points[lo]?.value ?? null
+    const vb = c.points[hi]?.value ?? null
+    const base = [c.meta.name, c.unit]
+    if (va === null || vb === null) {
+      return [...base, va === null ? '' : String(va), vb === null ? '' : String(vb), '', '']
+    }
+    if (typeof va === 'string' || typeof vb === 'string') {
+      return [...base, String(va), String(vb), va === vb ? 'no change' : 'changed', '']
+    }
+    const d = vb - va
+    const pct = va !== 0 ? ((d / Math.abs(va)) * 100).toFixed(1) : ''
+    return [...base, String(va), String(vb), String(Number(d.toFixed(6))), pct]
+  })
+  return { header, rows }
+}
+
+export function exportCompareCsv(cols: Series[], a: number, b: number): void {
+  const { header, rows } = compareRows(cols, a, b)
+  const lines = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))]
+  lines.push('')
+  lines.push(esc('Comparing two single months carries their weather with it. '
+                 + 'For a trend, read the full monthly series rather than the endpoints.'))
+  for (const line of attributionsFor(cols)) lines.push(esc(line))
+  download(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }),
+           `site-scanner-change-${header[2]}-to-${header[3]}.csv`)
+}
+
 /** GeoJSON with the annual series folded into the feature's properties, so the
  *  shape and its numbers travel together into QGIS. */
-export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: number): void {
+export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: number,
+                              markers: Marker[] = []): void {
   const props: Record<string, unknown> = {
     name: 'Site Scanner AOI',
     area_ha: Number(area_ha.toFixed(2)),
@@ -132,7 +177,17 @@ export function exportGeoJson(aoi: GeoJSON.Polygon, cols: Series[], area_ha: num
   }
   const fc: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
-    features: [{ type: 'Feature', geometry: aoi, properties: props }],
+    features: [
+      { type: 'Feature', geometry: aoi, properties: props },
+      // Markers ride along as their own features rather than being folded
+      // into the polygon's properties, so QGIS opens them as points and the
+      // labels are already there.
+      ...markers.map((m) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [m.lng, m.lat] },
+        properties: { name: m.name, kind: 'marker' },
+      })),
+    ],
   }
   download(new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' }),
            'site-scanner-aoi.geojson')
@@ -185,10 +240,38 @@ export function exportXml(cols: Series[]): void {
 
 /** A one-page printable report. Opens the browser's own print dialog, which
  *  gives PDF export on every platform without shipping a PDF library. */
-export function printReport(cols: Series[], area_ha: number,
-                            centroid: { lng: number; lat: number }): void {
+export interface ReportContext {
+  cols: Series[]
+  area_ha: number
+  centroid: { lng: number; lat: number }
+  /** Findings from the server, already ranked and already labelled. */
+  insights?: Insight[]
+  counts?: { total: number; shown: number; from_real_data: number; from_generated_data: number }
+  /** The map as the user arranged it. Omitted if the capture failed. */
+  map?: { dataUrl: string; width: number; height: number } | null
+  siteName?: string
+}
+
+/**
+ * The document that leaves.
+ *
+ * Everything else this app exports is data for another program. This is the
+ * thing a consultant puts in front of a client: the site as a picture, what
+ * was found in plain sentences, the figures behind it, and the licence
+ * notices that make using it lawful. Printed from the browser, so it is a PDF
+ * on every platform with no dependency and no server.
+ *
+ * The section that most reports would not have is "About this report". Most of
+ * this catalogue is still demo data, and a document that leaves the building
+ * without saying which parts are real is the one way this project could
+ * actively mislead someone. So the split is stated in the document, near the
+ * top, in the same size type as everything else.
+ */
+export function printReport(ctx: ReportContext): void {
+  const { cols, area_ha, centroid } = ctx
   const w = window.open('', '_blank')
   if (!w) return
+
   let anyPartial = false
   const rows = (cols[0]?.annual ?? []).map((r0) => {
     const cells = cols.map((c) => {
@@ -202,32 +285,201 @@ export function printReport(cols: Series[], area_ha: number,
     return `<tr><th>${r0.year}</th>${cells}</tr>`
   }).join('')
 
+  const realCols = cols.filter((c) => c.source === 'earth-engine' || c.source === 'open-data')
+  const findings = (ctx.insights ?? []).map((f) => {
+    const real = f.source === 'earth-engine' || f.source === 'open-data'
+    return `<li class="${real ? 'real' : 'demo'}"><span class="dot"></span>${escapeHtml(f.text)}</li>`
+  }).join('')
+
+  const provenance = [...new Map(cols
+    .filter((c) => c.provenance)
+    .map((c) => [c.provenance!.source + c.provenance!.endpoint, c.provenance!]))
+    .values()]
+    .map((p) => `<li>${escapeHtml(p.source)} via <span class="mono">${escapeHtml(p.endpoint)}</span>` +
+                `${p.status === 'written' ? ' — implemented and tested, not yet run against the live service' : ''}</li>`)
+    .join('')
+
+  // The printed report is the copy that leaves and gets forwarded, so it
+  // carries the brand rather than browser defaults: the mark, moss rules,
+  // figures in mono. The font stack degrades to whatever the printing machine
+  // has — a new window cannot see the app's loaded webfonts.
   w.document.write(`<!doctype html><meta charset="utf-8">
-<title>Site Scanner report</title>
+<title>Site Scanner report${ctx.siteName ? ` — ${escapeHtml(ctx.siteName)}` : ''}</title>
 <style>
- body{font:12px/1.5 -apple-system,system-ui,sans-serif;margin:32px;color:#111}
- h1{font-size:18px;margin:0 0 4px} .sub{color:#666;margin-bottom:20px}
+ :root{--moss:#4d6048;--ink:#232323;--slate:#69706a;--rule:#ddd8cf;--amber:#8a6520}
+ *{box-sizing:border-box}
+ body{font:12px/1.55 'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+      margin:30px;color:var(--ink);max-width:190mm}
+ header{display:flex;align-items:center;gap:12px;padding-bottom:14px;
+        border-bottom:2px solid var(--moss);margin-bottom:18px}
+ h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.01em}
+ h2{font-size:12px;margin:22px 0 9px;font-weight:600;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--moss)}
+ .sub{color:var(--slate);font-size:11.5px;margin-top:3px;
+      font-family:'IBM Plex Mono',ui-monospace,monospace}
+ .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+ figure{margin:0}
+ figure img{width:100%;border:1px solid var(--rule);border-radius:4px;display:block}
+ figcaption{font-size:10px;color:var(--slate);margin-top:5px}
+ ul{margin:0;padding:0;list-style:none}
+ .findings li{position:relative;padding:0 0 9px 16px;line-height:1.5}
+ .findings .dot{position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:50%}
+ .findings li.real .dot{background:var(--moss)}
+ .findings li.demo .dot{border:1.5px solid var(--rule)}
+ .findings li.demo{color:var(--slate)}
+ .panel{border:1px solid var(--rule);border-radius:4px;padding:11px 13px;
+        background:#faf9f6;font-size:11px;line-height:1.6}
+ .panel strong{color:var(--ink)}
  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
- th,td{border-bottom:1px solid #ddd;padding:5px 8px;text-align:right}
+ th,td{border-bottom:1px solid var(--rule);padding:6px 9px;text-align:right}
+ td{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px}
  th:first-child,td:first-child{text-align:left}
- thead th{border-bottom:2px solid #333;font-size:11px}
- .src{margin-top:24px;font-size:10px;color:#666}
- .p{color:#c2410c;font-weight:600;margin-left:2px}
- @media print{body{margin:12mm}}
+ tbody th{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace}
+ thead th{border-bottom:1.5px solid var(--moss);font-size:11px;color:var(--ink)}
+ tbody tr:nth-child(odd) td,tbody tr:nth-child(odd) th{background:#faf9f6}
+ .src{margin-top:10px;font-size:10px;color:var(--slate);line-height:1.6}
+ .p{color:var(--amber);font-weight:600;margin-left:2px}
+ @media print{
+   body{margin:12mm}
+   /* Keep a section and its heading together; a table that splits mid-row
+      across a page break is the usual way a printed report looks amateur. */
+   h2{break-after:avoid}
+   figure,.panel{break-inside:avoid}
+   tr{break-inside:avoid}
+   thead{display:table-header-group}
+ }
 </style>
-<h1>Site Scanner — site report</h1>
-<div class="sub">${area_ha.toFixed(1)} ha · centred ${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)}
- · generated ${new Date().toLocaleDateString('en-GB')}</div>
+<header>
+ <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
+  <g stroke="#4d6048" stroke-width="2.4" stroke-linecap="round" fill="none">
+   <path d="M10 21.5 6 26"/><path d="M22 21.5 26 26"/>
+   <path d="M12.5 24.5 11.5 29"/><path d="M19.5 24.5 20.5 29"/></g>
+  <g stroke="#4d6048" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".85">
+   <path d="M4 26.6h3.4M9.9 29.4h3.2M18.9 29.4h3.2M24.6 26.6H28"/></g>
+  <path d="M16 8c4.6 0 8.2 3.6 8.6 8.6.4 4.6-2.4 8.6-8.6 8.6s-9-4-8.6-8.6C7.8 11.6 11.4 8 16 8Z" fill="#4d6048"/>
+  <g stroke="#f8f6f2" stroke-width="1.1" fill="none" opacity=".5">
+   <ellipse cx="16" cy="18.2" rx="6" ry="4.2"/><ellipse cx="16" cy="18.2" rx="3.2" ry="2.2"/></g>
+  <circle cx="11.4" cy="9.6" r="4.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="4.1" fill="#4d6048"/>
+  <circle cx="11.4" cy="9.6" r="2.2" fill="#fff"/><circle cx="20.6" cy="9.6" r="2.2" fill="#fff"/>
+  <circle cx="11.4" cy="9.6" r="1.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="1.1" fill="#4d6048"/>
+ </svg>
+ <div>
+  <h1>${ctx.siteName ? escapeHtml(ctx.siteName) : 'Site report'}</h1>
+  <div class="sub">${area_ha.toFixed(1)} ha · ${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)} · EPSG:4326 · ${new Date().toLocaleDateString('en-GB')}</div>
+ </div>
+</header>
+
+${ctx.map ? `<figure>
+ <img src="${ctx.map.dataUrl}" alt="The site boundary on a map">
+ <figcaption>The area as drawn, at the extent shown on screen. Boundary and
+  markers are indicative; this is not a measured survey.</figcaption>
+</figure>` : ''}
+
+${findings ? `<h2>What the data shows</h2>
+<ul class="findings">${findings}</ul>` : ''}
+
+<h2>About this report</h2>
+<div class="panel">
+ <strong>${realCols.length} of ${cols.length} factors in this report return real
+ observations;</strong> the other ${cols.length - realCols.length} are generated
+ demonstration data and every statement drawn from them is marked as such.
+ ${ctx.counts && ctx.counts.from_generated_data > 0
+   ? `${ctx.counts.from_generated_data} of the findings above come from that
+      demonstration data and describe generated numbers, not this site.` : ''}
+ Figures are aggregated over the drawn boundary at approximately 30 m sampling
+ and are indicative rather than survey-grade.
+ ${provenance ? `<div style="margin-top:8px">Real factors were answered by:
+   <ul style="margin:4px 0 0 0">${provenance}</ul></div>` : ''}
+</div>
+
+<h2>Annual figures</h2>
 <table><thead><tr><th>Year</th>${cols.map((c) =>
-   `<th>${c.meta.name}<br><span style="font-weight:400;color:#888">${c.unit}</span></th>`).join('')}</tr></thead>
+   `<th>${escapeHtml(c.meta.name)}<br><span style="font-weight:400;color:#69706a;font-family:'IBM Plex Mono',monospace">${escapeHtml(c.unit)}</span></th>`).join('')}</tr></thead>
 <tbody>${rows}</tbody></table>
-${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}
- Hover a marked figure on screen for the exact count.</div>` : ''}
-<div class="src"><strong>Sources.</strong> ${[...new Set(cols.map((c) =>
-  `${c.meta.base_meta.name} (${c.meta.base_meta.licence})`))].join(' · ')}</div>`)
+${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}</div>` : ''}
+
+<h2>Sources and licences</h2>
+<div class="src"><strong>Datasets.</strong> ${[...new Set(cols.map((c) =>
+  `${escapeHtml(c.meta.base_meta.name)} (${escapeHtml(c.meta.base_meta.licence)})`))].join(' · ')}</div>
+${attributionsFor(cols).map((a) => `<div class="src">${escapeHtml(a)}</div>`).join('')}
+<div class="src">Generated by Site Scanner on ${new Date().toLocaleString('en-GB')}.</div>`)
   w.document.close()
   w.focus()
-  setTimeout(() => w.print(), 350)
+  setTimeout(() => w.print(), 400)
+}
+
+/** Text into HTML. Site names and marker labels are user input, and this
+ *  string is written straight into a document. */
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+}
+
+/**
+ * Saved sites, out to a file and back.
+ *
+ * Saved sites live in localStorage, which the user can clear by accident, and
+ * which does not follow them to another machine or browser. A list of sites
+ * someone has curated over a term is worth more than any single report, so it
+ * has to be possible to get it out and put it back.
+ */
+export function sitesFile(sites: SavedAoi[]): SitesFile {
+  return {
+    format: 'site-scanner.sites',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    sites,
+  }
+}
+
+export function exportSites(sites: SavedAoi[]): void {
+  const stamp = new Date().toISOString().slice(0, 10)
+  download(
+    new Blob([JSON.stringify(sitesFile(sites), null, 2)], { type: 'application/json' }),
+    `site-scanner-sites-${stamp}.json`,
+  )
+}
+
+/** Parses an exported sites file, keeping only entries that are actually
+ *  usable. A half-readable file should restore what it can and say how much,
+ *  rather than being refused whole. */
+export function parseSitesFile(text: string): SavedAoi[] {
+  let json: any
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error('That file is not a saved-sites file — it is not valid JSON.')
+  }
+  const list = Array.isArray(json) ? json : json?.sites
+  if (!Array.isArray(list)) {
+    throw new Error('That file does not contain a list of saved sites.')
+  }
+  const out: SavedAoi[] = []
+  for (const raw of list) {
+    const geom = raw?.geometry
+    const ring = geom?.coordinates?.[0]
+    if (geom?.type !== 'Polygon' || !Array.isArray(ring) || ring.length < 4) continue
+    out.push({
+      id: String(raw.id ?? `${Date.now()}-${out.length}`),
+      name: String(raw.name ?? 'Untitled site').slice(0, 120),
+      geometry: { type: 'Polygon', coordinates: [closeRing(ring)] },
+      area_ha: Number.isFinite(raw.area_ha) ? Number(raw.area_ha) : 0,
+      savedAt: Number.isFinite(raw.savedAt) ? Number(raw.savedAt) : Date.now(),
+      ...(Array.isArray(raw.factors) && raw.factors.length
+        ? { factors: raw.factors.filter((f: unknown) => typeof f === 'string') }
+        : {}),
+      ...(Number.isFinite(raw.timeIndex) ? { timeIndex: Number(raw.timeIndex) } : {}),
+      ...(raw.compareIndex === null || Number.isFinite(raw.compareIndex)
+        ? { compareIndex: raw.compareIndex === null ? null : Number(raw.compareIndex) }
+        : {}),
+    })
+  }
+  if (!out.length) throw new Error('No usable sites in that file.')
+  return out
+}
+
+export async function readSitesFile(file: File): Promise<SavedAoi[]> {
+  return parseSitesFile(await file.text())
 }
 
 /** Reads a dropped or picked file and returns the first polygon in it.

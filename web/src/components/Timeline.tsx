@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { compact, labelStep, seriesColor } from '../lib/format'
 
@@ -28,6 +28,22 @@ export default function Timeline() {
 
   const steps = catalog?.time.steps ?? []
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [editingDate, setEditingDate] = useState(false)
+
+  /**
+   * Move the head to a typed or picked month.
+   *
+   * A month outside the covered range clamps to the nearest end rather than
+   * being ignored: someone asking for 2003 is telling us they want the start,
+   * and silently doing nothing reads as a broken field.
+   */
+  const jumpTo = (value: string) => {
+    if (!/^\d{4}-\d{2}$/.test(value) || !steps.length) return
+    const exact = steps.indexOf(value)
+    if (exact >= 0) { setTimeIndex(exact); return }
+    if (value < steps[0]) setTimeIndex(0)
+    else if (value > steps[steps.length - 1]) setTimeIndex(steps.length - 1)
+  }
 
   // Playback. requestAnimationFrame with an accumulator rather than
   // setInterval — a fixed timer makes 180 steps feel like a slideshow, and
@@ -93,7 +109,7 @@ export default function Timeline() {
     const chartH = h - stripH - 3
 
     // Year gridlines, so 180 monthly steps stay legible.
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.strokeStyle = 'rgba(35,35,35,0.07)'
     ctx.lineWidth = 1
     steps.forEach((s, i) => {
       if (!s.endsWith('-01')) return
@@ -114,7 +130,7 @@ export default function Timeline() {
     const y = (v: number) => chartH - ((v - lo) / span) * (chartH - 6) - 3
 
     // Fill under the line, broken at gaps.
-    ctx.fillStyle = 'rgba(255,122,92,0.14)'
+    ctx.fillStyle = 'rgba(77,96,72,0.10)'
     let runStart = -1
     for (let i = 0; i <= values.length; i++) {
       const v = values[i]
@@ -132,7 +148,7 @@ export default function Timeline() {
     // The line itself. Gaps stay gaps — a cloudy month is a hole, not a
     // straight line between two distant observations.
     ctx.strokeStyle = seriesColor(0)
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 1.75
     ctx.lineJoin = 'round'
     let drawing = false
     ctx.beginPath()
@@ -146,7 +162,7 @@ export default function Timeline() {
     // The comparison marker, when a second position is pinned.
     if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
       const cx = x(compareIndex)
-      ctx.strokeStyle = 'rgba(111,195,212,0.9)'
+      ctx.strokeStyle = 'rgba(31,136,180,0.95)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([3, 2])
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
@@ -159,8 +175,8 @@ export default function Timeline() {
       const bw = Math.max(1, w / steps.length)
       const f = p.valid_fraction
       ctx.fillStyle = p.value === null
-        ? 'rgba(63,77,99,0.85)'
-        : `rgba(111,195,212,${0.18 + 0.62 * f})`
+        ? 'rgba(216,211,201,0.95)'
+        : `rgba(31,136,180,${0.18 + 0.6 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
   }, [primarySeries, steps, compareIndex])
@@ -174,8 +190,14 @@ export default function Timeline() {
   const readout = useMemo(() => {
     if (!point) return null
     if (point.value === null) return { text: 'No usable observation', gap: true }
+    // Money reads £745.9k, not "745.9k £" — the unit goes in front of a
+    // currency and behind everything else, and half the catalogue is money now.
+    const unit = primarySeries?.unit ?? ''
+    const money = unit.startsWith('£')
     return {
-      text: `${compact(point.value)} ${primarySeries?.unit ?? ''}`.trim(),
+      text: money
+        ? `£${compact(point.value)}${unit.slice(1)}`
+        : `${compact(point.value)} ${unit}`.trim(),
       gap: false,
       confidence: point.valid_fraction,
     }
@@ -197,7 +219,33 @@ export default function Timeline() {
       </button>
 
       <div className="time-readout">
-        <div className="time-step">{labelStep(step ?? '')}</div>
+        {/* Reaching one month out of 180 by dragging a 900px track means each
+            step is five pixels wide. Clicking the date turns it into a real
+            date field: pick or type a month and the head goes there. Falls
+            back to a text box in browsers with no month picker, where
+            "2019-07" still works. */}
+        {editingDate ? (
+          <input
+            type="month"
+            autoFocus
+            className="time-step-input"
+            min={steps[0]}
+            max={steps[steps.length - 1]}
+            defaultValue={step}
+            aria-label="Jump to a month"
+            onChange={(e) => jumpTo(e.target.value)}
+            onBlur={() => setEditingDate(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { jumpTo((e.target as HTMLInputElement).value); setEditingDate(false) }
+              if (e.key === 'Escape') setEditingDate(false)
+            }}
+          />
+        ) : (
+          <button className="time-step" onClick={() => setEditingDate(true)}
+                  title="Jump to a month">
+            {labelStep(step ?? '')}
+          </button>
+        )}
         {readout && (
           <div className={`time-value${readout.gap ? ' is-gap' : ''}`}>
             {readout.gap ? 'No data' : readout.text}
@@ -210,6 +258,18 @@ export default function Timeline() {
           <button className="time-compare" onClick={() => setCompareIndex(null)}
                   title="Clear the comparison point">
             vs {labelStep(steps[compareIndex] ?? '')} ×
+          </button>
+        ) : data && timeIndex >= 12 ? (
+          /* Comparison was reachable only by shift-clicking the track, which
+             nobody discovers. Year-on-year is the comparison people actually
+             want — this month against the same month last year, which is the
+             one pairing that holds the season constant. */
+          <button
+            className="time-compare time-compare-add"
+            onClick={() => { setCompareIndex(timeIndex - 12); setTab('charts') }}
+            title="Compare with the same month a year earlier. Shift-click the track to pin any other month."
+          >
+            vs a year ago
           </button>
         ) : (
           factorName && <div className="time-factor">{factorName}</div>

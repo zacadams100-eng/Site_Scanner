@@ -156,13 +156,45 @@ def test_ndvi_peaks_in_summer():
 
 
 def test_values_stay_inside_the_declared_range():
+    """Every factor, not a sample of four.
+
+    lo/hi drive the colour ramp and the axis, so a generator that overshoots
+    paints a cell off the end of the ramp and draws a chart nobody can read.
+    With 260-odd factors this is the only way to know the whole catalogue is
+    renderable."""
     steps = series_mod.month_steps("2011-01", "2025-12")
-    for fid in ("ndvi", "precip_total", "lst_day", "avg_sale_price"):
-        f = catalog.FACTOR_BY_ID[fid]
-        s = series_mod.generate_series(fid, (-0.57, 51.24), 150.0, steps)
+    for f in catalog.FACTORS:
+        s = series_mod.generate_series(f["id"], (-0.57, 51.24), 150.0, steps)
         for p in s["points"]:
-            if p["value"] is not None:
-                assert f["lo"] <= p["value"] <= f["hi"], (fid, p)
+            v = p["value"]
+            if v is None or isinstance(v, str):
+                continue
+            assert f["lo"] <= v <= f["hi"], (f["id"], v, f["lo"], f["hi"])
+
+
+def test_every_group_has_a_generator_character():
+    """A group the generator has never heard of falls back to the middle of
+    its range and sits there, which reads as broken data rather than as a
+    site. Every group must be tied to some site characteristic."""
+    import series as sm
+    site = {"urbanity": 0.9, "northness": 0.2, "wetness": 0.3,
+            "elevation": 0.4, "affluence": 0.8}
+    rural = {"urbanity": 0.05, "northness": 0.8, "wetness": 0.7,
+             "elevation": 0.6, "affluence": 0.2}
+    for group in catalog.GROUPS:
+        a = sm._coherent_position("x", group, site)
+        b = sm._coherent_position("x", group, rural)
+        assert a != b, f"{group} does not respond to the site at all"
+
+
+def test_the_catalogue_serves_more_than_one_profession():
+    """The point of the second half: a developer, an insurer, a grid engineer
+    and a farm agent should each find their own screen in here."""
+    groups = set(catalog.GROUPS)
+    for expected in ("Planning & consents", "Property market", "Ground risk",
+                     "Infrastructure", "Agriculture", "Energy"):
+        assert expected in groups
+    assert catalog.catalogue_summary()["factor_count"] > 240
 
 
 def test_unknown_factor_raises():
@@ -307,11 +339,18 @@ def test_stats_malformed_geometry_keeps_its_500(client):
 @pytest.fixture
 def registry():
     """Gives a clean REAL_SERIES and always restores it, so one test cannot
-    leave real data wired into another."""
+    leave real data wired into another.
+
+    The series cache is cleared with it: two tests registering different
+    implementations for the same factor and geometry would otherwise collide,
+    the second one silently reading the first one's answer.
+    """
     import routes_catalog
     routes_catalog.REAL_SERIES.clear()
+    routes_catalog.SERIES_CACHE.clear()
     yield routes_catalog.REAL_SERIES
     routes_catalog.REAL_SERIES.clear()
+    routes_catalog.SERIES_CACHE.clear()
 
 
 SHORT = {"start": "2024-01", "end": "2024-06"}
@@ -387,6 +426,131 @@ def test_the_real_source_receives_the_drawn_geometry(client, registry):
     assert seen["area_ha"] > 0
 
 
+def test_the_catalogue_says_which_factors_are_real(client, registry):
+    """A user picking factors should see which return observations *before*
+    spending a query, not afterwards from a badge on the result."""
+    registry["ndvi"] = _stub
+    body = client.get("/api/catalog").json()
+    by_id = {f["id"]: f for f in body["factors"]}
+    assert by_id["ndvi"]["real"] is True
+    assert by_id["precip_total"]["real"] is False
+    assert body["real_factor_ids"] == ["ndvi"]
+    assert body["summary"]["real_factor_count"] == 1
+
+
+def test_the_catalogue_marks_nothing_real_with_no_registry(client, registry):
+    body = client.get("/api/catalog").json()
+    assert body["real_factor_ids"] == []
+    assert all(f["real"] is False for f in body["factors"])
+
+
+# ---------------------------------------------------------------------------
+# Series cache — the difference between one Earth Engine call and eleven
+# ---------------------------------------------------------------------------
+def test_a_repeated_factor_is_served_from_cache(client, registry):
+    """Adding a factor to a report must not re-run the factors already in it.
+    That is eleven Earth Engine calls per toggle otherwise."""
+    calls = {"n": 0}
+
+    def counted(geometry, steps, area_ha):
+        calls["n"] += 1
+        return _stub(geometry, steps, area_ha)
+
+    registry["ndvi"] = counted
+    first = client.post("/api/series", json={"geometry": GUILDFORD,
+                                             "factor_ids": ["ndvi"], **SHORT}).json()
+    second = client.post("/api/series", json={"geometry": GUILDFORD,
+                                              "factor_ids": ["ndvi", "precip_total"],
+                                              **SHORT}).json()
+    assert calls["n"] == 1
+    assert first["series"]["ndvi"]["cached"] is False
+    assert second["series"]["ndvi"]["cached"] is True
+    assert second["series"]["ndvi"]["points"] == first["series"]["ndvi"]["points"]
+    assert second["series"]["ndvi"]["source"] == "earth-engine"
+
+
+def test_a_different_shape_is_not_a_cache_hit(client, registry):
+    calls = {"n": 0}
+
+    def counted(geometry, steps, area_ha):
+        calls["n"] += 1
+        return _stub(geometry, steps, area_ha)
+
+    registry["ndvi"] = counted
+    elsewhere = {"type": "Polygon", "coordinates": [[
+        [-1.58, 52.235], [-1.56, 52.235], [-1.56, 52.245], [-1.58, 52.245], [-1.58, 52.235],
+    ]]}
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"], **SHORT})
+    client.post("/api/series", json={"geometry": elsewhere, "factor_ids": ["ndvi"], **SHORT})
+    assert calls["n"] == 2
+
+
+def test_a_different_time_range_is_not_a_cache_hit(client, registry):
+    calls = {"n": 0}
+
+    def counted(geometry, steps, area_ha):
+        calls["n"] += 1
+        return _stub(geometry, steps, area_ha)
+
+    registry["ndvi"] = counted
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"], **SHORT})
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"],
+                                     "start": "2024-01", "end": "2024-09"})
+    assert calls["n"] == 2
+
+
+def test_a_failure_is_never_cached(client, registry):
+    """A flaky call should be retried next request, not remembered for fifteen
+    minutes — otherwise one blip freezes demo data onto a real factor."""
+    state = {"fail": True, "n": 0}
+
+    def flaky(geometry, steps, area_ha):
+        state["n"] += 1
+        if state["fail"]:
+            raise RuntimeError("EE quota exceeded")
+        return _stub(geometry, steps, area_ha)
+
+    registry["ndvi"] = flaky
+    first = client.post("/api/series", json={"geometry": GUILDFORD,
+                                             "factor_ids": ["ndvi"], **SHORT}).json()
+    assert first["series"]["ndvi"]["source"] == "generated"
+
+    state["fail"] = False
+    second = client.post("/api/series", json={"geometry": GUILDFORD,
+                                              "factor_ids": ["ndvi"], **SHORT}).json()
+    assert state["n"] == 2
+    assert second["series"]["ndvi"]["source"] == "earth-engine"
+
+
+def test_a_cache_hit_does_not_inherit_the_previous_response_decorations(client, registry):
+    """The route decorates each series with `annual` and `meta`. If the cached
+    dict were handed back by reference those would accumulate on it."""
+    import routes_catalog
+    registry["ndvi"] = _stub
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"], **SHORT})
+    key = list(routes_catalog.SERIES_CACHE._data)[0]
+    cached, _ = routes_catalog.SERIES_CACHE._data[key]
+    assert "annual" not in cached and "meta" not in cached
+
+
+def test_the_series_cache_reports_its_counters(client, registry):
+    registry["ndvi"] = _stub
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"], **SHORT})
+    client.post("/api/series", json={"geometry": GUILDFORD, "factor_ids": ["ndvi"], **SHORT})
+    info = client.get("/api/cache/series").json()
+    assert info["hits"] >= 1 and info["misses"] >= 1
+    assert info["entries"] >= 1
+
+
+def test_generated_factors_are_not_cached(client, registry):
+    """The generator is microseconds; caching it would only hold memory."""
+    import routes_catalog
+    routes_catalog.SERIES_CACHE.clear()
+    client.post("/api/series", json={"geometry": GUILDFORD,
+                                     "factor_ids": ["precip_total"], **SHORT})
+    assert len(routes_catalog.SERIES_CACHE) == 0
+
+
 # ---------------------------------------------------------------------------
 # Attribution — a licence condition, not a nicety
 # ---------------------------------------------------------------------------
@@ -425,3 +589,29 @@ def test_commercial_flags_are_triaged_not_assumed():
     derived product. It must stay flagged until someone confirms it."""
     assert catalog.COMMERCIAL_USE["sentinel2_sr"] == "verify"
     assert set(catalog.COMMERCIAL_USE.values()) <= {"yes", "verify"}
+
+
+# ---------------------------------------------------------------------------
+# The bundled basemap — a build artefact, so it can rot silently
+# ---------------------------------------------------------------------------
+def test_the_bundled_basemap_is_present_and_complete():
+    """The map's only cartography used to be a third-party raster, and when it
+    failed the canvas was an empty rectangle. This file is the fix, so its
+    absence should break a test rather than a user's first impression."""
+    import json
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parent.parent / "web" / "public" / "basemap" / "england.json"
+    assert path.exists(), "run scripts/build_basemap.py"
+
+    data = json.loads(path.read_text())
+    for layer in ("land", "urban", "lakes", "rivers", "roads", "rail", "places"):
+        assert data[layer]["features"], f"{layer} is empty"
+
+    # It ships to every visitor, so its size is a product decision.
+    assert path.stat().st_size < 1_200_000, "basemap has grown past its budget"
+
+    # England has to be in it, and the labels have to be named.
+    names = {f["properties"]["name"] for f in data["places"]["features"]}
+    assert {"London", "Manchester", "Bristol"} <= names
+    assert data["attribution"]

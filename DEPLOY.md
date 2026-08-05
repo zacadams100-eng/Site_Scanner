@@ -1,64 +1,85 @@
-# Deploying Contour
+# Deploying Site Scanner
 
-Two pieces, deployed separately:
+There are two ways to deploy this, and the first one needs no accounts beyond
+a Vercel login.
 
-| Piece | Where | Config |
-| --- | --- | --- |
-| `app.py` (or the mock) | Google Cloud Run | `Dockerfile` |
-| `web/` (the React app) | Vercel | `vercel.json` |
+| Path | What runs | What you need | What you get |
+| --- | --- | --- | --- |
+| **A. Vercel only** | React app + the credential-free API as one Python serverless function (`api/index.py`) | A Vercel account | Everything except Earth Engine factors |
+| **B. Vercel + Cloud Run** | React app on Vercel, `app.py` on Cloud Run | Vercel, Google Cloud, an Earth Engine service account | The above plus the 24 live satellite factors |
+
+Path A exists because path B used to be the only option, which meant a public
+URL required a Google Cloud account, a billing profile and an Earth Engine
+service account before anyone could see anything at all. That is a lot of setup
+between a repository and a link you can send someone.
 
 `site-scanner.html` is the original single-file prototype. It still works, but
-it predates the catalogue — it calls only `/api/stats`, `/api/summary` and
-`/api/tile/*`, and knows nothing about the 118 factors, the monthly timeline,
-the attribute table or the charts. `web/` is the deployed frontend; the
-prototype is kept for reference.
-
-**Step 2 (Vercel) is done and live at https://site-scanner-pi.vercel.app.**
-Step 1 (Cloud Run) is blocked on billing — see below. The commands in step 1
-have been run as far as billing allows and are corrected where they were wrong.
-
-What is verified:
-
-- **The image builds and serves.** Built with `docker build` in Cloud Shell and
-  run locally; the mock backend answered `/api/catalog` from inside the
-  container.
-- **The Vercel deploy works**, including the demo page and the MapLibre worker
-  files. The deployed `/` renders its map, which is the first proof the worker
-  fix holds — that bug only appears behind an SPA catch-all rewrite and cannot
-  be reproduced locally.
-- **The Dockerfile's module list was missing seven of ten modules.** Everything
-  added after the file was written. The container would have died on `import`
-  before serving a request. `tests/test_docker_context.py` now walks the import
-  graph and fails if the list drifts again.
-
-What is not:
-
-- **Cloud Run has never run.** The service account key, Secret Manager wiring
-  and the real Earth Engine path are all unproven in the cloud.
+it predates the catalogue. `web/` is the deployed frontend; the prototype is
+kept for reference.
 
 ---
 
-## 0. Billing — the current blocker
+## Path A — Vercel only (start here)
 
-`gcloud run deploy` fails on `sitescanner-504112` with:
+```bash
+npm i -g vercel
+vercel login
+vercel link          # creates .vercel/project.json
+vercel deploy --prod
+```
+
+That is the whole thing. `vercel.json` already declares:
 
 ```
-ERROR: FAILED_PRECONDITION: Billing account for project '328960690784' is not
-found. Billing must be enabled for activation of service(s)
-'artifactregistry.googleapis.com,cloudbuild.googleapis.com,run.googleapis.com'
+installCommand   npm --prefix web ci
+buildCommand     cp demo/site-scanner-demo.html web/public/demo.html
+                 npm --prefix web run build
+outputDirectory  web/dist
+functions        api/index.py  (includeFiles "*.py", maxDuration 30)
+rewrites         /api/(.*) -> /api/index
 ```
 
-Google gates *enabling those services* on a billing account, not just spending,
-so the free tier does not get you around it. A billing account with a payment
-method has to be attached to the project in the Cloud Console. Nothing in this
-repo can work around it, and no flag skips it.
+No environment variables are required. The function imports the same
+`routes_catalog` router the real backend mounts, so the API contract is
+identical; factors return generated data and say so, plus whatever the
+open-data sources (`open_data.py`) can reach.
 
-At this app's traffic the running cost is nil — Cloud Run scales to zero and
-the free tier is 2M requests a month — but the card still has to be on file.
+### Deploying from CI instead
+
+`.github/workflows/deploy.yml` runs the full test suite and then deploys, on
+manual trigger. It needs three repository secrets, all from Vercel:
+
+| Secret | Where it comes from |
+| --- | --- |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
+| `VERCEL_ORG_ID` | `.vercel/project.json` after `vercel link` |
+| `VERCEL_PROJECT_ID` | same file |
+
+### Verify the deployment
+
+```bash
+URL=https://your-project.vercel.app
+curl -sS "$URL/api/catalog" | head -c 200      # 266 factors
+curl -sS -D- -o /dev/null "$URL/"              # 200, CSP headers present
+curl -sS "$URL/basemap/england.json" -o /dev/null -w '%{http_code} %{size_download}\n'
+```
+
+The third one matters: the bundled basemap is what makes the map legible when
+the raster tiles are blocked, and the SPA catch-all rewrite will happily return
+`index.html` with a 200 for a missing file (see "Known gaps").
+
+### If the API 404s
+
+Vercel can route a rewritten request to a function in more than one shape, and
+not all of them preserve `/api/catalog` as the path the function sees.
+`api/index.py` normalises it from the ASGI path or from
+`x-vercel-original-path` / `x-forwarded-uri`, and `tests/test_serverless.py`
+covers all three. If you still get a 404, check what path the function received
+before assuming the application's routing is wrong.
 
 ---
 
-## 1. Backend → Cloud Run
+## Path B — adding the Earth Engine backend on Cloud Run
 
 ### Deploy the mock first (no Earth Engine needed)
 
@@ -106,14 +127,9 @@ gcloud run deploy contour-api \
   --set-env-vars EE_PROJECT=your-gcp-project-id \
   --set-secrets GOOGLE_APPLICATION_CREDENTIALS_JSON=contour-ee-key:latest \
   --set-secrets ANTHROPIC_API_KEY=contour-anthropic-key:latest \
-  --set-env-vars CORS_ALLOW_ORIGINS=https://your-app.vercel.app \
   --memory 1Gi \
   --timeout 120
 ```
-
-Set `CORS_ALLOW_ORIGINS` once you know the Vercel domain — it takes a
-comma-separated list, and unset means `*`. Step 2 explains why it matters even
-though the proxy means the browser never makes a cross-origin request.
 
 Note the deploy prints the service URL — you need it for step 2.
 
@@ -149,46 +165,28 @@ real backend — check `APP_MODULE`.
 
 ---
 
-## 2. Frontend → Vercel
+## Pointing the frontend at Cloud Run
 
-`vercel.json` is already set up for the Vite build. It installs and builds
-`web/`, publishes `web/dist`, and proxies `/api/*` to Cloud Run. The only thing
-you have to change is the backend URL.
+Once Cloud Run is up, point the frontend at it by replacing the serverless
+rewrite in `vercel.json`:
 
-First put the Cloud Run URL into `vercel.json`, replacing the placeholder in
-the `/api/:path*` rewrite:
+```json
+{ "source": "/api/(.*)", "destination": "https://YOUR-SERVICE.a.run.app/api/$1" }
+```
 
 ```bash
 API=$(gcloud run services describe contour-api --region europe-west2 --format='value(status.url)')
-sed -i "s#https://REPLACE-WITH-CLOUD-RUN-URL.a.run.app#${API}#" vercel.json   # macOS: sed -i ''
+python3 - <<EOF
+import json
+d = json.load(open("vercel.json"))
+d["rewrites"][0] = {"source": "/api/(.*)", "destination": "$API/api/\$1"}
+json.dump(d, open("vercel.json", "w"), indent=2)
+EOF
+vercel deploy --prod
 ```
 
-Then:
-
-```bash
-npx vercel deploy --prod
-```
-
-### What the first deploy actually took
-
-Four things went wrong, all in configuration rather than code:
-
-1. **`sudo npm i -g vercel` → `sudo: npm: command not found`.** Cloud Shell's
-   Node lives under `$HOME` and `sudo` drops it from `PATH`. Use `npx vercel`,
-   or `npm i -g vercel` without `sudo`.
-2. **Project names must be lowercase.** `SiteScanner` is rejected; the error
-   arrives after the settings prompts, so you answer them twice.
-3. **`Error: fetch failed`** on upload — `.vercelignore` did not exclude
-   `node_modules`, so it tried to send 244 MB.
-4. **The build failed in seven seconds with only an exit code.** `.vercelignore`
-   uses gitignore syntax, so a bare `scripts/` matched `web/scripts/` as well
-   as the root one, and `web/scripts/copy-maplibre-worker.mjs` never reached
-   the builder. Root-only patterns need a leading slash.
-
-Answer **no** to "Customize settings?" — `vercel.json` already has them, and
-the CLI's "Detected FastAPI" guess is wrong and harmless. Answer **no** to
-"Connect detected Git repository?" until the branch is merged, or Vercel will
-build `main` instead of what you have locally.
+Keep `api/index.py` in the repository either way — it is what a preview
+deployment falls back to when the Cloud Run service is down or not yet built.
 
 Vercel runs, from the repo root:
 
@@ -218,13 +216,8 @@ origin; Vercel proxies it to Cloud Run. The browser never makes a cross-origin
 request, so:
 
 - **no CORS**, and no backend URL baked into the bundle;
-- CORS on `app.py` is doing nothing for *your* frontend once the proxy is in
-  place — but the Cloud Run URL is still public and unauthenticated, so a
-  wildcard is what lets any other page on the web call this API from a
-  visitor's browser and spend your Earth Engine quota. Set
-  `CORS_ALLOW_ORIGINS` to your Vercel domain on deploy. Note this narrows the
-  browser path only; `curl` ignores CORS entirely, so it is not a substitute
-  for the rate limiting in §3;
+- `allow_origins=["*"]` in `app.py` is doing nothing once the proxy is in place
+  and should be narrowed to your Vercel domain before this is public;
 - you can point a preview deployment at a different backend by changing one
   line of `vercel.json`, with no rebuild of the app itself.
 

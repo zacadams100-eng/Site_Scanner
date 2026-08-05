@@ -54,6 +54,12 @@ SEASON_PEAK = {
     "Air quality": 1.0,     # winter inversions trap pollutants
     "Radar": 7.0,
     "Night lights": 0.0,    # brightest in the dark months
+    "Agriculture": 7.0,     # the working season
+    "Energy": 1.0,          # windiest in winter
+    "Property market": 5.0,  # the spring selling season
+    "Planning & consents": 6.0,  # a summer peak, a December trough
+    "Community & services": 7.5,  # recorded crime rises with daylight and drink
+    "Transport & access": 7.0,
 }
 
 # How strongly each group swings through the year, as a fraction of its range.
@@ -65,6 +71,16 @@ SEASON_AMPLITUDE = {
     "Radar": 0.12,
     "Night lights": 0.30,
     "People & economy": 0.03,
+    # The second half of the catalogue is mostly human activity, which has a
+    # season but a much shallower one than a canopy does. Overstating it would
+    # make a planning register look like a crop.
+    "Agriculture": 0.34,
+    "Energy": 0.18,
+    "Property market": 0.05,
+    "Planning & consents": 0.10,
+    "Community & services": 0.05,
+    "Transport & access": 0.04,
+    "Buildings & fabric": 0.02,
 }
 
 
@@ -158,6 +174,33 @@ def _coherent_position(fid: str, group: str, site: Dict[str, float]) -> float:
         return 0.1 + 0.8 * site["urbanity"]
     if group in ("Vegetation", "Land cover", "Designations"):
         return 0.8 - 0.55 * site["urbanity"]
+    # --- the second half of the catalogue -------------------------------
+    # Same principle: tie each family to the site character it would really
+    # follow, so a report reads as one place rather than as twelve unrelated
+    # random walks. An expensive area has expensive land, better schools and
+    # less crime; a rural one has better farmland and worse broadband.
+    if group in ("Property market",):
+        return 0.15 + 0.75 * site["affluence"]
+    if group in ("Community & services",):
+        return 0.2 + 0.65 * site["affluence"] + 0.1 * site["urbanity"]
+    if group in ("Planning & consents", "Buildings & fabric",
+                 "Infrastructure", "Transport & access", "Siting & logistics"):
+        return 0.12 + 0.8 * site["urbanity"]
+    if group in ("Agriculture", "Forestry & carbon"):
+        return 0.85 - 0.6 * site["urbanity"]
+    if group == "Energy":
+        return 0.3 + 0.45 * site["elevation"] + 0.25 * (1 - site["urbanity"])
+    if group == "Ground risk":
+        return 0.3 + 0.35 * site["wetness"] + 0.2 * site["urbanity"]
+    # These three were falling through to a flat 0.5, which meant soil, radar
+    # and solar read identically everywhere in England — the one thing a
+    # site-analysis tool must never do.
+    if group == "Soil & geology":
+        return 0.3 + 0.45 * site["wetness"] + 0.2 * (1 - site["urbanity"])
+    if group == "Radar":
+        return 0.7 - 0.35 * site["urbanity"] + 0.2 * site["wetness"]
+    if group == "Solar":
+        return 0.8 - 0.5 * site["northness"]
     return 0.5
 
 
@@ -183,6 +226,29 @@ def _trend_per_year(factor: Dict[str, Any], site: Dict[str, float]) -> float:
         return 0.001 + jitter
     if fid in ("lc_crop_pct", "lc_grass_pct"):
         return -0.002 + jitter
+
+    # --- the second half of the catalogue -------------------------------
+    # These are the trends of the last fifteen years in England, and a demo
+    # that flatlines through them is not a demo of anything.
+    if fid in ("median_sale_price", "rental_median", "land_value_residential",
+               "land_value_industrial", "affordability_ratio"):
+        return 0.020 + jitter
+    if fid in ("ev_chargepoint_density", "heat_pump_share",
+               "broadband_gigabit_pct", "mobile_5g_coverage"):
+        return 0.045 + jitter           # from near zero, fast
+    if fid in ("epc_mean_sap", "canopy_height_mean", "carbon_stock",
+               "above_ground_biomass"):
+        return 0.005 + jitter
+    if fid in ("epc_below_c_share", "retrofit_cost_index"):
+        return -0.006 + jitter
+    if fid in ("grid_headroom",):
+        return -0.012 + jitter          # headroom is being consumed
+    if fid in ("commercial_vacancy", "curtailment_risk"):
+        return 0.006 + jitter
+    if fid in ("planning_decision_days",):
+        return 0.007 + jitter           # determination times have lengthened
+    if fid in ("crime_rate", "burglary_rate"):
+        return -0.004 + jitter
     return jitter
 
 
@@ -202,6 +268,11 @@ def _seasonal(factor: Dict[str, Any], month: int) -> float:
         return -amp * swing * 1.6
     if fid in ("dry_days", "sunshine_hours", "o3", "solar_ghi"):
         return -amp * swing            # inverse of the Water group's phase
+    if fid == "late_frost_risk":
+        # A spring hazard, not a winter one: frost matters once buds are out.
+        return amp * math.cos((month - 4.5) / 12.0 * 2 * math.pi) * 1.5
+    if fid == "irrigation_demand":
+        return amp * max(0.0, swing) * 1.6
     if fid == "growing_degree_days":
         return amp * max(0.0, swing) * 1.8
     return amp * swing

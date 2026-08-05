@@ -350,6 +350,20 @@ from routes_catalog import router as catalog_router  # noqa: E402
 
 app.include_router(catalog_router)
 
+# The mock has no Earth Engine, but open data needs none either: registering it
+# here means the credential-free backend — the one that runs locally and in the
+# serverless deployment — still returns real designations, prices and crime
+# where the network allows, and falls back to generated data where it does not.
+if os.environ.get("MOCK_DISABLE_OPEN_DATA") != "1":
+    import routes_catalog as _rc                    # noqa: E402
+    try:
+        import open_data as _open_data              # noqa: E402
+        _open_data.install(_rc.REAL_SERIES, _rc.REAL_SOURCES)
+    except Exception:                               # pragma: no cover
+        # A missing `requests` must not stop the mock backend booting; that is
+        # the one thing it exists to guarantee.
+        pass
+
 
 if __name__ == "__main__":
     import uvicorn

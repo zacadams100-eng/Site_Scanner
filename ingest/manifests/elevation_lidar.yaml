@@ -18,3 +18,10 @@ spatial:
   bbox: [-6.42, 49.86, 1.77, 55.81]
 
 h3_resolutions: [7, 8]
+
+# Elevation in metres, England's range roughly [-4, 978]. 5 cm resolution is
+# finer than the 15 cm vertical accuracy of the source LiDAR, and int16 at that
+# scale reaches +/-1,638 m — comfortably past Scafell Pike.
+storage:
+  dtype: int16
+  scale: 0.05

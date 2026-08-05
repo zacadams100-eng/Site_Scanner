@@ -22,9 +22,22 @@ import time
 import redaction
 
 import catalog
+import insights
 import series as series_mod
+from cache import build_cache, cache_key
 
 router = APIRouter()
+
+# Real Earth Engine factors cost seconds each. Without a cache that outlives a
+# request, adding a twelfth factor to a report re-runs the eleven already on
+# screen — the user pays eleven Earth Engine calls for one new answer, every
+# time they touch the factor list. Keyed per factor, so a changed selection
+# only ever costs the factors that actually changed.
+#
+# Only the real path is cached: the generator is microseconds, and caching it
+# would just hold memory. Failures are never cached — a flaky call should be
+# retried on the next request, not remembered for fifteen minutes.
+SERIES_CACHE = build_cache()
 
 # Drawing outside the covered area should fail with an explanation, not return
 # plausible-looking nonsense for a field in France.
@@ -46,13 +59,49 @@ class SeriesRequest(BaseModel):
 @router.get("/api/catalog")
 def get_catalog() -> Dict[str, Any]:
     """Everything the UI needs to render the factor browser, with provenance
-    attached. The frontend never hard-codes a factor list."""
+    attached. The frontend never hard-codes a factor list.
+
+    Each factor carries `real`: true where it returns actual observations,
+    false where the generator stands in. Most of the catalogue is still demo
+    data, and a user picking factors should be able to see which is which
+    *before* spending a query on one — not afterwards, from a badge on the
+    result.
+
+    Real factors additionally carry `provenance`: which service answers them
+    and how far that has been proven — `verified` (run against the live
+    service and checked) or `written` (implemented against the documented API
+    and covered by fixture tests, not yet run live). "We wrote it" must never
+    reach a user as "we ran it".
+    """
+    real_ids = [f["id"] for f in catalog.FACTORS if f["id"] in REAL_SERIES]
+    # Provenance is attached only to factors that are *currently* registered.
+    # The two dicts are filled together but can come apart — a backend that
+    # unregisters a source, or a test that clears one — and a generated factor
+    # carrying a source name would be the exact mislabel this mechanism exists
+    # to prevent.
+    factors = [
+        {**f, "real": f["id"] in REAL_SERIES,
+         **({"provenance": REAL_SOURCES[f["id"]]}
+            if f["id"] in REAL_SERIES and f["id"] in REAL_SOURCES else {})}
+        for f in catalog.FACTORS
+    ]
+    verified = [fid for fid in real_ids
+                if REAL_SOURCES.get(fid, {}).get("status") == "verified"]
+    total = len(catalog.FACTORS) or 1
     return {
-        "factors": catalog.FACTORS,
+        "factors": factors,
+        "real_factor_ids": real_ids,
+        "verified_factor_ids": verified,
         "bases": catalog.BASES,
         "groups": catalog.GROUPS,
         "class_values": catalog.CLASS_VALUES,
-        "summary": catalog.catalogue_summary(),
+        "summary": {
+            **catalog.catalogue_summary(),
+            "real_factor_count": len(real_ids),
+            "verified_factor_count": len(verified),
+            "generated_factor_count": len(catalog.FACTORS) - len(real_ids),
+            "real_share": round(len(real_ids) / total, 4),
+        },
         "coverage": {"name": "England", "bbox": _BBOX},
         "time": {
             "start": catalog.TIME_START,
@@ -96,6 +145,24 @@ def _validate_geometry(geometry: dict) -> tuple:
 # catalogue is honest rather than confusing.
 REAL_SERIES: Dict[str, Any] = {}
 
+# Provenance for the entries above, keyed the same way:
+#
+#   {"source": "data.police.uk", "status": "written", "note": "..."}
+#
+# `status` is either "verified" — someone ran it against the live service and
+# checked the answer — or "written", meaning implemented against the documented
+# API and covered by fixture tests but never yet run for real. Installers fill
+# this in; a real factor with no entry is reported as real with unknown
+# provenance rather than silently promoted.
+REAL_SOURCES: Dict[str, Dict[str, str]] = {}
+
+
+@router.get("/api/cache/series")
+def series_cache_info() -> Dict[str, Any]:
+    """Hit/miss counters for the series cache, so its behaviour in a deployed
+    instance is observable rather than assumed. Mounted by both backends."""
+    return SERIES_CACHE.info()
+
 
 def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
                 steps: List[str]) -> Dict[str, Any]:
@@ -109,18 +176,39 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
     fn = REAL_SERIES.get(factor_id)
     if fn is not None:
         t0 = time.perf_counter()
+        key = cache_key("series", factor_id, geometry, steps)
+        hit = SERIES_CACHE.get(key)
+        if hit is not None:
+            # A copy, because the caller decorates the result with `annual`
+            # and `meta` — mutating the cached dict would let one request's
+            # additions leak into the next one's response.
+            return {**hit, "cached": True,
+                    "elapsed_ms": round((time.perf_counter() - t0) * 1000)}
         try:
             points = fn(geometry, steps, area_ha)
             f = catalog.FACTOR_BY_ID[factor_id]
-            return {
+            # Which real source, not just "real". Half the real catalogue now
+            # comes from planning.data.gov.uk and the Land Registry rather
+            # than from a satellite, and labelling those "earth-engine" was a
+            # mislabel of exactly the kind scripts/audit_catalogue.py exists
+            # to catch.
+            provenance = REAL_SOURCES.get(factor_id) or {}
+            endpoint = provenance.get("endpoint", "")
+            result = {
                 "factor_id": factor_id,
                 "kind": f["kind"],
                 "cadence": f["cadence"],
                 "unit": f["unit"],
                 "points": points,
-                "source": "earth-engine",
+                "source": ("earth-engine" if "earthengine" in endpoint
+                           else "open-data"),
+                "provenance": provenance or None,
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000),
+                "cached": False,
             }
+            # Store a copy for the same reason the hit path returns one.
+            SERIES_CACHE.set(key, dict(result))
+            return result
         except Exception as e:
             s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
             s["source"] = "generated"
@@ -130,11 +218,13 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
             s["error"] = ("Earth Engine failed, showing demo data: "
                           + redaction.safe_message(e))
             s["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
+            s["cached"] = False
             return s
 
     s = series_mod.generate_series(factor_id, centroid, area_ha, steps)
     s["source"] = "generated"
     s["elapsed_ms"] = 0
+    s["cached"] = False
     return s
 
 
@@ -256,8 +346,16 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # be retrofitted for it.
         "precision": "approx",
         # Which factors came back real, so the UI can say so per column rather
-        # than implying the whole report is one thing or the other.
-        "real_factors": [k for k, v in out.items() if v.get("source") == "earth-engine"],
+        # than implying the whole report is one thing or the other. Both real
+        # sources count; only "generated" does not.
+        "real_factors": [k for k, v in out.items()
+                         if v.get("source") in ("earth-engine", "open-data")],
         "steps": steps,
         "series": out,
+        # What the numbers say, in sentences. Computed here rather than in the
+        # browser because it is arithmetic over data the server already has in
+        # hand, and because the rules that keep it honest — no claims from
+        # generated data, no trends through carried-forward values — belong
+        # next to the labelling they depend on. See insights.py.
+        **insights.summarise({"series": out}),
     }
