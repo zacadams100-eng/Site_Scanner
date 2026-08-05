@@ -63,11 +63,20 @@ init_earth_engine()
 
 app = FastAPI(title="Site Scanner Earth Engine API")
 
-# Allow the frontend (served from anywhere during development) to call this API.
-# Lock this down to your real domain before going live.
+# In production the browser never calls this service cross-origin: Vercel
+# proxies /api/* to Cloud Run, so requests arrive same-origin and CORS is not
+# consulted at all. It still matters, because the Cloud Run URL is public and
+# --allow-unauthenticated, so a wildcard here is what lets any page on the web
+# call this API directly from a visitor's browser and spend our Earth Engine
+# quota.
+#
+# CORS_ALLOW_ORIGINS holds a comma-separated allowlist. Unset means "*", which
+# keeps `npm run dev` against a remote backend working; set it on deploy:
+#   --set-env-vars CORS_ALLOW_ORIGINS=https://your-app.vercel.app
+_origins = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in _origins.split(",") if o.strip()] or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -218,9 +218,22 @@ export default function App() {
             <div className="notice notice-error">
               <strong>Can't reach the API.</strong>
               <p>{catalogError}</p>
-              <p className="notice-fix">
-                Start it with <code>uvicorn mock_ee_backend:app --port 8000</code>
-              </p>
+              {/* The same failure means different things either side of a
+                  build. Locally it is nearly always a backend nobody started,
+                  and the command is the whole fix. On the deployed site the
+                  visitor cannot start anything, and telling them to run
+                  uvicorn reads as gibberish — so point them at the demo,
+                  which needs no backend at all. */}
+              {import.meta.env.DEV ? (
+                <p className="notice-fix">
+                  Start it with <code>uvicorn mock_ee_backend:app --port 8000</code>
+                </p>
+              ) : (
+                <p className="notice-fix">
+                  The live backend isn't deployed yet. <a href="/demo">Open the
+                  demo</a> to explore the interface with sample data.
+                </p>
+              )}
             </div>
           )}
 

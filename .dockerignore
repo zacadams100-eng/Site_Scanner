@@ -1,9 +1,17 @@
 # The image copies files explicitly, but this keeps the build context small
 # and makes it impossible to send credentials to the builder by accident.
 
-# Credentials — never build these into an image
+# Credentials — never send these to the builder.
+#
+# The last pattern is the load-bearing one and mirrors .gitignore: a real
+# Google service account key is named <project>-<16 hex chars>.json, which the
+# two literal names above do not match. `gcloud run deploy --source .` uploads
+# this directory to Cloud Build, so a key sitting in the working tree would
+# leave the machine even though the Dockerfile never copies it.
 service-account-key.json
 *.key.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
+**/ee-backend/
 .env
 .env.*
 
@@ -16,10 +24,20 @@ __pycache__/
 venv/
 .venv/
 
-# Frontend and docs — deployed separately, see vercel.json
+# Frontend and docs — deployed separately, see vercel.json.
+# web/ matters most: node_modules and dist run to hundreds of MB, and
+# `--source .` would upload every byte to Cloud Build on each deploy.
 site-scanner.html
 vercel.json
 .vercelignore
 *.md
+web/
+demo/
+**/node_modules/
 
+# Batch and developer tooling. None of it is imported by the served app —
+# tests/test_docker_context.py is what proves that.
 tests/
+bench/
+ingest/
+scripts/

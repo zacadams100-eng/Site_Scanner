@@ -13,9 +13,24 @@ it predates the catalogue — it calls only `/api/stats`, `/api/summary` and
 the attribute table or the charts. `web/` is the deployed frontend; the
 prototype is kept for reference.
 
-Nothing here has been run against a real cloud account — no credentials are
-configured yet. Treat the commands as the intended path, not as verified
-output, and expect the first deploy of anything to need a round of fixing.
+No cloud account has been connected yet, so none of the `gcloud` or `vercel`
+commands below have been run. Treat them as the intended path, not as verified
+output.
+
+What *has* been verified, without credentials:
+
+- **The Vercel build runs clean.** `installCommand` and `buildCommand` were
+  executed as written; `web/dist` comes out with the hashed assets, `demo.html`,
+  and both MapLibre worker files in `dist/maplibre/`. TypeScript passes.
+- **The Dockerfile's module list is now complete, and a test keeps it that
+  way.** It was missing seven of the ten modules the app imports — everything
+  added after the file was first written. The container would have died on
+  `import` before serving a request, and Cloud Run would have reported it the
+  same way it reports a credentials problem. `tests/test_docker_context.py`
+  walks the import graph and fails if the list drifts again.
+- **The image itself has not been built.** No Docker daemon was available, so
+  the pip install layer and the uvicorn start are still unproven. That is the
+  most likely place for the next failure.
 
 ---
 
@@ -67,9 +82,14 @@ gcloud run deploy contour-api \
   --set-env-vars EE_PROJECT=your-gcp-project-id \
   --set-secrets GOOGLE_APPLICATION_CREDENTIALS_JSON=contour-ee-key:latest \
   --set-secrets ANTHROPIC_API_KEY=contour-anthropic-key:latest \
+  --set-env-vars CORS_ALLOW_ORIGINS=https://your-app.vercel.app \
   --memory 1Gi \
   --timeout 120
 ```
+
+Set `CORS_ALLOW_ORIGINS` once you know the Vercel domain — it takes a
+comma-separated list, and unset means `*`. Step 2 explains why it matters even
+though the proxy means the browser never makes a cross-origin request.
 
 Note the deploy prints the service URL — you need it for step 2.
 
@@ -153,8 +173,13 @@ origin; Vercel proxies it to Cloud Run. The browser never makes a cross-origin
 request, so:
 
 - **no CORS**, and no backend URL baked into the bundle;
-- `allow_origins=["*"]` in `app.py` is doing nothing once the proxy is in place
-  and should be narrowed to your Vercel domain before this is public;
+- CORS on `app.py` is doing nothing for *your* frontend once the proxy is in
+  place — but the Cloud Run URL is still public and unauthenticated, so a
+  wildcard is what lets any other page on the web call this API from a
+  visitor's browser and spend your Earth Engine quota. Set
+  `CORS_ALLOW_ORIGINS` to your Vercel domain on deploy. Note this narrows the
+  browser path only; `curl` ignores CORS entirely, so it is not a substitute
+  for the rate limiting in §3;
 - you can point a preview deployment at a different backend by changing one
   line of `vercel.json`, with no rebuild of the app itself.
 
