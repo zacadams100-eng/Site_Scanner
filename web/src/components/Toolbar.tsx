@@ -6,6 +6,8 @@ import {
 } from '../lib/exports'
 import { shareUrl } from '../lib/permalink'
 import type { Series } from '../types'
+import type { Map as MapLibreMap } from 'maplibre-gl'
+import { captureMap } from '../lib/mapImage'
 
 /**
  * What you do *with* a report, as opposed to what you do to build one.
@@ -23,6 +25,7 @@ export default function Toolbar() {
   const timeIndex = useStore((s) => s.timeIndex)
   const compareIndex = useStore((s) => s.compareIndex)
   const markers = useStore((s) => s.markers)
+  const projectName = useStore((s) => s.projectName)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
@@ -97,7 +100,21 @@ export default function Toolbar() {
                     onClick={() => { if (aoi) exportGeoJson(aoi, cols, data.area_ha, markers); setMenuOpen(false) }}>
               GeoJSON — shape, data and markers
             </button>
-            <button onClick={() => { printReport(cols, data.area_ha, data.centroid); setMenuOpen(false) }}>
+            <button onClick={() => {
+              // The map is captured here rather than inside printReport,
+              // because it needs the live map instance and this is the layer
+              // that knows about the app. A failed capture omits the picture
+              // and still produces the document.
+              const shot = captureMap(
+                (window as unknown as { __map?: MapLibreMap }).__map,
+                aoi, markers)
+              printReport({
+                cols, area_ha: data.area_ha, centroid: data.centroid,
+                insights: data.insights, counts: data.counts,
+                map: shot, siteName: projectName || undefined,
+              })
+              setMenuOpen(false)
+            }}>
               Printable report / PDF
             </button>
           </div>

@@ -1,5 +1,5 @@
 import type { SavedAoi, SitesFile } from '../store'
-import type { Factor, Marker, Series } from '../types'
+import type { Factor, Insight, Marker, Series } from '../types'
 import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
 
 /** Explains the months-observed columns wherever a file has room to say it. */
@@ -240,10 +240,38 @@ export function exportXml(cols: Series[]): void {
 
 /** A one-page printable report. Opens the browser's own print dialog, which
  *  gives PDF export on every platform without shipping a PDF library. */
-export function printReport(cols: Series[], area_ha: number,
-                            centroid: { lng: number; lat: number }): void {
+export interface ReportContext {
+  cols: Series[]
+  area_ha: number
+  centroid: { lng: number; lat: number }
+  /** Findings from the server, already ranked and already labelled. */
+  insights?: Insight[]
+  counts?: { total: number; shown: number; from_real_data: number; from_generated_data: number }
+  /** The map as the user arranged it. Omitted if the capture failed. */
+  map?: { dataUrl: string; width: number; height: number } | null
+  siteName?: string
+}
+
+/**
+ * The document that leaves.
+ *
+ * Everything else this app exports is data for another program. This is the
+ * thing a consultant puts in front of a client: the site as a picture, what
+ * was found in plain sentences, the figures behind it, and the licence
+ * notices that make using it lawful. Printed from the browser, so it is a PDF
+ * on every platform with no dependency and no server.
+ *
+ * The section that most reports would not have is "About this report". Most of
+ * this catalogue is still demo data, and a document that leaves the building
+ * without saying which parts are real is the one way this project could
+ * actively mislead someone. So the split is stated in the document, near the
+ * top, in the same size type as everything else.
+ */
+export function printReport(ctx: ReportContext): void {
+  const { cols, area_ha, centroid } = ctx
   const w = window.open('', '_blank')
   if (!w) return
+
   let anyPartial = false
   const rows = (cols[0]?.annual ?? []).map((r0) => {
     const cells = cols.map((c) => {
@@ -257,21 +285,51 @@ export function printReport(cols: Series[], area_ha: number,
     return `<tr><th>${r0.year}</th>${cells}</tr>`
   }).join('')
 
+  const realCols = cols.filter((c) => c.source === 'earth-engine' || c.source === 'open-data')
+  const findings = (ctx.insights ?? []).map((f) => {
+    const real = f.source === 'earth-engine' || f.source === 'open-data'
+    return `<li class="${real ? 'real' : 'demo'}"><span class="dot"></span>${escapeHtml(f.text)}</li>`
+  }).join('')
+
+  const provenance = [...new Map(cols
+    .filter((c) => c.provenance)
+    .map((c) => [c.provenance!.source + c.provenance!.endpoint, c.provenance!]))
+    .values()]
+    .map((p) => `<li>${escapeHtml(p.source)} via <span class="mono">${escapeHtml(p.endpoint)}</span>` +
+                `${p.status === 'written' ? ' — implemented and tested, not yet run against the live service' : ''}</li>`)
+    .join('')
+
   // The printed report is the copy that leaves and gets forwarded, so it
   // carries the brand rather than browser defaults: the mark, moss rules,
   // figures in mono. The font stack degrades to whatever the printing machine
   // has — a new window cannot see the app's loaded webfonts.
   w.document.write(`<!doctype html><meta charset="utf-8">
-<title>Site Scanner report</title>
+<title>Site Scanner report${ctx.siteName ? ` — ${escapeHtml(ctx.siteName)}` : ''}</title>
 <style>
- :root{--moss:#4d6048;--ink:#232323;--slate:#69706a;--rule:#ddd8cf}
+ :root{--moss:#4d6048;--ink:#232323;--slate:#69706a;--rule:#ddd8cf;--amber:#8a6520}
+ *{box-sizing:border-box}
  body{font:12px/1.55 'IBM Plex Sans',system-ui,-apple-system,sans-serif;
-      margin:30px;color:var(--ink)}
+      margin:30px;color:var(--ink);max-width:190mm}
  header{display:flex;align-items:center;gap:12px;padding-bottom:14px;
         border-bottom:2px solid var(--moss);margin-bottom:18px}
  h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.01em}
+ h2{font-size:12px;margin:22px 0 9px;font-weight:600;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--moss)}
  .sub{color:var(--slate);font-size:11.5px;margin-top:3px;
       font-family:'IBM Plex Mono',ui-monospace,monospace}
+ .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+ figure{margin:0}
+ figure img{width:100%;border:1px solid var(--rule);border-radius:4px;display:block}
+ figcaption{font-size:10px;color:var(--slate);margin-top:5px}
+ ul{margin:0;padding:0;list-style:none}
+ .findings li{position:relative;padding:0 0 9px 16px;line-height:1.5}
+ .findings .dot{position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:50%}
+ .findings li.real .dot{background:var(--moss)}
+ .findings li.demo .dot{border:1.5px solid var(--rule)}
+ .findings li.demo{color:var(--slate)}
+ .panel{border:1px solid var(--rule);border-radius:4px;padding:11px 13px;
+        background:#faf9f6;font-size:11px;line-height:1.6}
+ .panel strong{color:var(--ink)}
  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
  th,td{border-bottom:1px solid var(--rule);padding:6px 9px;text-align:right}
  td{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px}
@@ -279,9 +337,17 @@ export function printReport(cols: Series[], area_ha: number,
  tbody th{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace}
  thead th{border-bottom:1.5px solid var(--moss);font-size:11px;color:var(--ink)}
  tbody tr:nth-child(odd) td,tbody tr:nth-child(odd) th{background:#faf9f6}
- .src{margin-top:20px;font-size:10px;color:var(--slate);line-height:1.6}
- .p{color:#8a6520;font-weight:600;margin-left:2px}
- @media print{body{margin:12mm}}
+ .src{margin-top:10px;font-size:10px;color:var(--slate);line-height:1.6}
+ .p{color:var(--amber);font-weight:600;margin-left:2px}
+ @media print{
+   body{margin:12mm}
+   /* Keep a section and its heading together; a table that splits mid-row
+      across a page break is the usual way a printed report looks amateur. */
+   h2{break-after:avoid}
+   figure,.panel{break-inside:avoid}
+   tr{break-inside:avoid}
+   thead{display:table-header-group}
+ }
 </style>
 <header>
  <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
@@ -298,21 +364,55 @@ export function printReport(cols: Series[], area_ha: number,
   <circle cx="11.4" cy="9.6" r="1.1" fill="#4d6048"/><circle cx="20.6" cy="9.6" r="1.1" fill="#4d6048"/>
  </svg>
  <div>
-  <h1>Site report</h1>
+  <h1>${ctx.siteName ? escapeHtml(ctx.siteName) : 'Site report'}</h1>
   <div class="sub">${area_ha.toFixed(1)} ha · ${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)} · EPSG:4326 · ${new Date().toLocaleDateString('en-GB')}</div>
  </div>
 </header>
+
+${ctx.map ? `<figure>
+ <img src="${ctx.map.dataUrl}" alt="The site boundary on a map">
+ <figcaption>The area as drawn, at the extent shown on screen. Boundary and
+  markers are indicative; this is not a measured survey.</figcaption>
+</figure>` : ''}
+
+${findings ? `<h2>What the data shows</h2>
+<ul class="findings">${findings}</ul>` : ''}
+
+<h2>About this report</h2>
+<div class="panel">
+ <strong>${realCols.length} of ${cols.length} factors in this report return real
+ observations;</strong> the other ${cols.length - realCols.length} are generated
+ demonstration data and every statement drawn from them is marked as such.
+ ${ctx.counts && ctx.counts.from_generated_data > 0
+   ? `${ctx.counts.from_generated_data} of the findings above come from that
+      demonstration data and describe generated numbers, not this site.` : ''}
+ Figures are aggregated over the drawn boundary at approximately 30 m sampling
+ and are indicative rather than survey-grade.
+ ${provenance ? `<div style="margin-top:8px">Real factors were answered by:
+   <ul style="margin:4px 0 0 0">${provenance}</ul></div>` : ''}
+</div>
+
+<h2>Annual figures</h2>
 <table><thead><tr><th>Year</th>${cols.map((c) =>
-   `<th>${c.meta.name}<br><span style="font-weight:400;color:#69706a;font-family:'IBM Plex Mono',monospace">${c.unit}</span></th>`).join('')}</tr></thead>
+   `<th>${escapeHtml(c.meta.name)}<br><span style="font-weight:400;color:#69706a;font-family:'IBM Plex Mono',monospace">${escapeHtml(c.unit)}</span></th>`).join('')}</tr></thead>
 <tbody>${rows}</tbody></table>
-${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}
- Hover a marked figure on screen for the exact count.</div>` : ''}
-<div class="src"><strong>Sources.</strong> ${[...new Set(cols.map((c) =>
-  `${c.meta.base_meta.name} (${c.meta.base_meta.licence})`))].join(' · ')}</div>
-${attributionsFor(cols).map((a) => `<div class="src">${a}</div>`).join('')}`)
+${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}</div>` : ''}
+
+<h2>Sources and licences</h2>
+<div class="src"><strong>Datasets.</strong> ${[...new Set(cols.map((c) =>
+  `${escapeHtml(c.meta.base_meta.name)} (${escapeHtml(c.meta.base_meta.licence)})`))].join(' · ')}</div>
+${attributionsFor(cols).map((a) => `<div class="src">${escapeHtml(a)}</div>`).join('')}
+<div class="src">Generated by Site Scanner on ${new Date().toLocaleString('en-GB')}.</div>`)
   w.document.close()
   w.focus()
-  setTimeout(() => w.print(), 350)
+  setTimeout(() => w.print(), 400)
+}
+
+/** Text into HTML. Site names and marker labels are user input, and this
+ *  string is written straight into a document. */
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
 
 /**

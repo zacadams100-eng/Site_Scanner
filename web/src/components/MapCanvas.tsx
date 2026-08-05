@@ -175,6 +175,12 @@ export default function MapCanvas() {
       center: [-0.57, 51.24],
       zoom: 11,
       attributionControl: false,
+      // WebGL clears its drawing buffer after every frame unless told not to,
+      // so `canvas.toDataURL()` returns a blank image. The printable report
+      // puts the map at the top of the page, and this is what makes that
+      // possible. It costs a little GPU memory; nothing else. (MapLibre 5
+      // moved this under canvasContextAttributes.)
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     })
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
