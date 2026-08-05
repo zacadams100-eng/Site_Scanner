@@ -99,8 +99,13 @@ def test_dockerfile_copies_every_module_the_app_imports():
 
 
 def _vercel_ignored_modules() -> set:
+    """Module names .vercelignore excludes.
+
+    Entries are anchored (`/app.py`) so they match only at the repo root; the
+    leading slash is stripped here to get back to the module name.
+    """
     return {
-        line.strip()[: -len(".py")]
+        line.strip().lstrip("/")[: -len(".py")]
         for line in (REPO_ROOT / ".vercelignore").read_text().splitlines()
         if line.strip().endswith(".py") and not line.strip().startswith("#")
     }
@@ -158,6 +163,13 @@ FRONTEND_BUILD_INPUTS = (
     "web/scripts/copy-maplibre-worker.mjs",
     # Copied to web/public/demo.html by vercel.json's buildCommand.
     "demo/site-scanner-demo.html",
+    # The serverless function and its dependency manifest. `requirements.txt`
+    # unanchored matched this one too, so Vercel found no Python manifest,
+    # installed nothing, and every API request failed with
+    # `ModuleNotFoundError: No module named 'fastapi'` — with the project's own
+    # modules bundled correctly, which made it look like an application bug.
+    "api/index.py",
+    "api/requirements.txt",
 )
 
 

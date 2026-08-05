@@ -8,13 +8,18 @@
 
 # The Earth Engine backend belongs on Cloud Run, not in a serverless function —
 # earthengine-api and its Google client stack blow past the bundle limit.
-app.py
-ee_series.py
-Dockerfile
-.dockerignore
-requirements.txt
-requirements-dev.txt
-pytest.ini
+# Anchored, all of them. Unanchored these are gitignore patterns matching at
+# any depth: a bare `requirements.txt` also excluded api/requirements.txt, so
+# Vercel found no Python manifest, installed nothing, and every request died
+# with ModuleNotFoundError: No module named 'fastapi' — while the modules
+# themselves bundled correctly and made it look like an application fault.
+/app.py
+/ee_series.py
+/Dockerfile
+/.dockerignore
+/requirements.txt
+/requirements-dev.txt
+/pytest.ini
 
 # Leading slashes are load-bearing. .vercelignore uses .gitignore syntax,
 # where a bare `scripts/` matches at ANY depth — it also excluded
@@ -32,7 +37,7 @@ venv/
 .venv/
 
 # The prototype is kept in the repo for reference but is not deployed.
-site-scanner.html
+/site-scanner.html
 
 # demo/ is NOT excluded: vercel.json's buildCommand copies
 # demo/site-scanner-demo.html into the build so it is served at /demo.
