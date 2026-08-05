@@ -22,7 +22,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copied explicitly rather than `COPY . .` so a stray service-account key or
 # .env in the working tree can never end up in a pushed image.
-COPY app.py summary.py mock_ee_backend.py ./
+#
+# This is every module the served app imports, directly or transitively. An
+# omission here is not a soft failure: the module is simply absent from the
+# image, so `import` raises and the container dies before it serves anything.
+# tests/test_docker_context.py walks the import graph and fails if this list
+# stops covering it — the list had already drifted five modules behind by the
+# time anyone tried to deploy.
+COPY app.py mock_ee_backend.py routes_catalog.py \
+     catalog.py series.py ee_series.py \
+     cache.py geometry.py redaction.py summary.py ./
 
 # Don't run as root. Cloud Run doesn't require it, but nothing here needs the
 # privileges and the container has network egress.
