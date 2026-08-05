@@ -16,6 +16,8 @@ first. Better to fail here, in a test that needs no cloud account.
 
 import ast
 import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -118,6 +120,59 @@ def test_vercelignore_excludes_every_python_module():
     assert not leaked, (
         ".vercelignore does not exclude: "
         + ", ".join(sorted(f"{m}.py" for m in leaked))
+    )
+
+
+# Everything Vercel needs in order to build the frontend. If any of these is
+# excluded, the build fails on their machine and nowhere else — a local build
+# reads the working tree and never consults .vercelignore at all.
+FRONTEND_BUILD_INPUTS = (
+    "web/package.json",
+    "web/package-lock.json",
+    "web/index.html",
+    "web/vite.config.ts",
+    "web/tsconfig.json",
+    "web/src/App.tsx",
+    "web/public/favicon.svg",
+    # The one that actually broke. `prebuild` runs it, and MapLibre renders a
+    # blank map without the worker files it copies.
+    "web/scripts/copy-maplibre-worker.mjs",
+    # Copied to web/public/demo.html by vercel.json's buildCommand.
+    "demo/site-scanner-demo.html",
+)
+
+
+def test_vercelignore_keeps_what_the_build_needs():
+    """.vercelignore uses .gitignore syntax, so bare directory names match at
+    any depth: `scripts/` excluded web/scripts/ as well as the root one, and
+    the first real deploy failed with MODULE_NOT_FOUND in seven seconds.
+
+    Rather than reimplement gitignore matching and get it subtly wrong, this
+    hands the patterns to git itself — the same matcher Vercel's rules follow.
+    """
+    ignore_text = (REPO_ROOT / ".vercelignore").read_text()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        (root / ".gitignore").write_text(ignore_text)
+        for rel in FRONTEND_BUILD_INPUTS:
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+
+        # check-ignore exits 0 and echoes the paths it would ignore.
+        result = subprocess.run(
+            ["git", "check-ignore", *FRONTEND_BUILD_INPUTS],
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+        excluded = [line for line in result.stdout.splitlines() if line.strip()]
+
+    assert not excluded, (
+        ".vercelignore excludes files the Vercel build needs: "
+        + ", ".join(sorted(excluded))
     )
 
 

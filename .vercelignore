@@ -28,10 +28,15 @@ Dockerfile
 .dockerignore
 pytest.ini
 
-bench/
-ingest/
-scripts/
-tests/
+# The leading slashes are load-bearing. .vercelignore uses .gitignore syntax,
+# where a bare `scripts/` matches a directory at ANY depth — so it also
+# excluded web/scripts/, and web/scripts/copy-maplibre-worker.mjs never
+# reached the builder. `prebuild` runs that script, so the build died with
+# MODULE_NOT_FOUND before Vite started. Anchor anything meant to be root-only.
+/bench/
+/ingest/
+/scripts/
+/tests/
 __pycache__/
 *.pyc
 .pytest_cache/
