@@ -5,6 +5,12 @@ import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
+import {
+  GLYPHS,
+  VECTOR_SOURCE,
+  VECTOR_SOURCE_ID,
+  vectorBasemapLayers,
+} from '../lib/basemapStyle'
 
 /**
  * The map is the canvas, not a widget in a frame — full bleed, with panels
@@ -42,12 +48,20 @@ maplibregl.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
 const BASE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {},
+  // Street names are the one place this app uses a glyph server, and it is a
+  // departure from the rule two comments below, so it is worth stating why.
+  // Place labels are DOM markers because "Guildford" is one word at one point
+  // and a whole font pipeline to draw it is a bad trade. A street name is not:
+  // it has to bend along the road it names, which no DOM element can do, and
+  // at the zooms where someone is analysing a site rather than finding one it
+  // is most of what makes the map legible. Nothing is fetched unless a text
+  // layer actually draws, and if the glyph host is down the labels are simply
+  // absent — same failure contract as the rest of the basemap.
+  glyphs: GLYPHS,
   // Sea. The land polygons of the bundled basemap sit on top of this, which
   // is what gives the map a coastline before a single tile has loaded.
   layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e6ecee' } }],
 }
-
-const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 /**
  * The bundled basemap: coastline, urban areas, water, motorways, railways and
@@ -61,8 +75,9 @@ const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
  * up, and at 1:10 million it is exactly the right detail for the zooms where
  * someone is *finding* a site rather than drawing one.
  *
- * The raster still earns its place at close range, so the two hand over: the
- * bundled layers carry the map to about z11 and fade as the raster fades in.
+ * Vector tiles still earn their place at close range, so the two hand over: the
+ * bundled layers carry the map to about z11 and fade as the vector layers fade
+ * in. See lib/basemapStyle.ts.
  */
 const BASEMAP_URL = '/basemap/england.json'
 
@@ -333,31 +348,19 @@ export default function MapCanvas() {
           // contract the raster has always had.
         })
 
-      if (!map.getSource('osm')) {
-        map.addSource('osm', {
-          type: 'raster',
-          tiles: [BASEMAP_TILES],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors',
-        })
-        map.addLayer({
-          id: 'osm',
-          type: 'raster',
-          source: 'osm',
-          // Desaturated and dimmed so data layers read as the foreground. The
-          // basemap is context, not content.
-          // Washed rather than dimmed: on a paper ground the basemap has to
-          // lose saturation and contrast, not brightness, or it turns to mud
-          // under the value overlay.
-          // Fades in as the bundled layers fade out: coarse vector data is
-          // better than nothing at national zoom and worse than tiles at
-          // field zoom, so each carries the range it is actually good for.
-          paint: {
-            'raster-opacity': ['interpolate', ['linear'], ['zoom'], 9.5, 0, 12.5, 0.62],
-            'raster-saturation': -0.8,
-            'raster-contrast': -0.15,
-          },
-        }, 'cells-fill')
+      // Close-range detail: OSM vector tiles drawn in this app's own palette.
+      // See lib/basemapStyle.ts — the short version is that the raster this
+      // replaced could only be washed out, never restyled, so zooming in used
+      // to abandon the palette exactly when the map became detailed enough to
+      // analyse.
+      //
+      // Added last and beneath 'cells-fill', so it is decoration in the same
+      // sense the raster was: if the tile host is unreachable these layers draw
+      // nothing and the bundled basemap carries the map alone.
+      if (!map.getSource(VECTOR_SOURCE_ID)) {
+        map.addSource(VECTOR_SOURCE_ID, VECTOR_SOURCE)
+        const first = map.getLayer('cells-fill') ? 'cells-fill' : undefined
+        for (const layer of vectorBasemapLayers()) map.addLayer(layer, first)
       }
 
       setReady(true)
