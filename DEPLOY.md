@@ -13,24 +13,48 @@ it predates the catalogue — it calls only `/api/stats`, `/api/summary` and
 the attribute table or the charts. `web/` is the deployed frontend; the
 prototype is kept for reference.
 
-No cloud account has been connected yet, so none of the `gcloud` or `vercel`
-commands below have been run. Treat them as the intended path, not as verified
-output.
+**Step 2 (Vercel) is done and live at https://site-scanner-pi.vercel.app.**
+Step 1 (Cloud Run) is blocked on billing — see below. The commands in step 1
+have been run as far as billing allows and are corrected where they were wrong.
 
-What *has* been verified, without credentials:
+What is verified:
 
-- **The Vercel build runs clean.** `installCommand` and `buildCommand` were
-  executed as written; `web/dist` comes out with the hashed assets, `demo.html`,
-  and both MapLibre worker files in `dist/maplibre/`. TypeScript passes.
-- **The Dockerfile's module list is now complete, and a test keeps it that
-  way.** It was missing seven of the ten modules the app imports — everything
-  added after the file was first written. The container would have died on
-  `import` before serving a request, and Cloud Run would have reported it the
-  same way it reports a credentials problem. `tests/test_docker_context.py`
-  walks the import graph and fails if the list drifts again.
-- **The image itself has not been built.** No Docker daemon was available, so
-  the pip install layer and the uvicorn start are still unproven. That is the
-  most likely place for the next failure.
+- **The image builds and serves.** Built with `docker build` in Cloud Shell and
+  run locally; the mock backend answered `/api/catalog` from inside the
+  container.
+- **The Vercel deploy works**, including the demo page and the MapLibre worker
+  files. The deployed `/` renders its map, which is the first proof the worker
+  fix holds — that bug only appears behind an SPA catch-all rewrite and cannot
+  be reproduced locally.
+- **The Dockerfile's module list was missing seven of ten modules.** Everything
+  added after the file was written. The container would have died on `import`
+  before serving a request. `tests/test_docker_context.py` now walks the import
+  graph and fails if the list drifts again.
+
+What is not:
+
+- **Cloud Run has never run.** The service account key, Secret Manager wiring
+  and the real Earth Engine path are all unproven in the cloud.
+
+---
+
+## 0. Billing — the current blocker
+
+`gcloud run deploy` fails on `sitescanner-504112` with:
+
+```
+ERROR: FAILED_PRECONDITION: Billing account for project '328960690784' is not
+found. Billing must be enabled for activation of service(s)
+'artifactregistry.googleapis.com,cloudbuild.googleapis.com,run.googleapis.com'
+```
+
+Google gates *enabling those services* on a billing account, not just spending,
+so the free tier does not get you around it. A billing account with a payment
+method has to be attached to the project in the Cloud Console. Nothing in this
+repo can work around it, and no flag skips it.
+
+At this app's traffic the running cost is nil — Cloud Run scales to zero and
+the free tier is 2M requests a month — but the card still has to be on file.
 
 ---
 
@@ -142,8 +166,29 @@ sed -i "s#https://REPLACE-WITH-CLOUD-RUN-URL.a.run.app#${API}#" vercel.json   # 
 Then:
 
 ```bash
-vercel deploy --prod
+npx vercel deploy --prod
 ```
+
+### What the first deploy actually took
+
+Four things went wrong, all in configuration rather than code:
+
+1. **`sudo npm i -g vercel` → `sudo: npm: command not found`.** Cloud Shell's
+   Node lives under `$HOME` and `sudo` drops it from `PATH`. Use `npx vercel`,
+   or `npm i -g vercel` without `sudo`.
+2. **Project names must be lowercase.** `SiteScanner` is rejected; the error
+   arrives after the settings prompts, so you answer them twice.
+3. **`Error: fetch failed`** on upload — `.vercelignore` did not exclude
+   `node_modules`, so it tried to send 244 MB.
+4. **The build failed in seven seconds with only an exit code.** `.vercelignore`
+   uses gitignore syntax, so a bare `scripts/` matched `web/scripts/` as well
+   as the root one, and `web/scripts/copy-maplibre-worker.mjs` never reached
+   the builder. Root-only patterns need a leading slash.
+
+Answer **no** to "Customize settings?" — `vercel.json` already has them, and
+the CLI's "Detected FastAPI" guess is wrong and harmless. Answer **no** to
+"Connect detected Git repository?" until the branch is merged, or Vercel will
+build `main` instead of what you have locally.
 
 Vercel runs, from the repo root:
 

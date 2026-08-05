@@ -252,7 +252,12 @@ export default function App() {
             </div>
           )}
 
-          {error && (
+          {/* Suppressed while the catalogue is unreachable. If the API is not
+              there at all, every shape drawn produces a second failure, and
+              "That didn't work. 404" underneath a notice that already explains
+              the backend is missing tells the reader nothing they don't know.
+              One cause, stated once. */}
+          {error && !catalogError && (
             <div className="notice notice-error">
               <strong>That didn't work.</strong>
               <p>{error}</p>

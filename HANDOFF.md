@@ -3,8 +3,11 @@
 Written at the end of the session that took the app from 4 real Earth Engine
 factors to 24, repalletted the interface, and set up automated verification.
 
-Branch: `claude/accessible-gis-web-app-tktvmz`
+Branch: `claude/handoff-md-review-e6zlvw`
 Repo: `zacadams100-eng/Site_Scanner` (public)
+
+**Live at https://site-scanner-pi.vercel.app** — the frontend is deployed. The
+backend is not. See "Deployment" below before sending that link to anyone.
 
 ---
 
@@ -55,9 +58,32 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
+### Deployment — half done
+
+The frontend is on Vercel at **https://site-scanner-pi.vercel.app**. Two pages:
+
+| URL | State |
+| --- | --- |
+| `/demo` | **Works completely.** Self-contained, no backend, no network. This is the link to send someone. It cannot break. |
+| `/` | The real app. Map, drawing and permalinks all work; the data panel says "Can't reach the API" because there is no backend. |
+
+The backend is **not** deployed, and is blocked on something no code change can
+fix: Google Cloud requires a billing account on the project before Cloud Run,
+Cloud Build or Artifact Registry can be enabled at all — free tier included.
+`sitescanner-504112` has none, so `gcloud run deploy` fails with
+`UREQ_PROJECT_BILLING_NOT_FOUND` before it builds anything.
+
+Everything else about the backend deploy is proven: the image builds, the
+container starts, and it served `/api/catalog` in Cloud Shell. Once billing
+exists the remaining work is `gcloud run deploy`, then pasting the resulting
+URL over the placeholder in `vercel.json`'s `/api/:path*` rewrite. No code
+changes — the frontend asks its own origin for `/api/*` and Vercel proxies it.
+
+Worth knowing: `/` in production is what finally proved the MapLibre worker fix
+holds. That bug only manifests behind an SPA catch-all rewrite and could never
+be reproduced locally.
+
 ### Not built
-- No deployment. It runs in Cloud Shell; there is no public URL for the real
-  app. `DEPLOY.md` has the Cloud Run and Vercel steps, untried.
 - No accounts, no saved projects, no persistence beyond `localStorage`.
 - The ingest pipeline (`ingest/`) works on synthetic rasters only. Nothing has
   been ingested for real, so the fast H3 path is unused in production.
@@ -148,6 +174,21 @@ dependency graph.
 **MapLibre's stylesheet loads after ours** and wins the specificity tie on
 `.map-canvas`, collapsing the container to zero height and swallowing every
 pointer event. The `.app .map-canvas` selector is load-bearing.
+
+**Every ignore file had drifted, and all three broke the first deploy.** The
+Dockerfile copied 3 of the 10 modules the app imports, so the container died on
+`import` before serving anything — and a missing module produces no application
+logs, so Cloud Run reports it exactly like a credentials problem.
+`.vercelignore` shipped 244 MB of `node_modules`, which killed the upload with a
+bare `Error: fetch failed`. Then it excluded `web/scripts/` — because
+`.vercelignore` uses gitignore syntax where a bare `scripts/` matches at *any*
+depth — so the MapLibre worker copier never reached the builder.
+
+That last one is the one to remember: had it excluded the worker output instead
+of the script, the build would have **passed** and deployed a blank map with no
+console error. `tests/test_docker_context.py` now checks all three lists
+against reality, using `git check-ignore` for the gitignore-syntax ones rather
+than reimplementing the matching.
 
 **AOI size limit is 250,000 ha** (`routes_catalog.py`). Larger returns 400.
 Earth Engine would time out long before that anyway.
