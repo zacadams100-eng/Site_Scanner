@@ -143,6 +143,25 @@ interface State {
 }
 
 let inflight: AbortController | null = null
+// Incremented on every refresh request. A call whose generation is no longer
+// the current one has been superseded and stops rather than resolving — a
+// timer-based debounce that clears the pending timeout leaves its promise
+// permanently unresolved, which quietly leaks one per keystroke.
+let refreshGeneration = 0
+
+/**
+ * How long to wait for the user to stop changing their mind.
+ *
+ * Aborting an in-flight request already stops answers arriving out of order,
+ * but the request has still been *sent* — toggling three factors fired three
+ * round trips, two of which the server did the work for and nobody read. That
+ * costs upstream quota and, now that the API is rate limited, some of the
+ * user's own budget.
+ *
+ * 180ms is below the ~250ms at which a delay starts to feel like lag, and
+ * comfortably above the gap between two deliberate clicks.
+ */
+const REFRESH_DEBOUNCE_MS = 180
 
 /**
  * Don't land the user on a blank month.
@@ -435,16 +454,31 @@ export const useStore = create<State>((set, get) => ({
   },
 
   refresh: async () => {
-    const { aoi, selected } = get()
-    if (!aoi || selected.length === 0) return
+    if (!get().aoi || get().selected.length === 0) return
 
-    // A user redrawing quickly, or toggling three factors in a row, should not
-    // queue three round trips whose answers arrive out of order.
+    // Coalesce a burst of changes into one request. Loading goes up straight
+    // away so the interface answers the click, even though nothing has left
+    // for the network yet.
+    set({ loading: true, error: null })
+    const generation = ++refreshGeneration
+    await new Promise<void>((resolve) => setTimeout(resolve, REFRESH_DEBOUNCE_MS))
+    // A later call arrived during the window and will do the work.
+    if (generation !== refreshGeneration) return
+
+    // Read after the wait, not before: the whole point of the window is that
+    // the selection may have changed inside it.
+    const { aoi, selected } = get()
+    if (!aoi || selected.length === 0) {
+      set({ loading: false })
+      return
+    }
+
+    // Redrawing during the request itself still needs the abort: the debounce
+    // only covers changes closer together than the window.
     inflight?.abort()
     const ctrl = new AbortController()
     inflight = ctrl
 
-    set({ loading: true, error: null })
     try {
       const [data, cells] = await Promise.all([
         fetchSeries(aoi, selected, ctrl.signal),

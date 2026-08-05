@@ -5,6 +5,99 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-05 (second pass) — Phase 2, and the gaps the brief still had
+
+Went back through the brief looking for what was genuinely missing rather than
+what was already built. Three things were, all in Phase 2.
+
+### Rate limiting (`ratelimit.py`)
+
+There was none, and the API is public, unauthenticated, and calls upstreams
+with quotas shared across every user. One script in a loop could spend an
+Earth Engine budget that belongs to everybody.
+
+A cost-weighted sliding window per client. Costs are per route because the
+routes are not comparable — `/api/catalog` is a cached dictionary at 0.5,
+`/api/series` can be twenty-four upstream calls at 6.0. Charging them equally
+either throttles browsing or fails to throttle work.
+
+Three decisions worth recording:
+
+- **Sliding window, not a token bucket.** A bucket lets a client spend its
+  allowance instantly and then starve, which for an interactive map means the
+  fourth shape you draw fails while you watch. A window degrades more gently.
+- **Rejected requests are not counted.** Otherwise a client already over the
+  limit holds itself over by retrying, turning a one-minute limit into a
+  permanent ban.
+- **Tracked clients are bounded.** `X-Forwarded-For` is forgeable, so an
+  unbounded map of clients would make this middleware the memory exhaustion it
+  exists to prevent.
+
+**What it does not do:** the counters live in the process, so on Vercel the
+effective limit is per instance, not per deployment. That makes it a guard
+against one client hammering one instance, not a global budget. A real budget
+needs shared state (Redis, Vercel KV) — a dependency and an account, for a
+service with no users yet. `DEPLOY.md` already makes the same argument about
+the response cache. Documented rather than dressed up, as the brief asks.
+
+### Staged loading (`LoadingSequence.tsx`)
+
+A frozen "Reading the site…" for eight seconds reads as broken; the same eight
+seconds narrated reads as work. The stages are the real ones in the order the
+backend performs them, and the sequence holds on its last message rather than
+implying completion — the response arriving is the only thing that knows when
+it is done. Past nine seconds it says the data source is slow, because at that
+point that is more useful than another verb.
+
+### Debouncing (`store.ts`)
+
+Aborting an in-flight request already stopped answers arriving out of order,
+but the request had still been *sent* — toggling three factors fired three
+round trips, two of which the server did the work for and nobody read. Now
+coalesced over 180ms, below the ~250ms where a delay starts to feel like lag.
+
+Implemented with a generation counter rather than a cleared timeout: clearing
+a pending timeout leaves its promise permanently unresolved, which quietly
+leaks one per keystroke.
+
+### Latency profile — and why the numbers below are not the real ones
+
+Measured locally, 4 factors x 180 months, draw to report:
+
+| | median |
+| --- | ---: |
+| uncached | 31 ms |
+| cached | 31 ms |
+| `/api/ask` | 8 ms |
+
+Against targets of 8 s uncached and 2 s cached, that looks like a rout. It is
+not, and the number should not be quoted. **This measures `series.py`, the
+generator** — the sandbox proxy blocks Earth Engine and all five open-data
+hosts, so nothing here touched a network. The real cost of a real factor is
+one upstream round trip, and the honest profile needs a machine with open
+egress. That, not the arithmetic, is the slow step.
+
+What the measurement does establish: nothing in the app's own request path —
+geometry validation, 180-month generation, annual rollup, the cell grid — is
+anywhere near the budget. Any latency a user sees is upstream.
+
+### Mobile
+
+Checked at iPhone 13 viewport in a real browser rather than by reading CSS: no
+horizontal overflow, tool rail usable, report panel present as a bottom sheet,
+viewport meta correct.
+
+### Not attempted, and why
+
+Phase 5's monitoring/alerts, AR mode, multiplayer cursors and cross-site
+pattern mining all need something this product does not have — accounts,
+persistence, a scheduler, or usage volume. Building any of them now would add
+a subsystem with no user. Phase 5's confidence overlays are the best next
+candidate: the data already carries `months_observed` and `confidence`, so it
+is a rendering job rather than a new pipeline.
+
+---
+
 ## 2026-08-05 — Phase 0 inventory, and natural-language querying
 
 ### Orientation: the brief describes an older product

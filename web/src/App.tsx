@@ -7,6 +7,7 @@ import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
 import Findings from './components/Findings'
+import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
@@ -292,7 +293,7 @@ export default function App() {
             </div>
           )}
 
-          {loading && <div className="loading">Reading the site…</div>}
+          {loading && <LoadingSequence />}
 
           {!loading && !error && data && (
             <>

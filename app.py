@@ -63,6 +63,12 @@ init_earth_engine()
 
 app = FastAPI(title="Site Scanner Earth Engine API")
 
+# Public, unauthenticated, and every series call can reach an upstream with a
+# shared quota. See ratelimit.py for what this does and does not protect.
+import ratelimit  # noqa: E402
+
+ratelimit.install(app)
+
 # In production the browser never calls this service cross-origin: Vercel
 # proxies /api/* to Cloud Run, so requests arrive same-origin and CORS is not
 # consulted at all. It still matters, because the Cloud Run URL is public and

@@ -146,6 +146,19 @@ def _reset_ee_state():
 
 
 @pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """The limiter is one process-wide instance, so without this the budget is
+    shared across the whole session and tests start failing in whatever order
+    happens to exhaust it. Resetting per test keeps the middleware exercised —
+    raising the budget for tests would leave it untested."""
+    import ratelimit
+
+    ratelimit.LIMITER.reset()
+    yield
+    ratelimit.LIMITER.reset()
+
+
+@pytest.fixture(autouse=True)
 def _no_real_api_key(monkeypatch):
     """Nothing in this suite should reach the Anthropic API.
 

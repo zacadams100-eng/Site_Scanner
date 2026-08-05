@@ -1254,3 +1254,13 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   color: var(--accent); background: none; border: none; cursor: pointer;
 }
 .ask-suggestion:hover { text-decoration: underline; }
+
+/* The staged loading readout. The elapsed counter only appears once a request
+   has been slow enough to be worth timing — showing "0s" immediately makes a
+   fast response look like a stopwatch. */
+.loading-text { display: block; }
+.loading-elapsed {
+  display: block; margin-top: 5px;
+  font-size: 11px; font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}

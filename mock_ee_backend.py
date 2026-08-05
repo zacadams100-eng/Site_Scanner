@@ -235,6 +235,12 @@ def make_stats(year: int, geometry: dict) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Contour Earth Engine API (mock)")
 
+# Public, unauthenticated, and every series call can reach an upstream with a
+# shared quota. See ratelimit.py for what this does and does not protect.
+import ratelimit  # noqa: E402
+
+ratelimit.install(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
