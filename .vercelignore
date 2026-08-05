@@ -1,8 +1,16 @@
 # Vercel builds the React app in web/ and publishes web/dist. Everything
 # Python goes to Cloud Run via the Dockerfile instead.
 #
-# Excluding requirements.txt also stops Vercel's framework detection from
-# treating this as a Python project and trying to build serverless functions.
+#
+# Note that excluding requirements.txt does NOT stop the CLI printing
+# "Detected FastAPI" — detection reads the local directory before anything is
+# uploaded, so .vercelignore cannot influence it. The settings in vercel.json
+# take precedence regardless, which is why the answer to "Customize settings?"
+# is always no.
+#
+# What is NOT excluded matters as much: web/src and web/package.json have to
+# be uploaded, because Vercel runs the build. Only the build's inputs and
+# outputs are dropped below.
 
 app.py
 mock_ee_backend.py
@@ -29,6 +37,14 @@ __pycache__/
 .pytest_cache/
 venv/
 .venv/
+
+# Installed and built artefacts. Vercel runs `npm --prefix web ci` and the
+# build itself, so uploading either is pure waste — and node_modules alone is
+# ~244 MB, which is enough to kill the upload from Cloud Shell with a bare
+# `Error: fetch failed` that names no cause.
+**/node_modules/
+web/dist/
+.git/
 
 # The prototype is kept in the repo for reference but is not deployed.
 site-scanner.html
