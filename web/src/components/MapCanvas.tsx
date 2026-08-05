@@ -7,8 +7,8 @@ import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
 import {
   GLYPHS,
-  VECTOR_SOURCE,
   VECTOR_SOURCE_ID,
+  resolveVectorSource,
   vectorBasemapLayers,
 } from '../lib/basemapStyle'
 
@@ -151,6 +151,9 @@ export default function MapCanvas() {
   // markers they also get the interface's own typeface for free.
   const [places, setPlaces] = useState<PlaceFeature[]>([])
   const placeMarkers = useRef<maplibregl.Marker[]>([])
+  // The vector basemap resolves its tile URL over the network, so `install`
+  // can run again mid-flight; this makes that idempotent.
+  const vectorPending = useRef<Promise<void> | null>(null)
   const userMarkers = useRef<maplibregl.Marker[]>([])
 
   const drawMode = useStore((s) => s.drawMode)
@@ -358,9 +361,17 @@ export default function MapCanvas() {
       // sense the raster was: if the tile host is unreachable these layers draw
       // nothing and the bundled basemap carries the map alone.
       if (!map.getSource(VECTOR_SOURCE_ID)) {
-        map.addSource(VECTOR_SOURCE_ID, VECTOR_SOURCE)
-        const first = map.getLayer('cells-fill') ? 'cells-fill' : undefined
-        for (const layer of vectorBasemapLayers()) map.addLayer(layer, first)
+        // Marked before the await so a second `styledata` during the round trip
+        // cannot add the source twice.
+        vectorPending.current = vectorPending.current || (async () => {
+          const source = await resolveVectorSource()
+          if (!map.style || map.getSource(VECTOR_SOURCE_ID)) return
+          map.addSource(VECTOR_SOURCE_ID, source)
+          const under = map.getLayer('cells-fill') ? 'cells-fill' : undefined
+          for (const layer of vectorBasemapLayers()) map.addLayer(layer, under)
+        })().catch(() => {
+          // Decoration only. The bundled basemap carries the map without it.
+        })
       }
 
       setReady(true)

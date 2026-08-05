@@ -27,15 +27,53 @@ import type {
 
 export const VECTOR_SOURCE_ID = 'ofm'
 
+/** ODbL requires the OSM credit; OpenFreeMap asks for its own. This project
+ *  carries the notice every licence actually requires rather than just naming
+ *  the licence, so both appear. */
+const ATTRIBUTION =
+  '<a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>'
+
+/** OpenFreeMap's published style. Not used for its layers — those are ours —
+ *  but for the one fact only it can state authoritatively: where its tiles
+ *  actually live. */
+const PUBLISHED_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
+
+/** The documented tile endpoint, used only if the style above is unreachable. */
 export const VECTOR_SOURCE: VectorSourceSpecification = {
   type: 'vector',
   url: 'https://tiles.openfreemap.org/planet',
-  // ODbL requires the OSM credit; OpenFreeMap asks for its own. This project
-  // carries the notice every licence actually requires rather than just naming
-  // the licence, so both appear.
-  attribution:
-    '<a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a> ' +
-    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>',
+  attribution: ATTRIBUTION,
+}
+
+/**
+ * Resolve the vector source by reading OpenFreeMap's own style.
+ *
+ * The first version of this file hardcoded the TileJSON URL from memory and
+ * the basemap silently rendered nothing — a wrong source produces no error a
+ * user can see, just an absence, which is the same class of failure as the
+ * MapLibre worker returning index.html. Asking the provider where its tiles
+ * are removes the guess: whatever URL its own style declares is by definition
+ * the right one, and it keeps working if they move.
+ *
+ * Falls back to the documented endpoint so an unreachable style file costs a
+ * round trip rather than the basemap.
+ */
+export async function resolveVectorSource(
+  fetchImpl: typeof fetch = fetch,
+): Promise<VectorSourceSpecification> {
+  try {
+    const res = await fetchImpl(PUBLISHED_STYLE)
+    if (!res.ok) return VECTOR_SOURCE
+    const style = (await res.json()) as { sources?: Record<string, unknown> }
+    const vector = Object.values(style.sources ?? {}).find(
+      (s): s is VectorSourceSpecification =>
+        !!s && typeof s === 'object' && (s as { type?: string }).type === 'vector',
+    )
+    return vector ? { ...vector, attribution: ATTRIBUTION } : VECTOR_SOURCE
+  } catch {
+    return VECTOR_SOURCE
+  }
 }
 
 /** Glyphs for street labels. Only fetched when a text layer is actually drawn. */

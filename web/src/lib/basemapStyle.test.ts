@@ -5,8 +5,59 @@ import {
   GLYPHS,
   VECTOR_SOURCE,
   VECTOR_SOURCE_ID,
+  resolveVectorSource,
   vectorBasemapLayers,
 } from './basemapStyle'
+
+const styleResponse = (body: unknown, ok = true) =>
+  (async () => ({ ok, json: async () => body })) as unknown as typeof fetch
+
+/**
+ * The tile URL is read from OpenFreeMap's published style rather than
+ * hardcoded, because hardcoding it from memory is exactly what produced a
+ * basemap that rendered nothing and reported no error.
+ */
+describe('resolveVectorSource', () => {
+  it('takes the vector source the provider declares', async () => {
+    const source = await resolveVectorSource(
+      styleResponse({
+        sources: {
+          maptiler_attribution: { type: 'vector', url: 'https://example.test/tiles.json' },
+        },
+      }),
+    )
+    expect(source.url).toBe('https://example.test/tiles.json')
+  })
+
+  it('ignores non-vector sources', async () => {
+    const source = await resolveVectorSource(
+      styleResponse({
+        sources: {
+          hillshade: { type: 'raster-dem', url: 'https://example.test/dem' },
+          base: { type: 'vector', url: 'https://example.test/vector' },
+        },
+      }),
+    )
+    expect(source.url).toBe('https://example.test/vector')
+  })
+
+  it('keeps our attribution rather than the provider style’s', async () => {
+    const source = await resolveVectorSource(
+      styleResponse({
+        sources: { base: { type: 'vector', url: 'https://x.test', attribution: 'someone else' } },
+      }),
+    )
+    expect(source.attribution).toMatch(/OpenStreetMap/)
+  })
+
+  it('falls back to the documented endpoint when the style is unreachable', async () => {
+    const rejecting = (async () => {
+      throw new Error('offline')
+    }) as unknown as typeof fetch
+    expect(await resolveVectorSource(rejecting)).toEqual(VECTOR_SOURCE)
+    expect(await resolveVectorSource(styleResponse({}, false))).toEqual(VECTOR_SOURCE)
+  })
+})
 
 /**
  * MapLibre validates a style at runtime, not at build time, so an invalid
