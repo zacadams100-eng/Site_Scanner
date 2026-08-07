@@ -229,6 +229,54 @@ def _spread(rows: List[Dict[str, Any]]) -> float:
     return sum(steps) / len(steps)
 
 
+# How much less-observed than its neighbours a year may be and still be
+# compared with them. One month of slack absorbs the ordinary cloudy winter;
+# beyond that the year is averaging a different set of seasons.
+_COVERAGE_SLACK = 1
+
+
+def _comparable(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop years too thinly observed to be compared with their neighbours.
+
+    A trend is the difference between two endpoints, so a short endpoint is the
+    one place a coverage artefact turns directly into a reported change. The
+    failure is concrete: ask this in August and the current year holds January
+    to July — the warm half — so a temperature series with no trend in it at
+    all reports a rise, and the noise floor cannot catch it because a stable
+    series has a noise floor of zero. That is the worst case, not an edge one:
+    the steadier the factor, the more reliably a missing autumn is narrated as
+    a trend.
+
+    The test is deliberately **relative to the series**, not against twelve.
+    Sentinel-2 never sees a January, so every NDVI year has nine or ten months
+    and an absolute threshold would refuse to answer any question about
+    vegetation at all. What matters is whether a year is short *compared with
+    the years it is being measured against*, so the yardstick is the median
+    coverage of the range itself.
+
+    Returns the rows unchanged when the coverage is not recorded — an older
+    cached response, or a source that does not report it. Silently dropping
+    every row would turn a missing field into "no data", which is a worse
+    answer than the slightly-too-confident one it replaced.
+    """
+    observed = [r.get("months_observed") for r in rows]
+    if any(o is None for o in observed) or len(rows) < 2:
+        return rows
+
+    ordered = sorted(observed)
+    median = ordered[len(ordered) // 2]
+    floor = median - _COVERAGE_SLACK
+    return [r for r in rows if r["months_observed"] >= floor]
+
+
+def _years(years: List[int]) -> str:
+    """'2026', '2011 and 2026', '2011, 2019 and 2026'."""
+    items = [str(y) for y in years]
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
 def _fmt(value: float, unit: str) -> str:
     if unit == "%":
         return f"{value:.1f}%"
@@ -270,6 +318,31 @@ def answer_one(
         return {**base, "verdict": "level", "from": rows[0]["year"], "to": latest["year"],
                 "text": f"{name} in {latest['year']}: {latest['value']}."}
 
+    # Years too thinly observed to compare with their neighbours are set aside
+    # before anything is computed from them. A short endpoint turns a coverage
+    # artefact straight into a reported trend, and a short year anywhere in the
+    # range drags the mean toward whichever seasons it happens to hold.
+    # `_comparable` measures against the range's own median, so it can never
+    # return nothing — the median-coverage rows always survive their own test.
+    # That is why there is no "everything was too short" branch here: it would
+    # be unreachable, and unreachable code that looks like a safety net is
+    # worse than none. A test pins the invariant.
+    usable = _comparable(rows)
+    dropped = [r["year"] for r in rows if r not in usable]
+    if dropped and len(usable) < 2 and intent != "level":
+        return {**base, "verdict": "no-data",
+                "text": (f"Only {usable[0]['year']} has enough of {name} observed to "
+                         f"compare in that range — {_years(dropped)} had too few "
+                         f"months.")}
+    rows = usable
+
+    # Said once, appended to whichever answer follows. Silently excluding a
+    # year the user can see in the table is the kind of quiet disagreement
+    # between two views of one number this project refuses everywhere else.
+    caveat = (f" {_years(dropped)} {'was' if len(dropped) == 1 else 'were'} left out: "
+              f"too few months observed to compare with the rest."
+              if dropped else "")
+
     first, last = rows[0], rows[-1]
     values = [r["value"] for r in rows]
     mean = sum(values) / len(values)
@@ -286,7 +359,8 @@ def answer_one(
         return {**base, "verdict": "extreme",
                 "high_year": hi["year"], "low_year": lo["year"],
                 "text": (f"{name} was highest in {hi['year']} at {_fmt(hi['value'], unit)} "
-                         f"and lowest in {lo['year']} at {_fmt(lo['value'], unit)}.")}
+                         f"and lowest in {lo['year']} at {_fmt(lo['value'], unit)}."
+                         + caveat)}
 
     # Trend.
     if len(rows) < 2:
@@ -309,14 +383,14 @@ def answer_one(
                 "text": (f"{name} shows no clear trend between {first['year']} and "
                          f"{last['year']} — it moved {_fmt(abs(delta), unit)}, which is "
                          f"within its typical year-to-year variation of "
-                         f"{_fmt(noise, unit)}.")}
+                         f"{_fmt(noise, unit)}." + caveat)}
 
     direction = "rose" if delta > 0 else "fell"
     change = f" ({abs(pct):.0f}%)" if pct is not None else ""
     return {**result,
             "text": (f"{name} {direction} from {_fmt(first['value'], unit)} in "
                      f"{first['year']} to {_fmt(last['value'], unit)} in "
-                     f"{last['year']}{change}.")}
+                     f"{last['year']}{change}." + caveat)}
 
 
 def compose(question: str, interpretation: Dict[str, Any],
