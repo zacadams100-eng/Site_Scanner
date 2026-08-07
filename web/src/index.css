@@ -974,7 +974,21 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 .band-fair { color: var(--text-dim); }
 .band-poor { color: var(--text-faint); font-style: italic; }
 .gap { color: var(--absent); }
+/* The partial-year caveat, graded.
+   A slight gap keeps the old dot — a hint, with the detail in the tooltip. A
+   severe one carries the month count as a small chip, because a dot only says
+   "something is off" and this row is the last thing a reader sees before
+   quoting the number somewhere it cannot be corrected. */
 .partial { color: var(--warn); margin-left: 3px; }
+.partial.is-severe {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+  padding: 1px 4px; border-radius: 3px; margin-left: 5px;
+  background: var(--amber-100); color: var(--warn);
+  white-space: nowrap;
+}
+/* A severely short year is not a number you should read across a row, so the
+   cell itself steps back from the ones it is not comparable with. */
+td.cov-severe { color: var(--text-dim); }
 
 /* ---------- Charts ---------- */
 .chart-stack {
