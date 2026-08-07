@@ -98,6 +98,33 @@ export function confidenceBand(c: number): 'good' | 'fair' | 'poor' {
   return 'poor'
 }
 
+/** The floor a fully-unreliable month is painted at. Not zero: a month with
+ *  almost no usable pixels still has a value, and hiding it would replace an
+ *  honest weak reading with the appearance of no data at all — which is a
+ *  different claim, and a false one. */
+export const MIN_CONFIDENCE_ALPHA = 0.35
+
+/**
+ * How solidly a month's cells are painted, from the fraction of pixels that
+ * were actually usable.
+ *
+ * Every competitor renders all pixels at equal weight, so a December mean
+ * scraped from 8% cloud-free coverage looks exactly as authoritative as a
+ * clear June. The table has said so for a while and the map has not, which is
+ * the wrong way round: the map is what people screenshot.
+ *
+ * Colour keeps meaning value and opacity now means confidence — two channels,
+ * two variables, no overloading. The square root is deliberate: perceived
+ * opacity is markedly non-linear, and a plain linear ramp made everything
+ * below about 0.5 look equally washed out, collapsing the distinction this
+ * exists to draw.
+ */
+export function confidenceAlpha(validFraction: number | undefined): number {
+  if (validFraction === undefined || Number.isNaN(validFraction)) return 1
+  const f = Math.max(0, Math.min(1, validFraction))
+  return MIN_CONFIDENCE_ALPHA + (1 - MIN_CONFIDENCE_ALPHA) * Math.sqrt(f)
+}
+
 /** Deterministic colour ramp position for a value within a factor's range. */
 export function rampPosition(v: number, factor: Factor): number {
   const lo = factor.lo ?? 0

@@ -5,6 +5,137 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-07 — The three moat items, made real
+
+Worked from the competitive context doc, which says to default to items 1–3
+(speed, accessibility, shareability) when a call is not obvious, because those
+are the structural moat and the rest only matters if they hold. Three things
+were claimed rather than true.
+
+### The shared link was dropping data (item 3)
+
+The doc calls a URL that reconstructs a whole analysis a structural moat, and
+sets the bar at "does this survive a fresh page load from a pasted link" as a
+hard requirement. It did not. Markers and the site's name were held in the
+store and saved into workspaces, but never encoded — so sending someone an
+annotated site sent them the shape and silently discarded every note on it,
+and the site arrived as an unnamed rectangle.
+
+Worse, `permalink.ts` had **no test file at all**, despite `HANDOFF.md` listing
+"permalink round-trip (`lib/permalink.ts` with tests)" as already done.
+
+Both fields now encode, every marker mutation syncs the URL, and there is a
+`permalink.test.ts` with 16 tests. The one worth keeping is the completeness
+guard: it walks `URL_STATE_KEYS`, clears each field in turn, and fails naming
+any field that decodes the same with and without it. Adding a field to
+`UrlState` without teaching the encoder about it now breaks the build on
+purpose. Verified by deleting the marker encoder and watching it fail with
+`these UrlState fields do not survive a shared link: markers`.
+
+Two details that took a second attempt:
+
+- **The marker separators are `;` and `,` specifically because
+  `encodeURIComponent` escapes both.** The obvious choices — `~`, `*`, `!` —
+  are all left untouched by it, so a marker called "north gate; by the oak"
+  would have worked in testing and broken on the first real user.
+- **Marker ids are reissued by position rather than carried.** They are local
+  handles for React keys, never seen outside one browser, and spending URL
+  length on a timestamp buys nothing.
+
+Driven in a real browser from a pasted link: the name and both markers come
+back.
+
+### Latency was never measured (items 1 and 10)
+
+The doc says to treat a response-time regression as a P0 and to instrument
+from day one so speed is measurable rather than assumed. Nothing measured the
+request a user actually waits on. `/api/series` reported a per-factor
+`elapsed_ms`, which is the upstream call, not validation plus fan-out plus
+rollup plus serialisation.
+
+`telemetry.py` now times every `/api/*` request on both backends, emits
+`Server-Timing` (which devtools plots for free) and `X-Response-Time`, writes
+one structured JSON line per request, and serves the distribution at
+`/api/metrics` — a real endpoint returning structured data, per item 7, not a
+debug page that has to be rebuilt when the first integrator asks for it.
+
+Decisions worth recording:
+
+- **Percentiles, not averages.** A mean hides the tail and the tail is the
+  experience. A test drives 99 requests at 20 ms and one at 10 s and asserts
+  the p50 stays 20 and the max stays 10,000.
+- **A rejected request is still timed.** Installed outside the rate limiter, so
+  a 429 is measured. Otherwise a limiter that had started refusing everything
+  would show up as a sudden, flattering improvement in latency.
+- **Bounded on both axes** — 512 samples per route, 64 routes. A caller probing
+  `/api/<random>` would otherwise turn the instrumentation into the memory leak.
+- **`sampled_from` is in the payload**, saying "per-instance, not
+  per-deployment", because the figure most likely to be misquoted is the one
+  read straight off an endpoint by somebody who never opened the file.
+- **No client address, no geometry, no question text** in the log line. A
+  latency log is a poor place to start keeping records of who asked what about
+  which piece of land, and two tests assert it stays that way.
+
+`tests/test_docker_context.py` caught the new module missing from the
+Dockerfile — exactly the failure it was written for.
+
+### The map claimed more certainty than it had (item 8)
+
+The table has greyed poorly-observed numbers for a while. The map painted every
+cell at uniform opacity, so a December mean scraped from 26% cloud-free
+coverage rendered exactly as solidly as a clear May — on the artefact people
+screenshot and paste into a report.
+
+Colour still means value; opacity now means confidence, from the month's
+`valid_fraction`. Three things that matter:
+
+- **A floor of 0.35, never zero.** A thin month still has a value, and hiding
+  it would replace an honest weak reading with the appearance of no data,
+  which is a different claim and a false one.
+- **Square root, not linear.** Perceived opacity is markedly non-linear, and a
+  linear ramp made everything below about 0.5 look equally washed out —
+  collapsing the distinction the overlay exists to draw.
+- **The paint expression multiplies.** Each cell carries `alpha`; the overlay
+  slider sets `['*', ['coalesce', ['get','alpha'], 1], overlayOpacity]`.
+  Writing a bare number there, as the slider used to, silently discards every
+  cell's confidence the first time it is touched. There is a test for it.
+
+The timeline chip changed from a binary "low confidence" below 0.4 to
+`26% observed`, shown for `fair` as well as `poor`. A map that goes pale with
+no stated cause reads as a rendering fault.
+
+Checked in a browser at two months of the same site: May 2019 paints solid
+with no chip, November 2025 paints washed out with an amber `26% observed`.
+
+### Not attempted, and why
+
+**BNG pre-screen (item 4), the highest-value item on the list.** The catalogue
+has `bng_units_available`, `bng_uplift_potential` and `priority_habitat_pct`
+and a Biodiversity net gain template that selects them — and every one of those
+factors is `series.py` output. Building a compliance screen on generated
+numbers would attach the product to a legal deadline and answer it with
+invented data, which is the one thing this repo has consistently refused. It
+needs the Natural England / DEFRA priority-habitat and Environment Agency work
+in `BLOCKERS.md §2` first. That is the real prerequisite, and it is a data job
+before it is a feature.
+
+**Monitoring (item 6) and the shared EIA library (item 11)** both need accounts
+and server-side storage, which do not exist. Item 6's advice — make "saved
+sites" and "changes since last check" first-class in the data model now — is
+worth taking, but a saved site is still a `localStorage` entry, so there is no
+model to put it in yet.
+
+**Export counts** are not in `/api/metrics`. Exports happen entirely in the
+browser, so counting them means a beacon endpoint, which is a privacy decision
+rather than a coding one. The counter mechanism is there when that is settled.
+
+### Test counts
+
+465 Python passing, 10 skipped (Postgres). 85 frontend passing, up from 59 —
+the 26 new ones are the permalink round trip and the confidence rendering.
+
+---
+
 ## 2026-08-05 (second pass) — Phase 2, and the gaps the brief still had
 
 Went back through the brief looking for what was genuinely missing rather than

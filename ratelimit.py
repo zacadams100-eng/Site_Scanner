@@ -48,6 +48,11 @@ ROUTE_COST: Dict[str, float] = {
     "/api/summary": 4.0,  # may call an LLM
     "/api/stats": 3.0,
     "/api/catalog": 0.5,  # a cached dictionary; browsing must stay free
+    # Also a dictionary read, and something a monitor may poll every few
+    # seconds. Charging it full price would have the health check exhaust the
+    # budget it exists to report on.
+    "/api/metrics": 0.5,
+    "/api/cache/series": 0.5,
 }
 
 # Bound the number of tracked clients so a spray of forged X-Forwarded-For

@@ -1,4 +1,4 @@
-import type { DrawMode } from '../types'
+import type { DrawMode, Marker } from '../types'
 
 /**
  * URL state.
@@ -10,6 +10,15 @@ import type { DrawMode } from '../types'
  *
  * Encoded in the hash rather than the query string so that restoring state
  * never round-trips to a server.
+ *
+ * **Every field of `UrlState` must survive a round trip.** Not "most of it",
+ * and not "the parts that are cheap to encode" — a link that restores four
+ * fifths of an analysis is worse than one that restores none, because the
+ * recipient cannot see which fifth is missing and reads the remainder as the
+ * whole. `URL_STATE_KEYS` below names the fields, and a test walks it and
+ * fails on any that does not come back; adding a field to this interface
+ * without teaching `encodeState`/`decodeState` about it breaks that test on
+ * purpose.
  */
 
 export interface UrlState {
@@ -17,7 +26,20 @@ export interface UrlState {
   factors: string[]
   t: number
   compare: number | null
+  /** Annotated points. Saved with a workspace since markers existed, but until
+   *  now dropped from the URL — so sharing an annotated site sent the shape
+   *  and silently discarded every note on it. */
+  markers: Marker[]
+  /** The site's name, when it has one. What the recipient sees in the top bar,
+   *  and the difference between opening "Manor Farm, parcel 3" and opening an
+   *  unnamed rectangle. */
+  name: string | null
 }
+
+/** The field list the completeness test walks. Kept beside the interface so
+ *  the two are edited in the same glance. */
+export const URL_STATE_KEYS: (keyof UrlState)[] =
+  ['aoi', 'factors', 't', 'compare', 'markers', 'name']
 
 /** Polygons are the bulky part, so coordinates are quantised to ~1 m and
  *  delta-encoded before base64. A 60-vertex freehand shape fits in a URL that
@@ -51,12 +73,61 @@ function decodeRing(s: string): number[][] {
   return out
 }
 
+/**
+ * Markers, as `lng,lat,name;lng,lat,name`.
+ *
+ * The separators are `;` and `,` specifically because `encodeURIComponent`
+ * escapes both, so a marker called "north gate; by the oak" cannot punch its
+ * way out of its own field. The obvious-looking choices — `~`, `*`, `!` — are
+ * all left untouched by `encodeURIComponent` and would have worked in testing
+ * and failed on the first user who typed one.
+ *
+ * Coordinates are quantised to ~1 m, matching the ring encoding. A marker is a
+ * dropped pin, not a survey control point.
+ */
+function encodeMarkers(markers: Marker[]): string {
+  return markers
+    .map((m) => [
+      Math.round(m.lng * 1e5),
+      Math.round(m.lat * 1e5),
+      encodeURIComponent(m.name),
+    ].join(','))
+    .join(';')
+}
+
+function decodeMarkers(s: string): Marker[] {
+  const out: Marker[] = []
+  for (const part of s.split(';')) {
+    if (!part) continue
+    const [x, y, ...rest] = part.split(',')
+    const lng = Number(x)
+    const lat = Number(y)
+    // A truncated or mangled marker is dropped rather than placed at 0°N 0°E,
+    // which is in the Atlantic and would read as a real annotation.
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+    let name = 'Point'
+    try {
+      name = decodeURIComponent(rest.join(',')) || 'Point'
+    } catch {
+      // A hand-edited URL can carry a `%` that is not an escape sequence.
+      name = rest.join(',') || 'Point'
+    }
+    // Ids are reissued by position rather than carried. They are local handles
+    // for React keys and edit operations, not content — nothing outside this
+    // browser has ever seen one, so spending URL length on them buys nothing.
+    out.push({ id: `m${out.length}`, name, lng: lng / 1e5, lat: lat / 1e5 })
+  }
+  return out
+}
+
 export function encodeState(s: UrlState): string {
   const parts: string[] = []
   if (s.aoi) parts.push('g=' + encodeRing(s.aoi.coordinates[0] as number[][]))
   if (s.factors.length) parts.push('f=' + s.factors.join('.'))
   parts.push('t=' + s.t)
   if (s.compare !== null) parts.push('c=' + s.compare)
+  if (s.markers.length) parts.push('m=' + encodeMarkers(s.markers))
+  if (s.name) parts.push('n=' + encodeURIComponent(s.name))
   return parts.join('&')
 }
 
@@ -83,6 +154,14 @@ export function decodeState(hash: string): Partial<UrlState> {
     } else if (k === 'f') out.factors = v.split('.').filter(Boolean)
     else if (k === 't') out.t = Number(v)
     else if (k === 'c') out.compare = Number(v)
+    else if (k === 'm') out.markers = decodeMarkers(v)
+    else if (k === 'n') {
+      try {
+        out.name = decodeURIComponent(v) || null
+      } catch {
+        out.name = v || null
+      }
+    }
   }
   return out
 }

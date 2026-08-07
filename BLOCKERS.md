@@ -112,16 +112,16 @@ promise data they cannot deliver.
 
 ---
 
-## 4. No Vercel account, so there is still no live URL
+## 4. ~~No Vercel account, so there is still no live URL~~ — resolved
 
-Unchanged from `docs/DEPLOYMENT-STATUS.md`. Everything up to the authenticated
-call is built and verified locally through `scripts/serve_build.py`, which
-reproduces `vercel.json`'s routing. The remaining step is one command on a
-machine with a Vercel login:
+**Live at https://site-scanner-pi.vercel.app.** `npx vercel deploy --prod` from
+the repo root ships a new build.
 
-```bash
-npm i -g vercel && vercel login && vercel link && vercel deploy --prod
-```
+What is on that URL is the frontend and the credential-free API, which means
+the 22 open-data factors can be real and the 24 Earth Engine ones cannot. That
+half is blocked on item 5's sibling: Google requires a billing account before
+Cloud Run, Cloud Build or Artifact Registry can be enabled at all. See
+`DEPLOY.md §0` for the exact error. Nothing in this repo can work around it.
 
 ---
 

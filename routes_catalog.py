@@ -25,6 +25,7 @@ import catalog
 import insights
 import nlq
 import series as series_mod
+import telemetry
 from cache import build_cache, cache_key
 
 router = APIRouter()
@@ -163,6 +164,27 @@ def series_cache_info() -> Dict[str, Any]:
     """Hit/miss counters for the series cache, so its behaviour in a deployed
     instance is observable rather than assumed. Mounted by both backends."""
     return SERIES_CACHE.info()
+
+
+@router.get("/api/metrics")
+def metrics() -> Dict[str, Any]:
+    """Latency distribution and usage counters for this instance.
+
+    A real endpoint returning structured data rather than a debug page,
+    because the eventual pitch — "this screen took 900 ms, the desk study took
+    three weeks" — needs a number somebody can fetch, and because anything
+    built UI-first has to be rebuilt when the first integrator asks for it.
+
+    The cache counters are folded in so one call answers "is it fast, and is it
+    fast because it is cached", which are never useful apart.
+
+    Read `sampled_from` in the response before quoting anything from it: these
+    counters are per-process, so on a serverless deployment this describes one
+    instance rather than the service.
+    """
+    snap = telemetry.snapshot()
+    snap["cache"] = SERIES_CACHE.info()
+    return snap
 
 
 def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
@@ -338,6 +360,18 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         s["meta"] = catalog.resolve(fid)
         out[fid] = s
 
+    real_ids = [k for k, v in out.items()
+                if v.get("source") in ("earth-engine", "open-data")]
+
+    # Shape of use, not identity of user. How many layers a real query carries
+    # and how big the areas are is what tells us whether the latency figures
+    # describe the work people actually do — a p95 measured over one-factor
+    # queries says nothing about a six-factor screen. The geometry itself is
+    # never recorded; see telemetry._log.
+    telemetry.observe("series.factors", len(req.factor_ids))
+    telemetry.observe("series.real_factors", len(real_ids))
+    telemetry.observe("series.area_ha", area_ha)
+
     return {
         "area_ha": round(area_ha, 2),
         "centroid": {"lng": round(centroid[0], 5), "lat": round(centroid[1], 5)},
@@ -349,8 +383,7 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # Which factors came back real, so the UI can say so per column rather
         # than implying the whole report is one thing or the other. Both real
         # sources count; only "generated" does not.
-        "real_factors": [k for k, v in out.items()
-                         if v.get("source") in ("earth-engine", "open-data")],
+        "real_factors": real_ids,
         "steps": steps,
         "series": out,
         # What the numbers say, in sentences. Computed here rather than in the

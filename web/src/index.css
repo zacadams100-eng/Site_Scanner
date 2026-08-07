@@ -1036,9 +1036,15 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   display: flex; align-items: center; gap: 6px;
 }
 .time-value.is-gap { color: var(--text-faint); font-style: italic; }
+/* The map fades its cells when a month is thinly observed, so this chip is
+   the caption that stops the fade reading as a rendering fault. Two weights,
+   matching confidenceBand(): `fair` is a note, `poor` is a warning. */
 .low-conf {
   font-family: var(--font-ui); font-size: 9px; padding: 1px 5px; border-radius: 3px;
   font-style: normal; background: var(--amber-100); color: var(--warn);
+}
+.low-conf.band-fair {
+  background: var(--paper-300); color: var(--text-faint);
 }
 .time-factor {
   font-size: 10.5px; color: var(--text-faint);

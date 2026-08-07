@@ -332,8 +332,11 @@ trade.
   six-live-factor backend measured 18 hits to 6 misses.
 
 ### Not built
-- No deployment. It runs in Cloud Shell; there is no public URL for the real
-  app. `DEPLOY.md` has the Cloud Run and Vercel steps, untried.
+- **Earth Engine is not deployed.** The frontend and the credential-free API
+  are live on Vercel; the 24 Earth Engine factors need `app.py`, a service
+  account and a container, and Cloud Run cannot be enabled until the Google
+  project has a billing account (`DEPLOY.md §0`). So the live URL serves 22
+  real factors, not 46.
 - No accounts, and no persistence beyond `localStorage` — saved sites are
   per-browser, which is why they can now be exported to a file.
 - The ingest pipeline (`ingest/`) works on synthetic rasters only. Nothing has

@@ -58,7 +58,10 @@ export default function Toolbar() {
   }
 
   const onShare = async () => {
-    const url = shareUrl({ aoi, factors: selected, t: timeIndex, compare: compareIndex })
+    const url = shareUrl({
+      aoi, factors: selected, t: timeIndex, compare: compareIndex,
+      markers, name: projectName,
+    })
     try {
       await navigator.clipboard.writeText(url)
       say('Link copied — it restores this exact view')

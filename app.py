@@ -69,6 +69,12 @@ import ratelimit  # noqa: E402
 
 ratelimit.install(app)
 
+# Installed after the limiter so it wraps it: a 429 is part of what a client
+# experiences and must be timed too. See telemetry.py.
+import telemetry  # noqa: E402
+
+telemetry.install(app)
+
 # In production the browser never calls this service cross-origin: Vercel
 # proxies /api/* to Cloud Run, so requests arrive same-origin and CORS is not
 # consulted at all. It still matters, because the Cloud Run URL is public and

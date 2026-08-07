@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { compact, labelStep, seriesColor } from '../lib/format'
+import { compact, confidenceBand, labelStep, seriesColor } from '../lib/format'
 
 /**
  * The timeline is not just a control — it is a data display.
@@ -249,8 +249,18 @@ export default function Timeline() {
         {readout && (
           <div className={`time-value${readout.gap ? ' is-gap' : ''}`}>
             {readout.gap ? 'No data' : readout.text}
-            {!readout.gap && readout.confidence !== undefined && readout.confidence < 0.4 && (
-              <span className="low-conf" title="Few usable pixels this month">low confidence</span>
+            {/* The map now fades its cells when a month is poorly observed,
+                so this has to say *why* — an overlay that goes pale with no
+                stated cause reads as a rendering bug. Shown for `fair` as
+                well as `poor`, because the fade starts being visible there
+                and an unexplained one is the thing to avoid. */}
+            {!readout.gap && readout.confidence !== undefined
+              && confidenceBand(readout.confidence) !== 'good' && (
+              <span className={`low-conf band-${confidenceBand(readout.confidence)}`}
+                    title={`${Math.round(readout.confidence * 100)}% of pixels were usable `
+                           + 'this month — the map fades to match'}>
+                {Math.round(readout.confidence * 100)}% observed
+              </span>
             )}
           </div>
         )}

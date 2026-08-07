@@ -312,6 +312,8 @@ export const useStore = create<State>((set, get) => ({
     const next = [entry, ...saved].slice(0, 50)
     persistSaved(next)
     set({ saved: next, projectName: entry.name })
+    // Naming a site changes what the link says it is.
+    get().syncUrl()
   },
 
   loadSaved: (id) => {
@@ -376,6 +378,9 @@ export const useStore = create<State>((set, get) => ({
     return arriving.length
   },
 
+  // Every marker mutation syncs the URL. Markers are part of the shared
+  // analysis, not a private scratch layer — a link that drops the notes off a
+  // site is the failure mode this project is trying not to have.
   addMarker: (lng, lat, name) => {
     const { markers } = get()
     set({
@@ -387,18 +392,25 @@ export const useStore = create<State>((set, get) => ({
         lng, lat,
       }],
     })
+    get().syncUrl()
   },
 
   renameMarker: (id, name) => {
     const clean = name.trim()
     if (!clean) return
     set({ markers: get().markers.map((m) => (m.id === id ? { ...m, name: clean } : m)) })
+    get().syncUrl()
   },
 
-  moveMarker: (id, lng, lat) =>
-    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, lng, lat } : m)) }),
+  moveMarker: (id, lng, lat) => {
+    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, lng, lat } : m)) })
+    get().syncUrl()
+  },
 
-  removeMarker: (id) => set({ markers: get().markers.filter((m) => m.id !== id) }),
+  removeMarker: (id) => {
+    set({ markers: get().markers.filter((m) => m.id !== id) })
+    get().syncUrl()
+  },
 
   toggleFactor: (id) => {
     const { selected } = get()
@@ -443,14 +455,26 @@ export const useStore = create<State>((set, get) => ({
   // exactly what is on screen.
   syncUrl: () => {
     const s = get()
-    writeUrl({ aoi: s.aoi, factors: s.selected, t: s.timeIndex, compare: s.compareIndex })
+    writeUrl({
+      aoi: s.aoi,
+      factors: s.selected,
+      t: s.timeIndex,
+      compare: s.compareIndex,
+      markers: s.markers,
+      name: s.projectName,
+    })
   },
 
   hydrateFromUrl: () => {
     const s = decodeState(location.hash)
     if (s.factors?.length) set({ selected: s.factors.slice(0, MAX_FACTORS) })
     if (s.compare !== undefined && s.compare !== null) set({ compareIndex: s.compare })
-    if (s.aoi) get().setAoi(s.aoi, { skipHistory: true })
+    if (s.markers?.length) set({ markers: s.markers })
+    if (s.name) set({ projectName: s.name })
+    // Geometry last: setAoi fires the fetch, and it clears projectName unless
+    // told to keep it — so the name has to be in place before it runs, and the
+    // restore has to declare itself a restore.
+    if (s.aoi) get().setAoi(s.aoi, { skipHistory: true, keepProject: true })
   },
 
   refresh: async () => {

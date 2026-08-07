@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
-import { rampColor, rampPosition } from '../lib/format'
+import { confidenceAlpha, rampColor, rampPosition } from '../lib/format'
 import {
   GLYPHS,
   placeCutoff,
@@ -202,7 +202,13 @@ export default function MapCanvas() {
         id: 'cells-fill',
         type: 'fill',
         source: 'cells',
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.72 },
+        paint: {
+          'fill-color': ['get', 'color'],
+          // Opacity is the confidence channel: `alpha` comes from the month's
+          // valid_fraction, scaled by the user's overlay slider. Cells added
+          // before a repaint have no `alpha` yet, hence the coalesce.
+          'fill-opacity': ['*', ['coalesce', ['get', 'alpha'], 1], 0.72],
+        },
       })
 
       map.addSource('aoi', { type: 'geojson', data: EMPTY })
@@ -900,7 +906,11 @@ export default function MapCanvas() {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready || !map.getLayer('cells-fill')) return
-    map.setPaintProperty('cells-fill', 'fill-opacity', overlayOpacity)
+    // The multiply, not a bare number: each cell carries an `alpha` set from
+    // the month's observed fraction, and overwriting the property with a plain
+    // value here would silently throw that away every time the slider moved.
+    map.setPaintProperty('cells-fill', 'fill-opacity',
+      ['*', ['coalesce', ['get', 'alpha'], 1], overlayOpacity] as never)
     // Readable from a test, so "the slider moved" and "the map changed" can be
     // asserted separately rather than assumed to be the same thing.
     ;(window as unknown as { __cellsOpacity?: number }).__cellsOpacity = overlayOpacity
@@ -953,11 +963,17 @@ export default function MapCanvas() {
     const hi = factor.hi ?? 1
     const spread = (hi - lo) * 0.16
 
+    // How much of this month was actually observed. Carried onto every feature
+    // rather than set on the layer, so the overlay slider and the confidence
+    // weight multiply instead of overwriting one another — see the paint
+    // expression, which is `['*', ['get','alpha'], overlayOpacity]`.
+    const alpha = confidenceAlpha(point.valid_fraction)
+
     const features: GeoJSON.Feature[] = cells.map((c) => {
       const v = (point.value as number) + c.offset * spread
       return {
         type: 'Feature',
-        properties: { color: rampColor(rampPosition(v, factor)) },
+        properties: { color: rampColor(rampPosition(v, factor)), alpha },
         geometry: {
           type: 'Polygon',
           coordinates: [[

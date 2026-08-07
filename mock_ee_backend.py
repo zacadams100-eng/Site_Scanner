@@ -241,6 +241,12 @@ import ratelimit  # noqa: E402
 
 ratelimit.install(app)
 
+# Installed after the limiter so it wraps it: a 429 is part of what a client
+# experiences and must be timed too. See telemetry.py.
+import telemetry  # noqa: E402
+
+telemetry.install(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
