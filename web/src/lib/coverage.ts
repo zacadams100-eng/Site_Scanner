@@ -60,18 +60,35 @@ const SLIGHT_MAX_MISSING = 2
 const FULL_YEAR = 12
 
 /**
- * Grade a year by how far it is from twelve months, not from `months_total`.
+ * Grade a year by how far it is from a full year *of this factor*.
  *
- * `months_total` counts the months of that year inside the *requested range*,
- * so asking for 2011-06 onward gives 2011 a `months_total` of 7. Grading
- * against that would call a complete-looking 2-of-2 stub at the edge of a
- * range "complete", when it is ten months short of anything you could compare
- * it with. The two causes are told apart in the text, not in the grade —
- * either way the row is not a year.
+ * Two corrections to the obvious version, both of which the obvious version
+ * gets backwards:
+ *
+ * **Not against `months_total`.** That counts the months of the year inside
+ * the *requested range*, so asking for 2011-06 onward gives 2011 a
+ * `months_total` of 7 and a 2-of-2 stub at a range edge would grade
+ * "complete" while being ten months short of anything comparable.
+ *
+ * **Not against a flat twelve either.** Sentinel-2 never returns a January,
+ * February or December, so NDVI's best possible year is nine months. Grading
+ * those against twelve marks every NDVI year in the record "severe" and greys
+ * out the entire column — while the caveat text on the same cell says the
+ * years are comparable with each other, which is the truth. A factor's full
+ * year is twelve minus the months it never observes at all.
+ *
+ * `series` is optional so the cheap check still works without it; pass it
+ * wherever the series is to hand, which is everywhere it is actually called.
  */
-export function coverageGrade(r: Pick<AnnualRow, 'months_observed' | 'months_total' | 'value'>): CoverageGrade {
+export function coverageGrade(
+  r: Pick<AnnualRow, 'months_observed' | 'months_total' | 'value'>,
+  series?: Series,
+): CoverageGrade {
   if (r.value === null || r.value === undefined) return 'severe'
-  const missing = FULL_YEAR - r.months_observed
+  const fullYear = series
+    ? FULL_YEAR - neverObservedMonths(series).length
+    : FULL_YEAR
+  const missing = fullYear - r.months_observed
   if (missing <= 0) return 'complete'
   return missing <= SLIGHT_MAX_MISSING ? 'slight' : 'severe'
 }
@@ -226,7 +243,7 @@ function list(items: string[]): string {
  * copies staying in sync.
  */
 export function coverageCaveat(series: Series, r: AnnualRow): string | null {
-  const grade = coverageGrade(r)
+  const grade = coverageGrade(r, series)
   if (grade === 'complete') return null
   if (r.value === null) return 'No usable observation this year.'
 
@@ -245,30 +262,41 @@ export function coverageCaveat(series: Series, r: AnnualRow): string | null {
 
   const head = `${r.months_observed} of ${r.months_total} months observed`
 
-  // A month the record never observes anywhere is a property of the dataset,
-  // not of this row. Every year has the same hole, so the years still compare
-  // with each other — but none of them is a twelve-month mean, and someone
-  // about to quote one as an annual figure needs to know that. Computed
-  // independently of the bias because it is true even of a year that has no
-  // gaps of its own, which is precisely when seasonalBias declines to answer.
-  const never = neverObservedMonths(series)
-  const always = never.length
-    ? ` This factor is never observed in ${list(never)} in any year, ` +
-      `so no year here is a true 12-month average — but they are comparable with each other.`
-    : ''
-
   const bias = seasonalBias(series, r.year)
-  if (!bias || !bias.missing.length) return `${head}.${always}`
+  if (!bias || !bias.missing.length) return `${head}.`
 
   const missing = `missing ${list(bias.missing)}`
   if (bias.direction === 'none') {
     const gaps = bias.missing.length === 1 ? 'The gap does not' : 'The gaps are spread across the year, so they do not'
-    return `${head} — ${missing}. ${gaps} obviously bias the mean.${always}`
+    return `${head} — ${missing}. ${gaps} obviously bias the mean.`
   }
   const isAre = bias.missing.length === 1 ? 'which is' : 'which are'
   return `${head} — ${missing}, ${isAre} ${bias.direction === 'high' ? 'below' : 'above'} ` +
          `this factor's typical year, so ${r.year}'s figure reads ${bias.direction}. ` +
-         `Not comparable with the other years.${always}`
+         `Not comparable with the other years.`
+}
+
+/**
+ * What is true of the whole column, said once.
+ *
+ * A month the record never observes *anywhere* is a property of the dataset,
+ * not of any one row — Sentinel-2 returns nothing for January in any year of
+ * its life. That belongs beside the factor's name, not repeated in fifteen
+ * identical tooltips down a column, where it stops being read by the third
+ * row and crowds out the caveats that are about a specific year.
+ *
+ * The conclusion is the useful part and it is not the obvious one: because
+ * every year has the same hole, the years remain comparable **with each
+ * other**, even though none of them is a twelve-month mean. Someone about to
+ * quote one as an annual figure needs both halves of that.
+ */
+export function seriesCoverageNote(series: Series): string | null {
+  const never = neverObservedMonths(series)
+  if (!never.length) return null
+  if (never.length >= 12) return 'This factor has no observations at all.'
+  return `Never observed in ${list(never)} in any year, so no annual figure ` +
+         `here is a true 12-month average — but the years are comparable with ` +
+         `each other.`
 }
 
 /**
@@ -278,8 +306,8 @@ export function coverageCaveat(series: Series, r: AnnualRow): string | null {
  * problem where a `·` only hints that one exists, and the row is the last
  * place a reader looks before quoting the number.
  */
-export function coverageMark(r: AnnualRow): string | null {
-  const grade = coverageGrade(r)
+export function coverageMark(r: AnnualRow, series?: Series): string | null {
+  const grade = coverageGrade(r, series)
   if (grade === 'complete' || r.value === null) return null
   return grade === 'severe' ? `${r.months_observed} mo` : '·'
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   coverageGrade, coverageMark, coverageCaveat, missingMonths,
-  seasonalBias, yearToYearNoise,
+  seasonalBias, yearToYearNoise, seriesCoverageNote,
 } from './coverage'
 import type { AnnualRow, Point, Series } from '../types'
 
@@ -213,14 +213,12 @@ describe('coverageCaveat', () => {
     expect(text).toContain('Not comparable with the other years')
   })
 
-  it('says the years still compare with each other when the hole is dataset-wide', () => {
-    // The caveat a reader most needs before quoting an "annual" NDVI figure
-    // that has never once included a January.
+  it('does not repeat the dataset-wide fact on every single row', () => {
+    // It belongs beside the factor's name — see seriesCoverageNote. Fifteen
+    // identical tooltips down a column stop being read by the third row and
+    // crowd out the caveats that are about a specific year.
     const s = seasonalSeries([2017, 2018, 2019, 2020], (_y, m) => m === 1 || m === 2 || m === 12)
-    const text = coverageCaveat(s, s.annual[1])!
-    expect(text).toContain('never observed in Jan, Feb and Dec in any year')
-    expect(text).toContain('no year here is a true 12-month average')
-    expect(text).toContain('comparable with each other')
+    expect(coverageCaveat(s, s.annual[1])).toBeNull()
   })
 
   it('says so plainly when the gaps do not bias the mean', () => {
@@ -239,5 +237,68 @@ describe('coverageCaveat', () => {
     const text = coverageCaveat(s, s.annual[0])!
     expect(text).toContain('and 3 more')
     expect(text.length).toBeLessThan(240)
+  })
+})
+
+describe('coverageGrade against a factor that can never see twelve months', () => {
+  // Sentinel-2 returns nothing for Jan, Feb or Dec in ANY year, so NDVI's best
+  // possible year is nine months. Grading those against a flat twelve marked
+  // every NDVI year in the record "severe" and greyed out the whole column —
+  // while the caveat text on the same cell said the years were comparable with
+  // each other, which is the true statement. Two views of one number
+  // disagreeing is the exact failure this module exists to prevent.
+  const s2 = (extraSkip: (y: number, m: number) => boolean = () => false) =>
+    seasonalSeries([2017, 2018, 2019, 2020],
+      (y, m) => m === 1 || m === 2 || m === 12 || extraSkip(y, m))
+
+  it('calls a nine-month year complete when nine is the maximum', () => {
+    const s = s2()
+    expect(coverageGrade(s.annual[1], s)).toBe('complete')
+  })
+
+  it('still grades a year short for that factor', () => {
+    const s = s2((y, m) => y === 2019 && (m === 6 || m === 7 || m === 8))
+    const row2019 = s.annual.find((a) => a.year === 2019)!
+    expect(coverageGrade(row2019, s)).toBe('severe')
+  })
+
+  it('marks nothing on a year that is complete for its factor', () => {
+    const s = s2()
+    expect(coverageMark(s.annual[1], s)).toBeNull()
+  })
+
+  it('keeps grading against twelve when no series is given', () => {
+    // The cheap call site still works; it is simply less informed.
+    expect(coverageGrade(row({ months_observed: 9 }))).toBe('severe')
+  })
+
+  it('agrees with the caveat text on the same row', () => {
+    // The specific contradiction: "severe" in the cell, "comparable with each
+    // other" in its own tooltip.
+    const s = s2()
+    const r = s.annual[1]
+    expect(coverageGrade(r, s)).toBe('complete')
+    expect(coverageCaveat(s, r)).toBeNull()
+  })
+})
+
+describe('seriesCoverageNote', () => {
+  it('says nothing about a factor with no dataset-wide hole', () => {
+    expect(seriesCoverageNote(seasonalSeries([2017, 2018]))).toBeNull()
+  })
+
+  it('names the months and draws the conclusion that actually follows', () => {
+    // Both halves matter: no year is a real annual mean, AND the years are
+    // still comparable with each other. Either one alone misleads.
+    const s = seasonalSeries([2017, 2018, 2019], (_y, m) => m === 1 || m === 2 || m === 12)
+    const note = seriesCoverageNote(s)!
+    expect(note).toContain('Jan, Feb and Dec')
+    expect(note).toContain('no annual figure here is a true 12-month average')
+    expect(note).toContain('comparable with each other')
+  })
+
+  it('handles a factor with no observations at all', () => {
+    const s = seasonalSeries([2017], () => true)
+    expect(seriesCoverageNote(s)).toBe('This factor has no observations at all.')
   })
 })

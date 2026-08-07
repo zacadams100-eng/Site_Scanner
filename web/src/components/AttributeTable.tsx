@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { confidenceBand, formatValue, labelStep } from '../lib/format'
-import { coverageCaveat, coverageGrade, coverageMark } from '../lib/coverage'
+import { coverageCaveat, coverageGrade, coverageMark, seriesCoverageNote } from '../lib/coverage'
 import { annualRows, exportAnnualCsv } from '../lib/exports'
 import type { Series } from '../types'
 import { isReal } from '../lib/format'
@@ -109,7 +109,11 @@ export default function AttributeTable() {
                         ? `\n\nLive Earth Engine data${c.elapsed_ms ? ` — ${(c.elapsed_ms / 1000).toFixed(1)}s to fetch` : ''}`
                         : c.error
                           ? `\n\n${c.error}`
-                          : '\n\nDemo data — not observed')}>
+                          : '\n\nDemo data — not observed') +
+                      /* Said once, at the top of the column. Repeating it in
+                         fifteen identical row tooltips would crowd out the
+                         caveats that are about a specific year. */
+                      (seriesCoverageNote(c) ? `\n\n${seriesCoverageNote(c)}` : '')}>
                   <span className="th-name">
                     {isReal(c.source) && <span className="live" title="Live Earth Engine data">●</span>}
                     {c.meta.name}
@@ -139,8 +143,8 @@ export default function AttributeTable() {
                       const r = c.annual.find((a) => a.year === y)
                       if (!r) return <td key={c.factor_id}>—</td>
                       const band = confidenceBand(r.confidence)
-                      const grade = coverageGrade(r)
-                      const mark = coverageMark(r)
+                      const grade = coverageGrade(r, c)
+                      const mark = coverageMark(r, c)
                       // One sentence, computed once, used by the tooltip here
                       // and by every export. Four copies of this text is how
                       // the table and the CSV came to disagree before.

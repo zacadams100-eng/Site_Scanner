@@ -1,7 +1,7 @@
 import type { SavedAoi, SitesFile } from '../store'
 import type { Factor, Insight, Marker, Series } from '../types'
 import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
-import { coverageCaveat, coverageGrade, coverageMark } from './coverage'
+import { coverageCaveat, coverageGrade, coverageMark, seriesCoverageNote } from './coverage'
 
 /** Explains the months-observed columns wherever a file has room to say it.
  *
@@ -285,16 +285,25 @@ export function printReport(ctx: ReportContext): void {
   // lives in a hover is a mark with no meaning at all once it is on paper.
   let anyPartial = false
   const severe: string[] = []
+  // Column-level truths, said once each. On paper especially: fifteen rows
+  // repeating "never observed in January" is how a real caveat becomes
+  // wallpaper.
+  const columnNotes = cols
+    .map((c) => {
+      const note = seriesCoverageNote(c)
+      return note ? `<li><strong>${escapeHtml(c.meta.name)}.</strong> ${escapeHtml(note)}</li>` : ''
+    })
+    .filter(Boolean)
   const rows = (cols[0]?.annual ?? []).map((r0) => {
     const cells = cols.map((c) => {
       const r = c.annual.find((a) => a.year === r0.year)
-      const grade = r ? coverageGrade(r) : 'complete'
+      const grade = r ? coverageGrade(r, c) : 'complete'
       if (grade !== 'complete') anyPartial = true
       if (grade === 'severe' && r) {
         const caveat = coverageCaveat(c, r)
         if (caveat) severe.push(`<li><strong>${escapeHtml(c.meta.name)}, ${r.year}.</strong> ${escapeHtml(caveat)}</li>`)
       }
-      const mark = r ? coverageMark(r) : null
+      const mark = r ? coverageMark(r, c) : null
       return `<td class="cov-${grade}">${formatValue(r?.value ?? null, c.meta as Factor)}` +
              `${mark ? `<span class="p">${escapeHtml(mark === '·' ? '*' : mark)}</span>` : ''}</td>`
     }).join('')
@@ -421,6 +430,8 @@ ${findings ? `<h2>What the data shows</h2>
 ${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}</div>` : ''}
 ${severe.length ? `<div class="src"><strong>Years not comparable with a full one.</strong>
 <ul class="caveats">${severe.join('')}</ul></div>` : ''}
+${columnNotes.length ? `<div class="src"><strong>Coverage of these factors.</strong>
+<ul class="caveats">${columnNotes.join('')}</ul></div>` : ''}
 
 <h2>Sources and licences</h2>
 <div class="src"><strong>Datasets.</strong> ${[...new Set(cols.map((c) =>
