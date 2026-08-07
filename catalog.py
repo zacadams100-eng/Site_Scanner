@@ -61,6 +61,14 @@ BASES: List[Dict[str, Any]] = [
          source="Met Office", licence="OGL v3",
          url="https://www.metoffice.gov.uk/research/climate/maps-and-data/data/haduk-grid/",
          native_cadence="daily", cadence="monthly", resolution_m=1000, stored=True),
+    # Gauge measurements, not a grid. Deliberately separate from haduk_precip:
+    # a rain gauge is a point and HadUK-Grid is a 1 km areal average, so they
+    # answer different questions about the same weather and must not share
+    # provenance. `stored=False` — this is queried live per request.
+    dict(id="ea_hydrology", name="EA Hydrology (rain gauges)",
+         source="Environment Agency", licence="OGL v3",
+         url="https://environment.data.gov.uk/hydrology/",
+         native_cadence="daily", cadence="monthly", resolution_m=0, stored=False),
     dict(id="jrc_surface_water", name="JRC Global Surface Water",
          source="EC Joint Research Centre", licence="Open",
          url="https://global-surface-water.appspot.com/",
@@ -274,6 +282,9 @@ ATTRIBUTION: Dict[str, str] = {
                  "information {year}",
     "haduk_precip": "© Crown copyright, Met Office. Contains public sector "
                     "information licensed under the Open Government Licence v3.0",
+    "ea_hydrology": "© Environment Agency copyright and/or database right "
+                    "{year}. All rights reserved. Licensed under the Open "
+                    "Government Licence v3.0.",
     "jrc_surface_water": "© European Union, Joint Research Centre — "
                          "Global Surface Water",
     "ea_flood_zones": "© Environment Agency copyright and/or database right "
@@ -462,6 +473,14 @@ _F = [
     ("wet_days", "Wet days", "haduk_precip", "Water", "days", "continuous", "monthly", 0.0, 31.0, True, "Days at or above 1 mm."),
     ("max_daily_precip", "Heaviest daily rainfall", "haduk_precip", "Water", "mm", "continuous", "monthly", 0.0, 110.0, True, "Wettest single day — surface-water flood driver."),
     ("spi_3month", "Drought index (SPI-3)", "haduk_precip", "Water", "σ", "continuous", "monthly", -3.0, 3.0, True, "Standardised precipitation over three months."),
+
+    # Measured at a gauge rather than modelled onto a grid. The note names the
+    # trade in the factor itself, because "measured" reads as strictly better
+    # than "gridded" and for an area it often is not.
+    ("ea_rain_total", "Rainfall (gauge)", "ea_hydrology", "Water", "mm", "continuous", "monthly", 0.0, 260.0, False, "Monthly total at the nearest EA rain gauge. A point measurement, not an average over the site."),
+    ("ea_rain_max_daily", "Heaviest day (gauge)", "ea_hydrology", "Water", "mm", "continuous", "monthly", 0.0, 90.0, True, "Wettest single day in the month at that gauge."),
+    ("ea_rain_wet_days", "Wet days (gauge)", "ea_hydrology", "Water", "days", "continuous", "monthly", 0.0, 31.0, True, "Days of 1 mm or more — the WMO threshold, so this is comparable with published statistics."),
+    ("ea_rain_dry_days", "Dry days (gauge)", "ea_hydrology", "Water", "days", "continuous", "monthly", 0.0, 31.0, True, "Days below 1 mm at that gauge."),
     ("soil_moisture", "Soil moisture", "era5_land", "Water", "m³/m³", "continuous", "monthly", 0.05, 0.5, False, "Volumetric water in the top soil layer."),
     ("evapotranspiration", "Evapotranspiration", "era5_land", "Water", "mm", "continuous", "monthly", 0.0, 140.0, False, "Water returned to atmosphere by soil and plants."),
     ("humidity", "Relative humidity", "era5_land", "Water", "%", "continuous", "monthly", 55.0, 98.0, True, "Mean monthly relative humidity."),

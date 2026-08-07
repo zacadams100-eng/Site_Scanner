@@ -802,6 +802,19 @@ def install(registry: Dict[str, Any],
         # state before the job has ever run.
         pass
 
+    # Environment Agency rainfall gauges. Installed from here rather than from
+    # each backend because it needs exactly what this module needs — nothing —
+    # and a fifth call site is how one backend quietly ends up without a
+    # source that the audit thinks is registered. Imported late: ea_hydrology
+    # imports this module's session and helpers at import time.
+    try:
+        import ea_hydrology
+
+        ea_hydrology.install(registry, provenance)
+    except Exception:                                   # pragma: no cover
+        # An optional source must never stop a backend booting.
+        pass
+
     if provenance is not None:
         for factor_id in registry:
             if factor_id in SOURCE_STATUS:

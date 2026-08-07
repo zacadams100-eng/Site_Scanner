@@ -146,3 +146,55 @@ command and the write-up says exactly which figures to replace.
 consequence of every possible reply worked out in advance. Nobody in this
 environment can send an email or accept a licence. Send the ESA one first — it
 is the cheaper question and it may make the Google one unnecessary.
+
+---
+
+## 7. The EA's spatial layers need their service names confirmed
+
+Four factors now come from the Environment Agency's **Hydrology API** —
+`ea_rain_total`, `ea_rain_max_daily`, `ea_rain_wet_days`, `ea_rain_dry_days`
+in `ea_hydrology.py`. That API is keyless, documented, and returns JSON, so it
+could be written against its reference with reasonable confidence.
+
+The rest of the EA's catalogue is **not** in that shape. Flood Zone 2 and 3,
+Risk of Flooding from Surface Water, reservoir inundation, abstraction
+availability and water stress are published as *spatial* services — WFS and
+OGC API Features under `environment.data.gov.uk/spatialdata/…` — and each one
+is addressed by a service path and a typename that could not be confirmed from
+here, because the host is behind the same proxy block as everything else in §1.
+
+**They were deliberately not registered.** BLOCKERS §2 already states the rule
+and it applies exactly: registering a factor against an endpoint that cannot
+answer it makes the catalogue claim real data in the UI and then fail on every
+request, which is worse than the honest "generated" label those six carry now.
+Guessing six typenames would have produced six factors that 404 forever and a
+coverage figure that looked better than the product.
+
+**To unblock,** on any machine that can reach the host:
+
+```bash
+curl -s "https://environment.data.gov.uk/spatialdata/flood-map-for-planning-rivers-and-sea-flood-zone-3/wfs?service=WFS&request=GetCapabilities" | grep -i '<Name>'
+```
+
+That prints the real typenames. The six factors below are the ones waiting on
+them; each needs a polygon intersection against the AOI and a percentage,
+which is exactly what `open_data.planning_series` already does for the eleven
+planning designations — the mechanism exists, only the addresses are missing.
+
+| Factor | Layer needed |
+| --- | --- |
+| `flood_zone2_pct` | Flood Map for Planning, Flood Zone 2 |
+| `flood_zone3_pct` | Flood Map for Planning, Flood Zone 3 |
+| `surface_water_risk` | Risk of Flooding from Surface Water |
+| `reservoir_risk` | Risk of Flooding from Reservoirs |
+| `abstraction_availability` | Water resource availability (CAMS) |
+| `water_stress_class` | Water stressed areas |
+
+Roughly a day's work once the names are known, and it would take real coverage
+from 50 factors to 56.
+
+**`spi_3month` is a separate refusal, and not a blocker.** A proper SPI needs
+a gamma distribution fitted per calendar month and transformed to a normal
+deviate. A z-score of three-month totals is not that — rainfall is strongly
+right-skewed, so the two disagree most in the dry tail the index exists to
+measure. It stays generated until someone implements the real thing.
