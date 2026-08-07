@@ -112,6 +112,48 @@ UI and then fails on every request. Six factors that 404 forever would have
 made the coverage figure look better than the product. `BLOCKERS.md §7` is new
 and carries the one curl command that unblocks all six.
 
+### Three bugs found by carrying the coverage work outward
+
+Doing the same reasoning in a second place is what surfaced these. Each was
+found by running something, not by reading.
+
+**`/api/ask` reported a missing autumn as a trend.** `nlq.py` never looked at
+`months_observed`, and a trend is the difference between two endpoints, so a
+short endpoint turns a coverage gap straight into a reported change. Seven
+identical years of a seasonal factor plus a current year holding January to
+August produced "Air temperature rose from 10.00 °C in 2019 to 10.87 °C in
+2026 (9%)" — for a series with no trend in it whatsoever. The existing noise
+floor cannot catch this: a stable series has a noise floor of zero, so any
+artefact clears it, which means the steadier the factor the more reliably the
+artefact is narrated. Ask the question any time before December and the
+current year is short.
+
+Years too thin to compare with their neighbours are now set aside, and named
+in the answer. The test is **relative to the series** — Sentinel-2 never sees
+a January, so an absolute twelve-month threshold would decline every question
+about vegetation in the catalogue.
+
+**Every fallback blamed Earth Engine.** "Earth Engine failed, showing demo
+data" was true when Earth Engine was the only real source and stopped being
+true when `open_data` landed. The registry now holds Earth Engine, five
+open-data hosts and the EA API, so the message was sending people to check
+credentials for a service that had never been called. Found by exercising the
+new EA factors, which fail on every request from here and reported a Google
+problem.
+
+**The frontend contradicted itself about NDVI.** Grading against a flat twelve
+marked every NDVI year "severe" — nine months is its maximum — and greyed out
+the entire column, while the caveat on the same cell said the years were
+comparable with each other. A factor's full year is twelve minus the months it
+never observes. That fix exposed a second one: the dataset-wide fact was being
+repeated on every row when it belongs to the column, so it now appears once
+beside the factor's name.
+
+`insights.py` was checked for the same class of bug and is clean — it fits a
+line over monthly points rather than comparing annual endpoints, and the
+seasonal variance inflates the standard error enough that an unbalanced tail
+cannot trip the t-test. Verified by construction rather than assumed.
+
 ### A documentation contradiction, two days old
 
 `BLOCKERS.md §4` and `docs/DEPLOYMENT-STATUS.md` both still said there was no
