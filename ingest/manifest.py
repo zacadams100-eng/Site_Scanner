@@ -38,6 +38,41 @@ class Spatial:
 
 
 @dataclass
+class Storage:
+    """How a continuous raster is quantised on disk.
+
+    `scale` follows GDAL exactly: `value = raw * scale + offset`. So 0.0001
+    stores four decimal places, and the representable range is
+    [-32767 x scale + offset, 32767 x scale + offset] — 0.0001 gives
+    +/-3.2767, which covers any index bounded to [-1, 1] with room to spare.
+
+    Storing continuous data as int16 rather than float32 is a 3-6x saving on
+    every byte this project will ever pay to keep; docs/INGEST-BENCHMARK.md
+    Result 5 has the measurements. `dtype: float32` opts out for a raster
+    whose range genuinely needs it, and says so in the manifest rather than
+    by accident.
+    """
+    dtype: str = "int16"
+    scale: float = 0.0001
+    offset: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.dtype not in ("int16", "float32"):
+            raise ValueError(f"storage.dtype must be int16/float32, got {self.dtype!r}")
+        if self.dtype == "int16" and self.scale <= 0:
+            raise ValueError(f"storage.scale must be positive, got {self.scale!r}")
+
+    @property
+    def write_scale(self) -> Optional[float]:
+        """What to hand `write_cog`. None means "write it as it comes"."""
+        return self.scale if self.dtype == "int16" else None
+
+    def span(self) -> tuple:
+        """The values this quantisation can hold, for error messages."""
+        return (-32767 * self.scale + self.offset, 32767 * self.scale + self.offset)
+
+
+@dataclass
 class Manifest:
     id: str
     kind: str                      # 'continuous' | 'categorical'
@@ -47,6 +82,7 @@ class Manifest:
     spatial: Spatial
     h3_resolutions: List[int] = field(default_factory=lambda: [7, 8])
     nodata: Optional[float] = None
+    storage: Storage = field(default_factory=Storage)
 
     def __post_init__(self) -> None:
         if self.kind not in ("continuous", "categorical"):
@@ -79,6 +115,9 @@ class Manifest:
             spatial=Spatial(**raw["spatial"]),
             h3_resolutions=raw.get("h3_resolutions", [7, 8]),
             nodata=raw.get("nodata"),
+            # Continuous rasters quantise by default; a manifest has to opt
+            # out deliberately rather than get float32 by forgetting.
+            storage=Storage(**(raw.get("storage") or {})),
         )
 
     def timesteps(self) -> List[str]:
@@ -99,9 +138,15 @@ class Manifest:
                     m, y = 1, y + 1
         return out
 
-    def asset_key(self, timestep: str) -> str:
-        """Where this timestep's COG lives in object storage."""
-        if timestep == "static":
-            return f"{self.id}/static.tif"
-        year, month = timestep.split("-")
-        return f"{self.id}/{year}/{month}.tif"
+    def asset_key(self, timestep: str, tile: str = "-") -> str:
+        """Where this timestep's COG lives in object storage.
+
+        A tiled run gets one file per tile, keyed by the tile's grid position,
+        so the layout stays browsable and a tile can be re-fetched on its own.
+        An untiled run keeps the flat path it always had — the tile id '-'
+        means "the whole extent", and adding a '-' to those filenames would
+        invalidate every path already written.
+        """
+        stem = f"{self.id}/static" if timestep == "static" else \
+            "{}/{}/{}".format(self.id, *timestep.split("-"))
+        return f"{stem}.tif" if tile == "-" else f"{stem}/{tile}.tif"

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Catalog, Cell, DrawMode, Factor, SeriesResponse } from './types'
+import type { Catalog, Cell, DrawMode, Factor, Marker, SeriesResponse } from './types'
 import { fetchCells, fetchSeries } from './api'
 import { decodeState, writeUrl, type Template } from './lib/permalink'
 
@@ -17,12 +17,35 @@ const DEFAULT_FACTORS = ['ndvi', 'lc_tree_pct', 'precip_total', 'lst_day']
 const MAX_FACTORS = 12
 const SAVED_KEY = 'site-scanner.saved-aois'
 
+/**
+ * A saved site is a whole workspace, not just a shape.
+ *
+ * Reopening a site and finding the default four factors — with the timeline
+ * back at the present — is the same amount of work as drawing it again, which
+ * is to say the feature did not do anything. `factors`, `timeIndex` and
+ * `compareIndex` are optional because entries written before this change do
+ * not have them; those load their geometry and leave the rest of the view
+ * alone, which is exactly what they used to do.
+ */
 export interface SavedAoi {
   id: string
   name: string
   geometry: GeoJSON.Polygon
   area_ha: number
   savedAt: number
+  factors?: string[]
+  timeIndex?: number
+  compareIndex?: number | null
+  markers?: Marker[]
+}
+
+/** What an exported sites file looks like. Versioned so a later format change
+ *  can migrate rather than silently misread. */
+export interface SitesFile {
+  format: 'site-scanner.sites'
+  version: 1
+  exportedAt: string
+  sites: SavedAoi[]
 }
 
 interface State {
@@ -38,6 +61,9 @@ interface State {
   past: (GeoJSON.Polygon | null)[]
   future: (GeoJSON.Polygon | null)[]
   saved: SavedAoi[]
+  /** Named points on the map. Saved with the workspace and exported with the
+   *  shape, but never queried — a marker is a note, not an area. */
+  markers: Marker[]
 
   selected: string[]
   data: SeriesResponse | null
@@ -51,35 +77,91 @@ interface State {
   // in temporal GIS, and in ArcGIS it is a multi-step raster-calculator chore.
   compareIndex: number | null
 
-  activeTab: 'table' | 'charts' | 'sources'
+  activeTab: 'findings' | 'table' | 'charts' | 'sources'
   browserOpen: boolean
-  templatesOpen: boolean
+
+  sidebarOpen: boolean
+  sidebarSection: 'layers' | 'templates' | 'sites' | 'data' | 'analysis'
+  panelOpen: boolean
+  /** How strongly the value overlay is painted over the basemap. A layer you
+   *  cannot fade is a layer you cannot check against the ground beneath it. */
+  overlayOpacity: number
+
+  /** Live instrument readouts for the status bar. Held here rather than in
+   *  MapCanvas because the bar is a sibling of the map, not a child. */
+  cursor: { lng: number; lat: number } | null
+  view: { zoom: number; scale: number } | null
+  /** The site currently open, if it was loaded from a saved one — shown in the
+   *  top bar the way a document name is. */
+  projectName: string | null
+
+  /**
+   * A pending map move, consumed by MapCanvas.
+   *
+   * The map instance lives inside MapCanvas and nothing else can reach it, so
+   * "go to this place" travels as state rather than as a call. `nonce` is what
+   * makes searching for the same place twice move the map twice — without it
+   * the second request is an identical object and the effect never re-runs.
+   */
+  flyTo: { lng: number; lat: number; zoom: number; nonce: number } | null
+  goTo: (lng: number, lat: number, zoom?: number) => void
 
   setCatalog: (c: Catalog) => void
-  setCatalogError: (e: string) => void
+  setCatalogError: (e: string | null) => void
   setMock: (m: boolean) => void
   setDrawMode: (m: DrawMode) => void
-  setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean }) => void
+  setAoi: (g: GeoJSON.Polygon | null, opts?: { skipHistory?: boolean; keepProject?: boolean }) => void
   undo: () => void
   redo: () => void
   saveAoi: (name: string) => void
   loadSaved: (id: string) => void
   deleteSaved: (id: string) => void
+  renameSaved: (id: string, name: string) => void
+  updateSaved: (id: string) => void
+  importSites: (sites: SavedAoi[]) => number
+  addMarker: (lng: number, lat: number, name?: string) => void
+  renameMarker: (id: string, name: string) => void
+  moveMarker: (id: string, lng: number, lat: number) => void
+  removeMarker: (id: string) => void
   toggleFactor: (id: string) => void
   setSelected: (ids: string[]) => void
   applyTemplate: (t: Template) => void
   setTimeIndex: (i: number) => void
   setCompareIndex: (i: number | null) => void
   setPlaying: (p: boolean) => void
-  setTab: (t: 'table' | 'charts' | 'sources') => void
+  setTab: (t: 'findings' | 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
-  setTemplatesOpen: (o: boolean) => void
+  setSidebarOpen: (o: boolean) => void
+  setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
+  setPanelOpen: (o: boolean) => void
+  setOverlayOpacity: (o: number) => void
+  setCursor: (c: { lng: number; lat: number } | null) => void
+  setView: (v: { zoom: number; scale: number } | null) => void
   refresh: () => Promise<void>
   hydrateFromUrl: () => void
   syncUrl: () => void
 }
 
 let inflight: AbortController | null = null
+// Incremented on every refresh request. A call whose generation is no longer
+// the current one has been superseded and stops rather than resolving — a
+// timer-based debounce that clears the pending timeout leaves its promise
+// permanently unresolved, which quietly leaks one per keystroke.
+let refreshGeneration = 0
+
+/**
+ * How long to wait for the user to stop changing their mind.
+ *
+ * Aborting an in-flight request already stops answers arriving out of order,
+ * but the request has still been *sent* — toggling three factors fired three
+ * round trips, two of which the server did the work for and nobody read. That
+ * costs upstream quota and, now that the API is rate limited, some of the
+ * user's own budget.
+ *
+ * 180ms is below the ~250ms at which a delay starts to feel like lag, and
+ * comfortably above the gap between two deliberate clicks.
+ */
+const REFRESH_DEBOUNCE_MS = 180
 
 /**
  * Don't land the user on a blank month.
@@ -130,6 +212,7 @@ export const useStore = create<State>((set, get) => ({
   past: [],
   future: [],
   saved: loadSaved(),
+  markers: [],
   selected: DEFAULT_FACTORS,
   data: null,
   loading: false,
@@ -137,9 +220,23 @@ export const useStore = create<State>((set, get) => ({
   timeIndex: 0,
   playing: false,
   compareIndex: null,
-  activeTab: 'table',
+  // Findings first: it is the answer to the question people actually
+  // arrive with, and the table is one click away.
+  activeTab: 'findings',
   browserOpen: false,
-  templatesOpen: false,
+  // Open on a desktop, closed on a phone: at 390px the panel covers most of
+  // the map, and a first-time tap on the map is far more likely to be a drawn
+  // shape than a mis-tap on a section that was never asked for.
+  sidebarOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  sidebarSection: 'layers',
+  panelOpen: true,
+  overlayOpacity: 0.72,
+  cursor: null,
+  view: null,
+  projectName: null,
+  flyTo: null,
+
+  goTo: (lng, lat, zoom = 14) => set({ flyTo: { lng, lat, zoom, nonce: Date.now() } }),
 
   setCatalog: (c) => {
     // Land on the most recent step: users overwhelmingly want "now" first,
@@ -153,13 +250,24 @@ export const useStore = create<State>((set, get) => ({
   },
   setCatalogError: (e) => set({ catalogError: e }),
   setMock: (m) => set({ isMock: m }),
-  setDrawMode: (m) => set({ drawMode: m }),
+  setDrawMode: (m) => {
+    // Arming a tool on a narrow screen folds the sidebar away. Its panel is an
+    // overlay there, covering most of the map — so "pick the marker tool, tap
+    // the map" ended with the tap landing on the sidebar and nothing
+    // happening, which reads as a broken tool.
+    const narrow = typeof window !== 'undefined' && window.innerWidth <= 900
+    set(m && narrow ? { drawMode: m, sidebarOpen: false } : { drawMode: m })
+  },
 
   setAoi: (g, opts) => {
     const { aoi, past } = get()
     set({
       aoi: g,
       drawMode: null,
+      // Drawing somewhere else is a new site, not the saved one under a new
+      // shape — so the document name goes with it unless we were told to keep
+      // it (a restore, or an edit of the same site).
+      projectName: opts?.keepProject ? get().projectName : null,
       // Cap the history so a long session cannot grow it without bound.
       past: opts?.skipHistory ? past : [...past, aoi].slice(-40),
       future: opts?.skipHistory ? get().future : [],
@@ -188,7 +296,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   saveAoi: (name) => {
-    const { aoi, data, saved } = get()
+    const { aoi, data, saved, selected, timeIndex, compareIndex } = get()
     if (!aoi) return
     const entry: SavedAoi = {
       id: String(Date.now()),
@@ -196,15 +304,30 @@ export const useStore = create<State>((set, get) => ({
       geometry: aoi,
       area_ha: data?.area_ha ?? 0,
       savedAt: Date.now(),
+      factors: selected,
+      timeIndex,
+      compareIndex,
+      markers: get().markers,
     }
     const next = [entry, ...saved].slice(0, 50)
     persistSaved(next)
-    set({ saved: next })
+    set({ saved: next, projectName: entry.name })
   },
 
   loadSaved: (id) => {
     const entry = get().saved.find((s) => s.id === id)
-    if (entry) get().setAoi(entry.geometry)
+    if (!entry) return
+    // Factors and time go in *before* the geometry, because setAoi fires the
+    // fetch: setting them afterwards would request the old factor list and
+    // then immediately need a second round trip to correct it.
+    const patch: Partial<State> = {}
+    if (entry.factors?.length) patch.selected = entry.factors.slice(0, MAX_FACTORS)
+    if (typeof entry.timeIndex === 'number') patch.timeIndex = entry.timeIndex
+    if (entry.compareIndex !== undefined) patch.compareIndex = entry.compareIndex
+    patch.markers = entry.markers ?? []
+    patch.projectName = entry.name
+    set(patch)
+    get().setAoi(entry.geometry, { keepProject: true })
   },
 
   deleteSaved: (id) => {
@@ -212,6 +335,70 @@ export const useStore = create<State>((set, get) => ({
     persistSaved(next)
     set({ saved: next })
   },
+
+  renameSaved: (id, name) => {
+    const clean = name.trim()
+    if (!clean) return
+    const next = get().saved.map((s) => (s.id === id ? { ...s, name: clean } : s))
+    persistSaved(next)
+    set({ saved: next })
+  },
+
+  /** Overwrite a saved site with what is on screen now. Without this, refining
+   *  a boundary means saving a near-duplicate and deleting the old one. */
+  updateSaved: (id) => {
+    const { aoi, data, saved, selected, timeIndex, compareIndex } = get()
+    if (!aoi) return
+    const next = saved.map((s) =>
+      s.id === id
+        ? { ...s, geometry: aoi, area_ha: data?.area_ha ?? s.area_ha,
+            savedAt: Date.now(), factors: selected, timeIndex, compareIndex,
+            markers: get().markers }
+        : s,
+    )
+    persistSaved(next)
+    set({ saved: next })
+  },
+
+  /** Merge an imported list in, keeping both sides. Returns how many arrived,
+   *  so the caller can say. Ids are reissued on collision rather than
+   *  overwriting: two machines both saving at the same millisecond is
+   *  unlikely, but losing a site to it would be silent. */
+  importSites: (sites) => {
+    const { saved } = get()
+    const existing = new Set(saved.map((s) => s.id))
+    const arriving = sites.map((s) => (existing.has(s.id)
+      ? { ...s, id: `${s.id}-${Math.random().toString(36).slice(2, 7)}` }
+      : s))
+    const next = [...arriving, ...saved].slice(0, 50)
+    persistSaved(next)
+    set({ saved: next })
+    return arriving.length
+  },
+
+  addMarker: (lng, lat, name) => {
+    const { markers } = get()
+    set({
+      markers: [...markers, {
+        id: `m${Date.now()}`,
+        // Numbered rather than blank: an unnamed pin in a list of eight is
+        // indistinguishable from the other seven, and naming can wait.
+        name: name?.trim() || `Point ${markers.length + 1}`,
+        lng, lat,
+      }],
+    })
+  },
+
+  renameMarker: (id, name) => {
+    const clean = name.trim()
+    if (!clean) return
+    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, name: clean } : m)) })
+  },
+
+  moveMarker: (id, lng, lat) =>
+    set({ markers: get().markers.map((m) => (m.id === id ? { ...m, lng, lat } : m)) }),
+
+  removeMarker: (id) => set({ markers: get().markers.filter((m) => m.id !== id) }),
 
   toggleFactor: (id) => {
     const { selected } = get()
@@ -236,7 +423,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   applyTemplate: (t) => {
-    set({ selected: t.factors.slice(0, MAX_FACTORS), templatesOpen: false, drawMode: t.tool })
+    set({ selected: t.factors.slice(0, MAX_FACTORS), drawMode: t.tool })
     if (get().aoi) void get().refresh()
   },
 
@@ -245,7 +432,12 @@ export const useStore = create<State>((set, get) => ({
   setPlaying: (p) => set({ playing: p }),
   setTab: (t) => set({ activeTab: t }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
-  setTemplatesOpen: (o) => set({ templatesOpen: o }),
+  setSidebarOpen: (o) => set({ sidebarOpen: o }),
+  setSidebarSection: (s) => set({ sidebarSection: s }),
+  setPanelOpen: (o) => set({ panelOpen: o }),
+  setOverlayOpacity: (o) => set({ overlayOpacity: Math.max(0, Math.min(1, o)) }),
+  setCursor: (c) => set({ cursor: c }),
+  setView: (v) => set({ view: v }),
 
   // Keeps the address bar in step with state, so a copied URL always restores
   // exactly what is on screen.
@@ -262,16 +454,31 @@ export const useStore = create<State>((set, get) => ({
   },
 
   refresh: async () => {
-    const { aoi, selected } = get()
-    if (!aoi || selected.length === 0) return
+    if (!get().aoi || get().selected.length === 0) return
 
-    // A user redrawing quickly, or toggling three factors in a row, should not
-    // queue three round trips whose answers arrive out of order.
+    // Coalesce a burst of changes into one request. Loading goes up straight
+    // away so the interface answers the click, even though nothing has left
+    // for the network yet.
+    set({ loading: true, error: null })
+    const generation = ++refreshGeneration
+    await new Promise<void>((resolve) => setTimeout(resolve, REFRESH_DEBOUNCE_MS))
+    // A later call arrived during the window and will do the work.
+    if (generation !== refreshGeneration) return
+
+    // Read after the wait, not before: the whole point of the window is that
+    // the selection may have changed inside it.
+    const { aoi, selected } = get()
+    if (!aoi || selected.length === 0) {
+      set({ loading: false })
+      return
+    }
+
+    // Redrawing during the request itself still needs the abort: the debounce
+    // only covers changes closer together than the window.
     inflight?.abort()
     const ctrl = new AbortController()
     inflight = ctrl
 
-    set({ loading: true, error: null })
     try {
       const [data, cells] = await Promise.all([
         fetchSeries(aoi, selected, ctrl.signal),

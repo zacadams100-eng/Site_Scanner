@@ -1,29 +1,35 @@
-# Vercel builds the React app in web/ and publishes web/dist. Everything
-# Python goes to Cloud Run via the Dockerfile instead.
+# Vercel builds the React app in web/ and publishes web/dist, and runs the
+# credential-free API as one Python serverless function (api/index.py).
 #
-# Excluding requirements.txt also stops Vercel's framework detection from
-# treating this as a Python project and trying to build serverless functions.
+# The project's Python modules are NOT excluded any more: the function imports
+# them, and vercel.json's functions.includeFiles glob bundles them. Excluding
+# them was correct when the only backend was Cloud Run; it would now produce a
+# function that cannot import its own catalogue.
 
-app.py
-mock_ee_backend.py
-routes_catalog.py
-catalog.py
-series.py
-ee_series.py
-redaction.py
-summary.py
-geometry.py
-cache.py
-requirements.txt
-requirements-dev.txt
-Dockerfile
-.dockerignore
-pytest.ini
+# The Earth Engine backend belongs on Cloud Run, not in a serverless function —
+# earthengine-api and its Google client stack blow past the bundle limit.
+# Anchored, all of them. Unanchored these are gitignore patterns matching at
+# any depth: a bare `requirements.txt` also excluded api/requirements.txt, so
+# Vercel found no Python manifest, installed nothing, and every request died
+# with ModuleNotFoundError: No module named 'fastapi' — while the modules
+# themselves bundled correctly and made it look like an application fault.
+/app.py
+/ee_series.py
+/Dockerfile
+/.dockerignore
+/requirements.txt
+/requirements-dev.txt
+/pytest.ini
 
-bench/
-ingest/
-scripts/
-tests/
+# Leading slashes are load-bearing. .vercelignore uses .gitignore syntax,
+# where a bare `scripts/` matches at ANY depth — it also excluded
+# web/scripts/copy-maplibre-worker.mjs, which `prebuild` runs, so the build
+# died with MODULE_NOT_FOUND before Vite started.
+/bench/
+/ingest/
+/scripts/
+/tests/
+/docs/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -31,17 +37,21 @@ venv/
 .venv/
 
 # The prototype is kept in the repo for reference but is not deployed.
-site-scanner.html
+/site-scanner.html
 
 # demo/ is NOT excluded: vercel.json's buildCommand copies
 # demo/site-scanner-demo.html into the build so it is served at /demo.
 
-# Credentials. `vercel deploy` uploads the working directory, so the same
-# reasoning as .dockerignore applies: a real service account key is named
-# <project>-<16 hex chars>.json and matches neither literal name below.
 service-account-key.json
 *.key.json
 *-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
 **/ee-backend/
 .env
 .env.*
+
+# Installed and built artefacts. Vercel runs `npm --prefix web ci` and the
+# build itself, so uploading either is waste — and node_modules alone is
+# ~244 MB, enough to kill the upload with a bare `Error: fetch failed`.
+**/node_modules/
+web/dist/
+.git/

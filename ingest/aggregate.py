@@ -30,7 +30,20 @@ import numpy as np
 
 @dataclass
 class CellStat:
-    """One row of the fast tier."""
+    """One row of the fast tier.
+
+    `n_valid`, `n_total` and `m2` exist so two partial aggregations of the
+    same cell can be combined exactly. A national raster is ingested in tiles
+    (see `ingest/run.py`), and an H3 cell on a tile boundary is seen once per
+    tile it touches — each time over only the pixels in that tile. Averaging
+    two averages would weight a cell's 90%-in-tile-A half equally with its
+    10% sliver in tile B and produce a number that is simply wrong.
+
+    With a count and a sum of squared deviations, Chan's parallel algorithm
+    merges them exactly, and the merged row is indistinguishable from one
+    produced by aggregating the whole raster at once. `test_ingest.py` asserts
+    that equivalence directly.
+    """
     h3: int
     dataset_id: str
     t: str
@@ -40,10 +53,64 @@ class CellStat:
     stddev: Optional[float]
     valid_fraction: float
     class_counts: Optional[Dict[int, int]] = None
+    n_valid: int = 0
+    n_total: int = 0
+    m2: float = 0.0
 
     def as_row(self) -> tuple:
         return (self.dataset_id, self.h3, self.t, self.mean, self.min,
-                self.max, self.stddev, self.valid_fraction)
+                self.max, self.stddev, self.valid_fraction,
+                self.n_valid, self.n_total, self.m2)
+
+
+def merge_stats(a: CellStat, b: CellStat) -> CellStat:
+    """Combine two partial aggregations of the same cell.
+
+    Chan et al.'s parallel variance update. Kept here rather than only in SQL
+    because the same merge has to happen in the COG-only path, and because a
+    pure-Python version is what makes the equivalence testable without a
+    database.
+    """
+    if a.h3 != b.h3 or a.t != b.t or a.dataset_id != b.dataset_id:
+        raise ValueError("refusing to merge statistics from different cells")
+
+    n_total = a.n_total + b.n_total
+    n = a.n_valid + b.n_valid
+    if n == 0:
+        return CellStat(a.h3, a.dataset_id, a.t, None, None, None, None, 0.0,
+                        _merge_counts(a.class_counts, b.class_counts),
+                        0, n_total, 0.0)
+
+    if a.class_counts is not None or b.class_counts is not None:
+        return CellStat(a.h3, a.dataset_id, a.t, None, None, None, None,
+                        n / n_total if n_total else 0.0,
+                        _merge_counts(a.class_counts, b.class_counts),
+                        n, n_total, 0.0)
+
+    # One side may be an all-nodata sliver, in which case it contributes
+    # nothing but its pixel count to the denominator.
+    if a.n_valid == 0:
+        mean, m2, lo, hi = b.mean, b.m2, b.min, b.max
+    elif b.n_valid == 0:
+        mean, m2, lo, hi = a.mean, a.m2, a.min, a.max
+    else:
+        delta = b.mean - a.mean
+        mean = a.mean + delta * b.n_valid / n
+        m2 = a.m2 + b.m2 + delta * delta * a.n_valid * b.n_valid / n
+        lo, hi = min(a.min, b.min), max(a.max, b.max)
+
+    return CellStat(a.h3, a.dataset_id, a.t, mean, lo, hi,
+                    (m2 / n) ** 0.5, n / n_total if n_total else 0.0,
+                    None, n, n_total, m2)
+
+
+def _merge_counts(a: Optional[Dict[int, int]], b: Optional[Dict[int, int]]):
+    if a is None and b is None:
+        return None
+    out = dict(a or {})
+    for code, count in (b or {}).items():
+        out[code] = out.get(code, 0) + count
+    return out
 
 
 def cells_for_bounds(bounds: Tuple[float, float, float, float], res: int) -> List[str]:
@@ -168,11 +235,17 @@ def aggregate_array(data: np.ndarray, transform, bounds, *, dataset_id: str,
         n_valid = int(valid.sum())
         valid_fraction = n_valid / values.size
 
+        n_total = int(values.size)
+
         if n_valid == 0:
             # A cell with no usable pixels is still a fact worth recording —
-            # it is how the UI knows to show a gap rather than nothing.
+            # it is how the UI knows to show a gap rather than nothing. It
+            # still carries its pixel count, because when this cell is merged
+            # with its other half from the neighbouring tile the empty pixels
+            # belong in the denominator.
             yield CellStat(h3.str_to_int(cell), dataset_id, t,
-                           None, None, None, None, 0.0)
+                           None, None, None, None, 0.0,
+                           n_valid=0, n_total=n_total)
             continue
 
         good = values[valid]
@@ -182,13 +255,19 @@ def aggregate_array(data: np.ndarray, transform, bounds, *, dataset_id: str,
                 h3.str_to_int(cell), dataset_id, t,
                 None, None, None, None, valid_fraction,
                 class_counts={int(c): int(n) for c, n in zip(codes, counts)},
+                n_valid=n_valid, n_total=n_total,
             )
         else:
             good = good.astype(np.float64)
+            mean = float(good.mean())
             yield CellStat(
                 h3.str_to_int(cell), dataset_id, t,
-                float(good.mean()), float(good.min()), float(good.max()),
+                mean, float(good.min()), float(good.max()),
                 float(good.std()), valid_fraction,
+                n_valid=n_valid, n_total=n_total,
+                # Sum of squared deviations, which is what makes two partial
+                # aggregations of this cell combinable. n * variance.
+                m2=float(((good - mean) ** 2).sum()),
             )
 
 
@@ -203,11 +282,17 @@ def aggregate_cog(path: str, *, dataset_id: str, t: str, res: int,
     import rasterio
     from rasterio.warp import transform_bounds
 
+    from ingest.cog import read_band
+
     with rasterio.open(path) as src:
-        data = src.read(1)
+        # Through read_band, never src.read(1): continuous COGs are stored as
+        # scaled int16, and reading one raw gives values 10,000x too large
+        # with no error to notice. It returns nodata as None for a quantised
+        # raster because the holes come back as NaN.
+        data, nodata = read_band(src)
         bounds = transform_bounds(src.crs, "EPSG:4326", *src.bounds) \
             if src.crs and src.crs.to_epsg() != 4326 else tuple(src.bounds)
         yield from aggregate_array(
             data, src.transform, bounds,
-            dataset_id=dataset_id, t=t, res=res, kind=kind, nodata=src.nodata,
+            dataset_id=dataset_id, t=t, res=res, kind=kind, nodata=nodata,
         )

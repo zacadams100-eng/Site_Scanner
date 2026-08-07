@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { confidenceBand, formatValue, labelStep } from '../lib/format'
 import { annualRows, exportAnnualCsv } from '../lib/exports'
 import type { Series } from '../types'
+import { isReal } from '../lib/format'
 
 /**
  * One row per year (decision 5), each expandable into its twelve months.
@@ -103,13 +104,13 @@ export default function AttributeTable() {
               {cols.map((c) => (
                 <th key={c.factor_id} className="sortable" onClick={() => sortBy(c.factor_id)}
                     title={`${c.meta.note}\n\nSource: ${c.meta.base_meta.name}` +
-                      (c.source === 'earth-engine'
+                      (isReal(c.source)
                         ? `\n\nLive Earth Engine data${c.elapsed_ms ? ` — ${(c.elapsed_ms / 1000).toFixed(1)}s to fetch` : ''}`
                         : c.error
                           ? `\n\n${c.error}`
                           : '\n\nDemo data — not observed')}>
                   <span className="th-name">
-                    {c.source === 'earth-engine' && <span className="live" title="Live Earth Engine data">●</span>}
+                    {isReal(c.source) && <span className="live" title="Live Earth Engine data">●</span>}
                     {c.meta.name}
                   </span>
                   <span className="th-unit">{c.unit}</span>

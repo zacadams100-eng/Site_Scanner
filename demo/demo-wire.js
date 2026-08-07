@@ -370,7 +370,7 @@ function findRing(n) {
 
 /* Repaint on theme change — the canvases read CSS custom properties, so a
    theme flip must be redrawn rather than restyled. */
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawMap(); drawSpark(); render(); });
+/* One identity, no dark variant — nothing to repaint when the OS theme flips. */
 new MutationObserver(() => { drawMap(); drawSpark(); render(); })
   .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 

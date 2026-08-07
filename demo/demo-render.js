@@ -150,7 +150,7 @@ function svgEl(inner) {
   return `<svg viewBox="0 0 ${CW} ${CH}" preserveAspectRatio="xMidYMid meet" role="img">${inner}</svg>`;
 }
 function axes(yLo, yHi, xLabels) {
-  const gridCol = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.07)';
+  const gridCol = 'rgba(35,35,35,.09)';
   const txt = cssVar('--ink-3');
   let s = '';
   for (let i = 0; i <= 4; i++) {
@@ -373,7 +373,7 @@ function drawSpark() {
   if (!w) return;
 
   const stripH = 5, chartH = h - stripH - 3;
-  sparkCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.07)' : 'rgba(255,255,255,.05)';
+  sparkCtx.strokeStyle = 'rgba(35,35,35,.07)';
   sparkCtx.lineWidth = 1;
   STEPS.forEach((s, i) => {
     if (!s.endsWith('-01')) return;
@@ -391,7 +391,7 @@ function drawSpark() {
   const Y = v => chartH - ((v - lo) / span) * (chartH - 6) - 3;
 
   // Fill under the line, broken at gaps.
-  sparkCtx.fillStyle = isLight() ? 'rgba(162,112,28,.14)' : 'rgba(221,174,92,.13)';
+  sparkCtx.fillStyle = 'rgba(77,96,72,.12)';
   let run = -1;
   for (let i = 0; i <= vals.length; i++) {
     if (vals[i] !== null && vals[i] !== undefined) { if (run < 0) run = i; continue; }
@@ -413,7 +413,7 @@ function drawSpark() {
   sparkCtx.stroke();
 
   if (S.compare !== null) {
-    sparkCtx.strokeStyle = cssVar('--good'); sparkCtx.lineWidth = 1.5;
+    sparkCtx.strokeStyle = cssVar('--accent'); sparkCtx.lineWidth = 1.5;
     sparkCtx.setLineDash([3, 2]);
     sparkCtx.beginPath(); sparkCtx.moveTo(X(S.compare), 0); sparkCtx.lineTo(X(S.compare), chartH); sparkCtx.stroke();
     sparkCtx.setLineDash([]);
@@ -422,9 +422,11 @@ function drawSpark() {
   // Availability strip: how much of the area produced a usable observation.
   const bw = Math.max(1, w / STEPS.length);
   ser.points.forEach((p, i) => {
+    // Absence is not badness: a month with no usable observation is a hole in
+    // the record, so it reads neutral rather than red. Same rule as the app.
     sparkCtx.fillStyle = p.value === null
-      ? 'rgba(196,123,114,.6)'
-      : `rgba(127,179,163,${0.18 + 0.62 * p.valid})`;
+      ? 'rgba(216,211,201,.95)'
+      : `rgba(31,136,180,${0.18 + 0.6 * p.valid})`;
     sparkCtx.fillRect(X(i) - bw / 2, chartH + 3, bw, stripH);
   });
 }

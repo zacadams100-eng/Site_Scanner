@@ -84,18 +84,13 @@ const toLngLat = (px, py) => [
 
 /* ---------- colour ---------- */
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-/* Low reads as deep navy (it recedes into the sea), high reads as warm coral
-   (it advances, and ties to the accent). The middle passes through teal and
-   green so vegetation values still look like vegetation. */
-const RAMP_DARK  = [[16,26,42],[28,62,78],[58,104,94],[124,146,102],[198,164,112],[255,166,131]];
-const RAMP_LIGHT = [[214,223,233],[160,192,200],[136,174,150],[186,175,128],[214,138,106],[176,84,58]];
-function isLight() {
-  const t = document.documentElement.getAttribute('data-theme');
-  if (t) return t === 'light';
-  return window.matchMedia('(prefers-color-scheme: light)').matches;
-}
+/* One ramp, matching the product's (web/src/lib/format.ts): it starts near the
+   page so a low value recedes into it and runs through moss to a deep
+   instrument blue. Lightness falls all the way along, so the ordering survives
+   greyscale printing and colour-blind reading. */
+const RAMP = [[246,243,235],[214,220,200],[166,189,158],[109,150,126],[56,111,116],[23,71,97]];
 function ramp(t, alpha = 1) {
-  const R_ = isLight() ? RAMP_LIGHT : RAMP_DARK;
+  const R_ = RAMP;
   const x = Math.max(0, Math.min(0.999, t)) * (R_.length - 1);
   const i = Math.floor(x), fr = x - i;
   const a = R_[i], b = R_[Math.min(R_.length - 1, i + 1)];
@@ -104,7 +99,9 @@ function ramp(t, alpha = 1) {
 }
 /* Coral leads so the primary series matches the accent and the scrubber; the
    rest fan out in hue and stay distinguishable against navy. */
-const SERIES_COLORS = ['#d97742','#6fb0cd','#b9c48f','#8f9fd4','#d99ec4','#d2a570','#7fb8a0','#c4877a','#9db4d9','#cfa6d4','#a8c47f','#d4a06f'];
+/* Matches the product's series palette (web/src/lib/format.ts): moss leads,
+   because the first series is the one drawn on the map. */
+const SERIES_COLORS = ['#4d6048','#1f88b4','#a8722c','#7b5ea7','#2f7d6b','#b4534f','#5d7f2f','#8a5a78','#3f6b96','#96742f','#547a5c','#7a4f3a'];
 const sColor = i => SERIES_COLORS[i % SERIES_COLORS.length];
 
 /** A hex token at a given alpha. Lets the canvas honour the theme's accent
@@ -164,7 +161,7 @@ function drawMap() {
   const degPerPx = 1 / VIEW.scale;
   const stepDeg = [2, 1, .5, .25, .1, .05, .02, .01, .005, .002, .001]
     .find(d => d / degPerPx > 55) ?? .001;
-  mapCtx.strokeStyle = isLight() ? 'rgba(20,26,30,.10)' : 'rgba(255,255,255,.075)';
+  mapCtx.strokeStyle = 'rgba(35,35,35,.10)';
   mapCtx.lineWidth = 1;
   const tl = toLngLat(0, 0), br = toLngLat(w, h);
   for (let lat = Math.floor(br[1] / stepDeg) * stepDeg; lat <= tl[1]; lat += stepDeg) {

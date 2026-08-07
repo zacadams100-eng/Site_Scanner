@@ -88,6 +88,10 @@ of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
 The React frontend that replaces `site-scanner.html`. Vite + TypeScript +
 MapLibre, talking to whichever backend is on port 8000.
 
+The interface follows `BRAND.md`: paper ground, moss structure, one instrument
+blue that only ever means "here, now", IBM Plex Sans / Inter / IBM Plex Mono,
+and a frame of top bar, left sidebar, map, report panel and status bar.
+
 ```bash
 # terminal 1 — the API
 uvicorn mock_ee_backend:app --reload --port 8000
@@ -103,9 +107,21 @@ deployed API without an edit.
 
 What it does today:
 
+- **See where you are.** The map ships with its own cartography — coastline,
+  towns and cities, motorways, railways and rivers, generalised from Natural
+  Earth (public domain, `scripts/build_basemap.py`) and styled to the brand.
+  It works with no network at all; the OpenStreetMap raster fades in above
+  zoom 10 for street-level detail and is now optional rather than load-bearing.
+- **Mark** important locations with the marker tool: named, draggable points
+  that save with the site and export with it. An access point, a substation, a
+  pinch point — a marker is a note about where something is, and never
+  triggers a query.
 - **Draw** a rectangle, circle or freehand shape. Freehand is simplified with
   Douglas-Peucker on release and repaired if it self-intersects, so a scribble
   does not become a 600-vertex polygon that slows every later call.
+- **Adjust** a drawn area without redrawing it: drag inside to move, drag a
+  corner to resize. "Almost right, ten metres north" used to mean tracing the
+  whole outline again. Undo covers both.
 - **Scrub** 180 monthly steps from 2011 to 2025. The timeline draws the area's
   whole series inside its own track, with a data-availability strip beneath —
   it is a chart you can already read before you touch it. Scrubbing repaints
@@ -114,15 +130,41 @@ What it does today:
   twelve months. Copy pastes as TSV straight into Excel; CSV downloads.
 - **See** up to four charts chosen automatically from the selected factors,
   grouped so that two different units never share an axis.
+- **Compare** two dates: "vs a year ago" pins the same month twelve steps back
+  in one click, shift-clicking the track pins any other month, and the change
+  table exports as CSV. A gap at either end reports no change rather than a
+  zero, and a class code reports changed/no change rather than arithmetic.
 - **Check** every number's source, resolution and licence under Sources.
+- **Find** a site by postcode, place name, or coordinates pasted straight in
+  (`51.235, -0.57`). Lookups go to postcodes.io — free, keyless, ONS and
+  Ordnance Survey open data under the OGL, whose notice is shown with the
+  results. Searching only moves the map; it never draws an area for you.
+- **Start from a template.** Twenty-six worked starting points grouped by
+  trade — development appraisal, planning risk, ground conditions, grid
+  connection, solar farm, farm appraisal, biodiversity net gain, multi-peril
+  underwriting, logistics siting — each picking the layers that belong together
+  in that screen.
+- **Filter** the factor list to the ones backed by real observations —
+  satellite from Earth Engine, and 22 more from UK open data that need no
+  credentials at all (planning designations, sold prices, street-level crime;
+  see `docs/OPEN-DATA.md`). `/api/catalog` marks each factor `real: true|false`
+  and gives the real ones a `provenance` saying which service answers them and
+  whether that has been run against the live endpoint or only against recorded
+  fixtures. The demo majority of the catalogue is visible as such *before* you
+  spend a query on it rather than afterwards.
+- **Save** a site as a whole workspace — the shape, the chosen factors and the
+  timeline position — then reopen, rename or overwrite it. The list can be
+  backed up to a file and restored, because localStorage is one cleared
+  browser away from empty and does not follow you to another machine.
 
 Keyboard: `←`/`→` step a month, `PgUp`/`PgDn` a year, `Home`/`End` jump to the
-ends, `space` plays. The timeline is a real `<input type="range">` underneath
+ends, `space` plays. Clicking the date itself opens a month field, because
+reaching one step out of 180 by dragging means aiming at five pixels. The timeline is a real `<input type="range">` underneath
 the custom rendering, so screen readers and touch work without reimplementation.
 
 ### The data layer
 
-`catalog.py` holds 118 factors resolving to 20 base datasets, only 7 of which
+`catalog.py` holds 266 factors resolving to 44 base datasets, only 7 of which
 need monthly storage. That split is the point: slope, aspect, ruggedness and
 height-above-drainage all come off one elevation raster, and NDVI, NDWI, EVI
 and SAVI off the same two Sentinel-2 bands. A factor marked `derived` is
@@ -168,8 +210,18 @@ request (`cache.py`) — the README's own recommendation, now implemented.
 Redrawing the same shape or stepping the year slider back and forth no longer
 re-runs `reduceRegion`.
 
-`GET /api/cache` reports hits, misses and entry counts. `CONTOUR_CACHE_TTL=0`
-disables it; the default TTL is 15 minutes.
+`/api/series` is cached too, and that one matters most: a real Earth Engine
+factor costs seconds, and without a cache that outlives the request, adding a
+twelfth factor to a report re-runs the eleven already on screen. The key is
+per factor, per geometry, per time range, so changing the selection only costs
+the factors that actually changed. Generated factors are not cached (they are
+microseconds) and failures are never cached — a flaky call is retried on the
+next request rather than frozen in for fifteen minutes.
+
+`GET /api/cache` reports hits, misses and entry counts for all three caches;
+`GET /api/cache/series` reports the series cache alone and is available on the
+mock backend too. `CONTOUR_CACHE_TTL=0` disables caching; the default TTL is
+15 minutes.
 
 Worth being clear about the limit: this is **per-process**. Cloud Run runs
 several instances and recycles them, so a cold instance always misses and two

@@ -722,6 +722,40 @@ REAL_SERIES: Dict[str, Callable[[dict, List[str], float], List[Dict[str, Any]]]]
 }
 
 
-def install(registry: Dict[str, Any]) -> None:
+# How far each Earth Engine factor has been proven. NDVI was checked by hand
+# against live Earth Engine — twice, once catching a false success. The rest
+# are correct-by-construction and covered in CI against a stubbed client, which
+# is not the same thing and is not reported as if it were.
+_VERIFIED_EE = {"ndvi"}
+
+
+def _ee_provenance(factor_id: str) -> Dict[str, str]:
+    """Who publishes it, and where we actually get it from.
+
+    Those are never the same here: ESA publishes Sentinel-2, NASA publishes
+    MODIS, and every one of them reaches us through Earth Engine's servers.
+    A user told only "Copernicus / ESA" would look for this number in the
+    Copernicus Data Space and find a different one, because the compositing
+    and cloud masking happened in Earth Engine.
+    """
+    import catalog
+    base = catalog.BASE_BY_ID.get(
+        catalog.FACTOR_BY_ID.get(factor_id, {}).get("base", ""), {})
+    verified = factor_id in _VERIFIED_EE
+    return {
+        "source": base.get("source", "Google Earth Engine"),
+        "endpoint": "earthengine.googleapis.com",
+        "status": "verified" if verified else "written",
+        "note": "served through Earth Engine, which does the cloud masking and "
+                "compositing" + ("" if verified else
+                "; the reduction is verified in CI against a stubbed client, "
+                "not against live Earth Engine"),
+    }
+
+
+def install(registry: Dict[str, Any], provenance: Optional[Dict[str, Any]] = None) -> None:
     """Register the real implementations into routes_catalog's hook."""
     registry.update(REAL_SERIES)
+    if provenance is not None:
+        for factor_id in REAL_SERIES:
+            provenance[factor_id] = _ee_provenance(factor_id)

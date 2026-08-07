@@ -3,106 +3,70 @@
 /*
   Site Scanner — a field instrument, not a document.
 
-  The palette is the product's own: a cool green-cast near-black rather than a
-  neutral grey, one warm amber accent, and semantic colour (good/warn/bad) held
-  separate from that accent so a red cell never reads as "highlighted".
+  The palette and type are the product's own; see BRAND.md. Paper ground, moss
+  structure, ink type, hairline rules, and one instrument blue that only ever
+  means "here, now". Semantic colour (good/warn/bad) is held separate from the
+  accent so a warned cell never reads as "highlighted".
 
-  Two type roles: system-ui runs the interface, ui-monospace runs every number.
-  Data in a proportional face is the single fastest way to make a table look
-  untrustworthy.
+  Three type roles: IBM Plex Sans runs the interface, Inter runs prose, and
+  IBM Plex Mono runs every measurement. Data in a proportional face is the
+  single fastest way to make a table look untrustworthy.
+
+  There is no dark variant. One identity, one set of decisions — a demo that
+  flips palette with the operating system is a second product to keep true.
 */
 :root {
-  /* Ink and coral. Deep navy ground, warm coral accent — the contrast a
-     nautical chart uses, and the reason it reads as a map rather than a
-     dashboard. The neutrals are navy-biased rather than pure grey, so nothing
-     on the page looks like it was left at its default. */
-  --ground: #121822;
-  --surface: #1c2531;
-  --raised: #232d3b;
-  --sunken: #0d1219;
-  --line: rgba(255,255,255,.09);
-  --line-2: rgba(255,255,255,.17);
+  /* Brand palette — see BRAND.md. Paper ground, moss structure, ink type, one
+     instrument blue that only ever means "here, now". The demo is a public
+     face of the same product, so it uses the product's colours rather than a
+     variation on them. */
+  --ground: #f8f6f2;
+  --surface: #fcfbf9;
+  --raised: #ffffff;
+  --sunken: #f1eee8;
+  --line: #ddd8cf;
+  --line-2: #c9c3b7;
 
-  --ink: #e9e5dc;
-  --ink-2: #97a3b3;
-  --ink-3: #6b7a8f;
+  --ink: #232323;
+  --ink-2: #3d403c;
+  --ink-3: #69706a;
 
-  --accent: #d97742;
-  --accent-2: #a8481f;
-  --accent-soft: rgba(217,119,66,.16);
+  --structure: #4d6048;
+  --accent: #176f95;
+  --accent-2: #2fa8d8;
+  --accent-soft: #e2f2f9;
 
-  /* Semantic colour, deliberately not the accent. Copper means "here, now,
-     yours"; these three mean what the data is doing. */
-  --good: #6fb0cd;
-  --warn: #d2a570;
-  --bad:  #c96f80;
-  /* Absence is not badness. A month with no usable observation is a hole in
-     the record, not an error, so gaps read as dim neutral rather than red —
-     which also keeps them from competing with the coral accent. */
-  --absent: #384556;
+  /* Semantic colour, deliberately not the accent. Absence is not badness, so
+     a month with no usable observation reads neutral rather than red. */
+  --good: #72965e;
+  --warn: #8a6520;
+  --bad:  #a84545;
+  --absent: #c9c3b7;
 
-  --sea: #0d1219;
-  --land: #1b243100;
-  --land-fill: #1b2431;
-  --land-line: rgba(217,119,66,.34);
-  --outside-fill: #161d27;
-  --outside-line: rgba(148,163,184,.22);
+  --sea: #eef1ee;
+  --land: #ffffff00;
+  --land-fill: #ffffff;
+  --land-line: rgba(77,96,72,.55);
+  --outside-fill: #f1eee8;
+  --outside-line: rgba(105,112,106,.3);
 
-  --r: 12px;
+  --r: 10px;
   --r-sm: 8px;
-  --shadow: 0 2px 4px rgba(0,0,0,.20), 0 10px 26px rgba(0,0,0,.26);
+  --shadow: 0 1px 2px rgba(35,35,35,.06), 0 2px 6px rgba(35,35,35,.05);
 
-  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+  --ui: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+  --prose: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, "SF Mono", Menlo, monospace;
 
   --panel: 430px;
   --timeline: 104px;
-}
-
-/* Light theme is derived, not inverted: the ground lifts to a cool paper, the
-   coral darkens to hold contrast on it, and land keeps its relationship to
-   sea rather than flipping. */
-@media (prefers-color-scheme: light) {
-  :root {
-    --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
-    --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
-    --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
-    --accent: #c25f2f; --accent-2: #a8481f; --accent-soft: rgba(194,95,47,.13);
-    --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
-    --sea: #cfdae6; --land-fill: #e4e9f0;
-    --land-line: rgba(217,79,46,.5);
-    --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
-    --shadow: 0 10px 30px rgba(15,23,42,.13);
-  }
-}
-:root[data-theme="dark"] {
-  --ground: #121822; --surface: #1c2531; --raised: #232d3b; --sunken: #0d1219;
-  --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.17);
-  --ink: #e9e5dc; --ink-2: #97a3b3; --ink-3: #6b7a8f;
-  --accent: #d97742; --accent-2: #a8481f; --accent-soft: rgba(217,119,66,.16);
-  --good: #6fb0cd; --warn: #d2a570; --bad: #c96f80; --absent: #384556;
-  --sea: #0d1219; --land-fill: #1b2431;
-  --land-line: rgba(217,119,66,.34);
-  --outside-fill: #161d27; --outside-line: rgba(148,163,184,.22);
-  --shadow: 0 2px 4px rgba(0,0,0,.20), 0 10px 26px rgba(0,0,0,.26);
-}
-:root[data-theme="light"] {
-  --ground: #eef1f6; --surface: #f8fafc; --raised: #fff; --sunken: #dde4ec;
-  --line: rgba(15,23,42,.12); --line-2: rgba(15,23,42,.22);
-  --ink: #0f172a; --ink-2: #475569; --ink-3: #7c8a9c;
-  --accent: #c25f2f; --accent-2: #a8481f; --accent-soft: rgba(194,95,47,.13);
-  --good: #2b7f92; --warn: #a06a1e; --bad: #b03a58; --absent: #a9b4c2;
-  --sea: #cfdae6; --land-fill: #e4e9f0;
-  --land-line: rgba(217,79,46,.5);
-  --outside-fill: #dbe2ea; --outside-line: rgba(71,85,105,.28);
-  --shadow: 0 10px 30px rgba(15,23,42,.13);
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
   background: var(--ground); color: var(--ink);
-  font: 14px/1.5 var(--ui); -webkit-font-smoothing: antialiased;
+  font: 14px/1.55 var(--prose); -webkit-font-smoothing: antialiased;
 }
 button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -129,12 +93,12 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
 }
 .top > * { pointer-events: auto; }
 .brand { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-.mark {
-  width: 12px; height: 12px; border-radius: 3px; align-self: center; flex: none;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 0 14px var(--accent-soft);
+/* The mark is the frog itself — a gradient chip was standing in for it. */
+.mark { width: 24px; height: 24px; align-self: center; flex: none; }
+.brand h1 {
+  font: 600 13px/1 var(--ui); text-transform: uppercase; letter-spacing: .14em;
+  margin: 0; white-space: nowrap; align-self: center;
 }
-.brand h1 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin: 0; white-space: nowrap; }
 .brand span {
   font: 10px/1 var(--mono); color: var(--ink-3); text-transform: uppercase;
   letter-spacing: .08em; border: 1px solid var(--line); border-radius: 20px;
@@ -155,7 +119,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   display: flex; flex-direction: column; gap: 5px; padding: 6px; z-index: 7;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid var(--line); border-radius: 15px;
-  box-shadow: var(--shadow); backdrop-filter: blur(14px);
+  box-shadow: var(--shadow); 
 }
 .tool {
   width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px;
@@ -176,7 +140,7 @@ button { font: inherit; color: inherit; cursor: pointer; background: none; borde
   position: absolute; left: 66px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 88%, transparent);
   border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px;
-  pointer-events: none; z-index: 7; white-space: nowrap; backdrop-filter: blur(8px);
+  pointer-events: none; z-index: 7; white-space: nowrap; 
 }
 
 /* ---- panel ---- */
@@ -381,7 +345,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
 /* ---- overlays ---- */
 .scrim {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 22px;
-  background: color-mix(in srgb, var(--ground) 72%, transparent); backdrop-filter: blur(4px);
+  background: rgba(35,35,35,.28); 
 }
 .sheet {
   width: min(720px, 100%); max-height: 84vh; overflow-y: auto; padding: 18px 20px 22px;
@@ -411,7 +375,7 @@ table.cmp td:first-child { font-family: var(--ui); color: var(--ink-2); }
   display: flex; flex-direction: column; overflow: hidden;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   border: 1px solid var(--line-2); border-radius: var(--r);
-  box-shadow: var(--shadow); backdrop-filter: blur(18px);
+  box-shadow: var(--shadow); 
 }
 .browser header { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--line); }
 .browser input {

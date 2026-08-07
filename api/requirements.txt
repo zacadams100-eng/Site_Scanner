@@ -1,0 +1,8 @@
+# Dependencies for the Vercel serverless API (api/index.py).
+#
+# Deliberately not the project's requirements.txt: that one carries
+# earthengine-api and its Google client stack, which this function never
+# imports and which would blow past the serverless bundle limit.
+fastapi==0.115.6
+pydantic==2.10.4
+requests==2.32.3
