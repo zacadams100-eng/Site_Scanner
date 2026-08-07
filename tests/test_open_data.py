@@ -317,3 +317,55 @@ def test_a_failing_source_falls_back_to_generated_data_and_says_so(monkeypatch):
     finally:
         routes_catalog.REAL_SERIES.clear()
         routes_catalog.SERIES_CACHE.clear()
+
+
+# ---------------------------------------------------------------------------
+# What a failed real source looks like in the response
+# ---------------------------------------------------------------------------
+
+def test_a_failed_source_is_named_by_the_host_that_failed(monkeypatch):
+    """The fallback message must not blame Earth Engine for everyone.
+
+    This registry holds Earth Engine, five open-data hosts and the EA
+    hydrology API. A flat "Earth Engine failed" sends someone to check
+    credentials for a service that was never called — true when Earth Engine
+    was the only real source, false since open_data landed.
+    """
+    import routes_catalog as rc
+
+    registry, provenance = {}, {}
+    open_data.install(registry, provenance)
+    monkeypatch.setattr(rc, "REAL_SERIES", registry)
+    monkeypatch.setattr(rc, "REAL_SOURCES", provenance)
+
+    def boom(*a, **k):
+        raise open_data.OpenDataError("upstream is down")
+    monkeypatch.setitem(registry, "crime_density", boom)
+
+    steps = ["2024-01", "2024-02"]
+    s = rc._series_for("crime_density", GUILDFORD, (-0.57, 51.24), 20.0, steps)
+
+    assert s["source"] == "generated"
+    assert "data.police.uk failed" in s["error"]
+    assert "Earth Engine" not in s["error"]
+
+
+def test_a_failed_source_still_returns_labelled_demo_data(monkeypatch):
+    # The degradation this project chose: an outage becomes labelled demo data
+    # rather than an empty report. What must never happen is demo numbers
+    # carrying a real factor's provenance.
+    import routes_catalog as rc
+
+    registry, provenance = {}, {}
+    open_data.install(registry, provenance)
+    monkeypatch.setattr(rc, "REAL_SERIES", registry)
+    monkeypatch.setattr(rc, "REAL_SOURCES", provenance)
+
+    def boom(*a, **k):
+        raise open_data.OpenDataError("upstream is down")
+    monkeypatch.setitem(registry, "crime_density", boom)
+
+    s = rc._series_for("crime_density", GUILDFORD, (-0.57, 51.24), 20.0, ["2024-01"])
+    assert s["source"] == "generated"
+    assert not s.get("provenance")
+    assert s["points"]
