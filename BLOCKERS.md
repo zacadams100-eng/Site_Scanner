@@ -112,16 +112,21 @@ promise data they cannot deliver.
 
 ---
 
-## 4. No Vercel account, so there is still no live URL
+## 4. ~~No Vercel account, so there is still no live URL~~ — RESOLVED 2026-08-05
 
-Unchanged from `docs/DEPLOYMENT-STATUS.md`. Everything up to the authenticated
-call is built and verified locally through `scripts/serve_build.py`, which
-reproduces `vercel.json`'s routing. The remaining step is one command on a
-machine with a Vercel login:
+**This is done.** The app is deployed at https://site-scanner-pi.vercel.app and
+`npx vercel deploy --prod` from the repo root ships a new build. The frontend
+and the credential-free API both run there; only Earth Engine does not, and
+that is §5's problem, not this one.
 
-```bash
-npm i -g vercel && vercel login && vercel link && vercel deploy --prod
-```
+This entry sat here stale for two days after the fact, contradicting
+`HANDOFF.md` on the same page. It is kept rather than deleted because a
+blocker's history is the useful part: it was written 2026-08-04, the deploy
+landed 2026-08-05, and nobody came back to it.
+
+*(Not re-verified from this sandbox — `vercel.com` is behind the same proxy
+block as everything in §1, so this records what the deploy session reported,
+not a fresh check of the URL.)*
 
 ---
 
