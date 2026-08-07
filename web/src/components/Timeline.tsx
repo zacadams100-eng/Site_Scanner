@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { compact, labelStep, seriesColor } from '../lib/format'
+import { certaintyOf, certaintyNote } from '../lib/uncertainty'
 
 /**
  * The timeline is not just a control — it is a data display.
@@ -249,8 +250,16 @@ export default function Timeline() {
         {readout && (
           <div className={`time-value${readout.gap ? ' is-gap' : ''}`}>
             {readout.gap ? 'No data' : readout.text}
-            {!readout.gap && readout.confidence !== undefined && readout.confidence < 0.4 && (
-              <span className="low-conf" title="Few usable pixels this month">low confidence</span>
+            {/* The chip names the map. Whenever the overlay is hatched this is
+                what says why, and it carries the measured coverage rather than
+                an adjective — "12% of the site" can be checked, "low
+                confidence" cannot. The threshold comes from certaintyOf so the
+                chip and the hatch can never disagree. */}
+            {certaintyOf(point) === 'low' && (
+              <span className="low-conf"
+                    title={certaintyNote(point, labelStep(step ?? '')) ?? undefined}>
+                {Math.round((point?.valid_fraction ?? 0) * 100)}% observed
+              </span>
             )}
           </div>
         )}
