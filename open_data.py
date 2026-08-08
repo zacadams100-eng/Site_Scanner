@@ -56,7 +56,7 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 
 import requests
 
@@ -191,18 +191,45 @@ def locate(geometry: dict) -> Dict[str, Any]:
 # Each entry is a national dataset published by MHCLG on the planning data
 # platform. `pct` factors report the share of the AOI covered; `density`
 # factors report features per square kilometre.
-PLANNING_DATASETS = {
-    "conservation_area_pct": ("conservation-area", "pct"),
-    "article4_pct": ("article-4-direction-area", "pct"),
-    "green_belt_pct": ("green-belt", "pct"),
-    "national_park_pct": ("national-park", "pct"),
-    "aonb_pct": ("area-of-outstanding-natural-beauty", "pct"),
-    "sssi_pct": ("site-of-special-scientific-interest", "pct"),
-    "ancient_woodland_pct": ("ancient-woodland", "pct"),
-    "brownfield_register_pct": ("brownfield-land", "pct"),
-    "scheduled_monument_pct": ("scheduled-monument", "pct"),
-    "listed_building_density": ("listed-building-outline", "density"),
-    "tpo_density": ("tree-preservation-zone", "density"),
+class PlanningSpec(NamedTuple):
+    """One catalogue factor, and how to get it from the Planning Data Platform.
+
+    `field`/`values` are for the datasets that carry more than one thing. Flood
+    risk is the only one so far: Zone 2 and Zone 3 share the `flood-risk-zone`
+    dataset and are told apart by an attribute.
+    """
+    dataset: str
+    mode: str
+    field: Optional[str] = None
+    values: Tuple[str, ...] = ()
+
+
+PLANNING_DATASETS: Dict[str, PlanningSpec] = {
+    "conservation_area_pct": PlanningSpec("conservation-area", "pct"),
+    "article4_pct": PlanningSpec("article-4-direction-area", "pct"),
+    "green_belt_pct": PlanningSpec("green-belt", "pct"),
+    "national_park_pct": PlanningSpec("national-park", "pct"),
+    "aonb_pct": PlanningSpec("area-of-outstanding-natural-beauty", "pct"),
+    "sssi_pct": PlanningSpec("site-of-special-scientific-interest", "pct"),
+    "ancient_woodland_pct": PlanningSpec("ancient-woodland", "pct"),
+    "brownfield_register_pct": PlanningSpec("brownfield-land", "pct"),
+    "scheduled_monument_pct": PlanningSpec("scheduled-monument", "pct"),
+    "listed_building_density": PlanningSpec("listed-building-outline", "density"),
+    "tpo_density": PlanningSpec("tree-preservation-zone", "density"),
+
+    # Flood risk. The two zones are one dataset on the platform and two
+    # factors in the catalogue, because they mean different things to a
+    # developer: Zone 3 is a sequential-test refusal risk, Zone 2 is a
+    # flood-risk-assessment requirement. Reporting one number for both would
+    # be wrong in the direction that looks plausible.
+    #
+    # Zone 3 is a subset of Zone 2 on the published maps, so the two factors
+    # are not disjoint and should not be summed. `zone 3` matches both
+    # `Flood Zone 3` and the `3a`/`3b` subdivisions some authorities publish.
+    "flood_zone2_pct": PlanningSpec(
+        "flood-risk-zone", "pct", "flood-risk-type", ("zone 2",)),
+    "flood_zone3_pct": PlanningSpec(
+        "flood-risk-zone", "pct", "flood-risk-type", ("zone 3",)),
 }
 
 
@@ -271,13 +298,60 @@ def _coverage(geometry: dict, features: List[dict]) -> float:
     return round(100.0 * covered / inside_aoi, 1)
 
 
+def _feature_fields(feature: dict) -> List[Any]:
+    """Every place the platform might have put a dataset-specific attribute.
+
+    Some datasets surface these at the top level of a feature's properties,
+    others under a `json` sub-object, and which one is not documented per
+    dataset — so both are read rather than guessed between.
+    """
+    props = feature.get("properties") or {}
+    out = [props]
+    nested = props.get("json")
+    if isinstance(nested, dict):
+        out.append(nested)
+    return out
+
+
+def _feature_has(feature: dict, field: str) -> bool:
+    """Is this attribute present at all, whatever its value?"""
+    return any(field in d for d in _feature_fields(feature))
+
+
+def _feature_matches(feature: dict, field: str, wanted: Tuple[str, ...]) -> bool:
+    """Does this entity carry one of the wanted values in `field`?
+
+    The platform puts dataset-specific attributes in a nested `properties`
+    dict, but not consistently — some datasets surface them at the top level of
+    the feature's properties, others under a `json` sub-object. Both are
+    checked, and the comparison is case- and separator-insensitive, because the
+    same zone appears as `Flood Zone 3`, `flood-zone-3` and `zone 3` across the
+    register.
+    """
+    for value in [d.get(field) for d in _feature_fields(feature)]:
+        if value is None:
+            continue
+        flat = str(value).lower().replace("-", " ").replace("_", " ").strip()
+        if any(w in flat for w in wanted):
+            return True
+    return False
+
+
 def planning_series(dataset: str, mode: str, geometry: dict, steps: List[str],
-                    area_ha: float) -> List[Dict[str, Any]]:
+                    area_ha: float, field: Optional[str] = None,
+                    values: Tuple[str, ...] = ()) -> List[Dict[str, Any]]:
     """One national designation dataset, measured inside the drawn shape.
 
     `pct` factors report the share of the AOI covered, estimated by sampling
     (see `_coverage`). `density` factors report intersecting features per
     square kilometre, which needs no geometry at all.
+
+    `field`/`values` narrow one dataset to a subset of its entities. Flood risk
+    is the case that needs it: the platform publishes Zone 2 and Zone 3 as one
+    `flood-risk-zone` dataset distinguished by an attribute, and the catalogue
+    asks for them separately — as it must, because they carry entirely
+    different planning consequences. Without the filter both factors would
+    return the same number, which is the kind of wrong that looks right.
 
     These are static in time. The platform records when an entity entered and
     left the register, but a conservation area designated in 1974 has no
@@ -295,6 +369,30 @@ def planning_series(dataset: str, mode: str, geometry: dict, steps: List[str],
         return _static(steps, round(len(entities) / km2, 2))
 
     features = (data or {}).get("features", [])
+    if field and features:
+        # Before trusting the filter, check the attribute exists at all.
+        #
+        # This matters more than it looks. `flood-risk-type` is taken from the
+        # platform's published schema and has never been seen in a live
+        # response. If the real key is something else, every feature fails the
+        # filter, and "no feature matched" is indistinguishable from "no Zone 3
+        # here" — so the app would report 0% flood risk, confidently, on a
+        # floodplain. A silent false zero on the one factor a developer checks
+        # before buying land is the worst failure available in this file.
+        #
+        # So an absent attribute raises instead, and `_series_for` falls back
+        # to the generator and labels the result demo data. Wrong and labelled
+        # beats wrong and authoritative.
+        if not any(_feature_has(f, field) for f in features):
+            raise OpenDataError(
+                f"{dataset}: none of the {len(features)} entities carry "
+                f"'{field}' — the attribute name is wrong, so the filter "
+                f"cannot be trusted. Run scripts/discover_planning_datasets.py "
+                f"to see the real attribute names.")
+        # An entity carrying the attribute but not the wanted value is a real
+        # answer — no Zone 3 here — and correctly reads as 0%.
+        features = [f for f in features if _feature_matches(f, field, values)]
+
     if not features:
         return _static(steps, 0.0)
     return _static(steps, _coverage(geometry, features))
@@ -709,11 +807,12 @@ def install(registry: Dict[str, Any],
     """
     import catalog
 
-    for factor_id, (dataset, mode) in PLANNING_DATASETS.items():
+    for factor_id, spec in PLANNING_DATASETS.items():
         if factor_id not in catalog.FACTOR_BY_ID:
             continue
         registry[factor_id] = (
-            lambda g, s, a, _d=dataset, _m=mode: planning_series(_d, _m, g, s, a))
+            lambda g, s, a, _sp=spec: planning_series(
+                _sp.dataset, _sp.mode, g, s, a, _sp.field, _sp.values))
     # These eleven come from one host but five publishers — SSSI and AONB
     # boundaries are Natural England's, listed buildings are Historic
     # England's, and MHCLG aggregates them. The catalogue already knows who

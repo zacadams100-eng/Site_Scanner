@@ -139,6 +139,139 @@ def test_no_designation_is_zero_not_a_gap(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Flood risk zones — one dataset, two factors
+#
+# The field name `flood-risk-type` and its values are taken from the platform's
+# published schema and have NOT been confirmed against a live response. If the
+# live check shows a different attribute, this filter is where to fix it — the
+# rest of the path is the same code the eleven designations already use.
+# ---------------------------------------------------------------------------
+def _zone(kind, x0, y0, x1, y1):
+    f = _square(x0, y0, x1, y1)
+    f["properties"] = {"flood-risk-type": kind}
+    return f
+
+
+FLOOD_MIX = {"features": [
+    # Zone 2 over the western half, Zone 3 over a narrow strip of it.
+    _zone("Flood Zone 2", -0.58, 51.235, -0.57, 51.245),
+    _zone("Flood Zone 3", -0.58, 51.235, -0.578, 51.245),
+]}
+
+
+def test_the_two_flood_zones_do_not_return_the_same_number(monkeypatch):
+    """The failure this filter exists to prevent.
+
+    Zone 2 and Zone 3 share one dataset. Without the attribute filter both
+    factors measure every returned feature and report an identical figure —
+    which is wrong in the direction that looks entirely plausible, because
+    Zone 3 genuinely is a subset of Zone 2 and a reader would not blink at
+    two similar numbers.
+    """
+    fake_get(monkeypatch, {"planning.data.gov.uk": FLOOD_MIX})
+    z2 = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                   200.0, "flood-risk-type", ("zone 2",))
+    z3 = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                   200.0, "flood-risk-type", ("zone 3",))
+    assert z2[0]["value"] > z3[0]["value"], \
+        "Zone 2 covers Zone 3, so it can never be the smaller number"
+    assert z3[0]["value"] > 0
+
+
+def test_zone_3_subdivisions_count_as_zone_3(monkeypatch):
+    """Some authorities publish 3a and 3b rather than a bare 3. Both are
+    Zone 3 for planning purposes, and dropping them would report a floodplain
+    as dry."""
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [
+        _zone("Flood Zone 3b", -0.58, 51.235, -0.57, 51.245)]}})
+    pts = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                    200.0, "flood-risk-type", ("zone 3",))
+    assert pts[0]["value"] > 0
+
+
+def test_the_filter_is_insensitive_to_case_and_separators(monkeypatch):
+    """The same zone appears as `Flood Zone 3`, `flood-risk-zone-3` and
+    `zone_3` across the register."""
+    for spelling in ("Flood Zone 3", "flood-zone-3", "ZONE_3", "zone 3"):
+        fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [
+            _zone(spelling, -0.58, 51.235, -0.57, 51.245)]}})
+        pts = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD,
+                                        STEPS, 200.0, "flood-risk-type",
+                                        ("zone 3",))
+        assert pts[0]["value"] > 0, f"{spelling!r} was not recognised"
+
+
+def test_the_attribute_may_arrive_nested(monkeypatch):
+    """The platform surfaces dataset-specific fields at the top level for some
+    datasets and under a `json` sub-object for others."""
+    f = _square(-0.58, 51.235, -0.57, 51.245)
+    f["properties"] = {"json": {"flood-risk-type": "Flood Zone 3"}}
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [f]}})
+    pts = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                    200.0, "flood-risk-type", ("zone 3",))
+    assert pts[0]["value"] > 0
+
+
+def test_zones_present_but_none_matching_is_zero(monkeypatch):
+    """A site inside Zone 2 and outside Zone 3 must report 0% Zone 3 — not
+    fall through to measuring every feature the dataset returned."""
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [
+        _zone("Flood Zone 2", -0.58, 51.235, -0.57, 51.245)]}})
+    pts = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                    200.0, "flood-risk-type", ("zone 3",))
+    assert pts[0]["value"] == 0.0
+
+
+def test_a_wrong_attribute_name_raises_rather_than_reporting_no_flood_risk(monkeypatch):
+    """The most dangerous failure available in this file.
+
+    `flood-risk-type` comes from the published schema and has never been seen
+    in a live response. If the real key differs, every feature fails the
+    filter — and "nothing matched" would be indistinguishable from "no Zone 3
+    here", so the app would report 0% flood risk, confidently, on a
+    floodplain. Raising instead falls back to the generator, which labels
+    itself demo data.
+    """
+    f = _square(-0.58, 51.235, -0.57, 51.245)
+    f["properties"] = {"flood-zone": "Flood Zone 3"}     # a different key
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [f]}})
+    with pytest.raises(open_data.OpenDataError) as e:
+        open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                  200.0, "flood-risk-type", ("zone 3",))
+    assert "attribute name is wrong" in str(e.value)
+
+
+def test_an_empty_response_is_still_zero_not_an_error(monkeypatch):
+    """No entities at all is a genuine measurement — this site is nowhere near
+    a flood zone — and must not be confused with a broken attribute."""
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": []}})
+    pts = open_data.planning_series("flood-risk-zone", "pct", GUILDFORD, STEPS,
+                                    200.0, "flood-risk-type", ("zone 3",))
+    assert pts[0]["value"] == 0.0
+
+
+def test_an_unfiltered_dataset_is_unaffected(monkeypatch):
+    """The eleven designations pass no filter and must behave exactly as
+    before."""
+    fake_get(monkeypatch, {"planning.data.gov.uk": {
+        "features": [_square(-0.58, 51.235, -0.57, 51.245)]}})
+    pts = open_data.planning_series("conservation-area", "pct", GUILDFORD,
+                                    STEPS, 200.0)
+    assert 45 <= pts[0]["value"] <= 55
+
+
+def test_both_flood_factors_are_registered():
+    import catalog
+    import routes_catalog
+    registry, sources = {}, {}
+    open_data.install(registry, sources)
+    for fid in ("flood_zone2_pct", "flood_zone3_pct"):
+        assert fid in registry, f"{fid} should now be real"
+        assert sources[fid]["status"] == "written", \
+            "never run against the live platform — must not claim verified"
+
+
+# ---------------------------------------------------------------------------
 # Land Registry Price Paid
 # ---------------------------------------------------------------------------
 def _sale(date, amount, new=False, ptype="terraced"):

@@ -10,17 +10,25 @@ Tests: 426 passing, 10 skipped (they need a Postgres server) · 59 frontend
 
 ## Read this first
 
-**Two things need you, not another coding session.** Each is minutes of
+**Three things need you, not another coding session.** Each is minutes of
 work and each unblocks something no amount of code can:
 
 1. **Send the ESA/Copernicus email** — `docs/licensing/email-copernicus-sentinel-2.md`.
    Fill in a name and send. It is the cheaper of the two licence questions and
    it may make the Google one unnecessary.
-2. **Run the two check scripts anywhere with normal internet:**
+2. **Run the check scripts anywhere with normal internet:**
    `python3 scripts/check_open_data.py` and `python3 -m ons.job --check`. The
-   first promotes 22 factors from "written" to "verified" — or tells us which
+   first promotes 24 factors from "written" to "verified" — or tells us which
    integrations are wrong. The second finds which ONS release URLs have moved,
    which some of them will have.
+3. **Confirm the flood-zone attribute name**, which is the most consequential
+   unverified guess in the repo:
+   `python3 scripts/discover_planning_datasets.py --attributes flood-risk-zone`.
+   `flood_zone2_pct` and `flood_zone3_pct` filter on an attribute taken from a
+   published schema and never seen in a live response. If it is wrong they
+   currently fall back to labelled demo data — deliberately, rather than
+   reporting 0% flood risk on a floodplain — and this says what to change it
+   to. The same script also reports which further datasets are worth adding.
 
 **The deploy is done.** The frontend and the credential-free API are live on
 Vercel at the URL above; `npx vercel deploy --prod` from the repo root ships a
