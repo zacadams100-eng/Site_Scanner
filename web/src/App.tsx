@@ -293,9 +293,13 @@ export default function App() {
             </div>
           )}
 
-          {loading && <LoadingSequence />}
+          {/* A refetch keeps the report it already has and puts a strip above
+              it; only a first query gets the full skeleton. Blanking a report
+              the user is reading in order to say "working on it" takes away
+              the answer to tell them about the question. */}
+          {loading && <LoadingSequence variant={data ? 'strip' : 'full'} />}
 
-          {!loading && !error && data && (
+          {!error && data && (
             <>
               {tab === 'findings' && <Findings />}
               {tab === 'table' && <AttributeTable />}

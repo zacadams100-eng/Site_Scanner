@@ -5,6 +5,88 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-07 (fourth pass) — Surface water, and the loading state
+
+### JRC Global Surface Water: three more real factors
+
+`water_occurrence`, `water_seasonality` and `water_change` were generated, and
+the catalogue already named JRC Global Surface Water as their base at 30 m.
+48 → 51 real of 269 (19%).
+
+Chose Earth Engine over an Environment Agency HTTP endpoint deliberately. The
+EA spatial layers would have meant guessing at ArcGIS service URLs that cannot
+be reached from here to check, adding to a pile of 47 written-but-never-run
+factors. These go through the registry `scripts/check_real_factors.py` already
+walks, so **the CI job with Earth Engine credentials verifies them without
+anybody remembering to** — which is the difference that mattered.
+
+The design decision worth keeping is the split between JRC's two products.
+`GlobalSurfaceWater` is one static image summarising 1984–2021; those are
+long-baseline statistics with no annual value. `YearlyHistory` is per-year. So
+seasonality and change are served static and flagged carried-forward, and only
+occurrence varies year to year. Spreading a static statistic across fifteen
+years as though it were measured each one would manufacture a trend out of a
+constant — the failure `insights.py` already guards against for carried-forward
+census figures — so the carried-forward flag is load-bearing and tested.
+
+Two rules carried over from earlier mistakes in that file: extent is summed
+from `pixelArea` rather than counted, because a pixel count is a count in
+whatever projection the reduction lands in and that inflated coverage 1.6x over
+England once already; and a year with no usable classification is a gap, never
+0%, because reporting no water is the claim that the site is dry.
+
+### The loading state was narrating a guess
+
+Driven in a browser with the response held for twelve seconds, which is the
+only way to see it — locally it returns in about 30 ms, which is why nobody
+had ever looked at it.
+
+What was there: one line of grey 12.5px text, centred in a panel 700 px tall,
+changing every few seconds on a timer. **It looked frozen** — nothing moved
+between stage changes, so for two-second stretches it was indistinguishable
+from a dead page, the exact failure its own docstring said it prevented. And
+**it was narrating a guess**: "Rolling months into years…" appeared at 2.5
+seconds whether or not any months were being rolled.
+
+It now shows what the app actually knows, which turns out to be plenty — which
+layers were requested, which are real, and which host each real one reaches:
+
+> 2 of 4 are live sources, and those are the ones taking the time.
+> NDVI (vegetation vigour) · demo data
+> Flood Zone 3 coverage · planning.data.gov.uk
+
+Past nine seconds it names the host rather than saying "the data source is
+slow", because a hostname is something a person can act on.
+
+**The temptation resisted** is ticking rows off one at a time. `/api/series` is
+one POST returning every factor at once, so the client never learns that NDVI
+has landed and precipitation has not — a row filling in on a timer would be the
+same lie in a nicer coat. A test asserts the copy never implies per-factor
+progress. Per-factor progress needs the server to stream.
+
+### The bigger flaw underneath it
+
+Driving the real flow — add a layer to a report you are already reading —
+showed that `loading` hid `data` even when data was present. **Adding a fifth
+factor blanked the four you were reading**: the app taking away the answer it
+had already given in order to say it was working.
+
+A refetch now keeps the previous report and puts a thin strip above it, saying
+the figures below are from the last query. Only a first query gets the full
+skeleton. Verified by driving the factor browser: the fifteen-year table stays
+readable throughout.
+
+Reduced motion is honoured — animations off, content identical, checked by
+emulating the media query rather than by reading the CSS.
+
+The copy lives in `lib/loading.ts` with 20 tests, because the wording is a
+claim about what the app is doing and this project does not let a claim go
+untested for being small and grey.
+
+502 Python passing, 102 frontend (up from 85).
+
+---
+
 ## 2026-08-07 (third pass) — Flood risk made real, and guessing made measurable
 
 Picked the highest-value unblocked work while the user was away: everything at

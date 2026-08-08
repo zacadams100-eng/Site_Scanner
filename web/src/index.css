@@ -794,7 +794,7 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   font-family: var(--font-mono); font-size: 11px;
   background: var(--paper-000); padding: 1px 5px; border-radius: 4px;
 }
-.loading { padding: 32px; text-align: center; color: var(--text-faint); font-size: 12.5px; }
+.loading { padding: 20px; color: var(--text-faint); font-size: 12.5px; }
 .empty-note { padding: 28px 20px; text-align: center; color: var(--text-faint); font-size: 12.5px; }
 
 /* Findings — what the numbers say, in sentences.
@@ -1264,9 +1264,123 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 /* The staged loading readout. The elapsed counter only appears once a request
    has been slow enough to be worth timing — showing "0s" immediately makes a
    fast response look like a stopwatch. */
-.loading-text { display: block; }
+/* Loading — a skeleton of the report that is coming, not a message about it.
+
+   The rules that shape this: nothing may imply per-factor completion (the API
+   returns every factor in one response, so the client cannot know), nothing
+   may move enough to distract from a panel the user is waiting on, and the
+   whole thing must hold its shape so the findings do not jump when they land.
+   See LoadingSequence.tsx. */
+.loading-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px;
+}
+.loading-text {
+  display: inline-flex; align-items: baseline; gap: 1px;
+  color: var(--text); font-size: 13px;
+}
 .loading-elapsed {
-  display: block; margin-top: 5px;
   font-size: 11px; font-variant-numeric: tabular-nums;
   color: var(--text-faint);
+}
+
+/* Three dots, because the summary line changes only twice in ten seconds and
+   the gap between changes was reading as a hung page. */
+.loading-dots { display: inline-flex; gap: 2px; margin-left: 2px; }
+.loading-dots i {
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--text-faint);
+  animation: loading-dot 1.4s ease-in-out infinite;
+}
+.loading-dots i:nth-child(2) { animation-delay: .2s; }
+.loading-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes loading-dot {
+  0%, 60%, 100% { opacity: .25; }
+  30%           { opacity: 1; }
+}
+
+.loading-why {
+  margin: 8px 0 0; font-size: 11.5px; line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.loading-rows { list-style: none; margin: 18px 0 0; padding: 0; }
+.loading-row {
+  position: relative; padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.loading-row-name {
+  display: block; font-size: 12.5px; color: var(--text-dim);
+}
+.loading-row-src {
+  display: block; margin-top: 2px;
+  font-size: 10px; color: var(--text-faint);
+}
+.loading-row-src.mono { font-size: 9.5px; }
+/* The one place colour is spent here: a live source is the row that will
+   actually take time, and it is also the row carrying a real observation. */
+.loading-row.is-live .loading-row-src { color: var(--accent); }
+
+/* The value that has not arrived. A fixed width rather than a full-bleed bar,
+   because the number it stands in for is short and a wide sweep suggests a
+   paragraph is coming. */
+.loading-bar {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 62px; height: 9px; border-radius: 2px;
+  background: linear-gradient(90deg,
+    var(--paper-300) 0%, var(--rule-400) 50%, var(--paper-300) 100%);
+  background-size: 200% 100%;
+  animation: loading-sweep 1.6s ease-in-out infinite;
+}
+.loading-row.is-live .loading-bar { width: 78px; }
+@keyframes loading-sweep {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* The refetch strip. Sits above a report that is still readable, so it has to
+   be quiet enough to ignore and clear enough to explain why a figure might be
+   a second out of date. */
+.loading-strip {
+  position: relative;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 8px 20px 9px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-100);
+}
+.loading-strip-track {
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  overflow: hidden; background: var(--paper-300);
+}
+.loading-strip-track::after {
+  content: ''; position: absolute; inset: 0;
+  width: 40%; background: var(--accent);
+  animation: loading-slide 1.5s var(--ease) infinite;
+}
+@keyframes loading-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.loading-strip-text {
+  flex: 1; font-size: 11.5px; color: var(--text-dim);
+}
+.loading-strip-text em { font-style: normal; color: var(--text-faint); }
+
+.loading-row-more {
+  font-size: 11.5px; color: var(--text-faint); border-bottom: 0;
+}
+.loading-slow {
+  margin: 14px 0 0; padding: 9px 11px; border-radius: 4px;
+  background: var(--amber-100); color: var(--warn);
+  font-size: 11.5px; line-height: 1.5;
+}
+
+/* Someone who has asked for less movement gets a static skeleton, not a
+   flickering one. The layout still carries the information; only the
+   animation goes. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-dots i, .loading-bar { animation: none; }
+  .loading-strip-track::after { animation: none; width: 100%; opacity: .5; }
+  .loading-dots i { opacity: .6; }
+  .loading-bar { background: var(--rule-300); }
 }
