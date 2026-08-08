@@ -5,6 +5,73 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-07 (second pass) — Item 11 measured, and it does not pass
+
+Asked to test item 11, the user-contributed library of environmental
+assessments — the data network effect. The context doc is explicit that the
+anonymisation design must be settled before the upload mechanic is built, so
+this is a measurement, not a feature: `experiments/eia_library/`, imported by
+nothing, mounted on no route.
+
+`experiments/eia_library/FINDINGS.md` is the write-up.
+`python3 -m experiments.eia_library.report` prints the numbers.
+
+**Test A — stripping identifiers from EIA text.** 30.8% of identifiers survive
+on held-out passages, at 100% retention of the findings. The residue is not
+random: bare settlement names (`Guildford`) need a gazetteer, and client-name
+variants (`BHSE`, `Bloor's`, after the full company name was correctly removed
+from the header) cannot be caught by any pattern, because recognising `BHSE` as
+a client requires knowing who the client is.
+
+Twice, the mechanism protecting the *valuable* content punched a hole in the
+redaction. Species binomials were protected by shape — capitalised word then
+lowercase word — which matched `Homes ownership` and `Hartley and`, and a
+protected span blocks every redaction rule, so the false species match shielded
+the client name behind it. The fix used Latin epithet endings including `-e`,
+`-a` and `-is`, which are also the endings of a large share of ordinary
+English, so `Road frontage` parsed as a species and shielded the site name.
+Both looked correct while reading the code and were caught only by measuring.
+The general form is worth keeping: **the protection mechanism and the redaction
+mechanism are adversaries**, and every exception carved out to save the ecology
+is a doorway an identifier walks through.
+
+**Test B — the geometry, which is worse.** Rounding a boundary to ~1 m leaves
+100% of sites matchable to their own original; fuzzing only anonymises at
+~111 m, by which point a 0.3 ha parcel has no shape left. Generalising to an H3
+cell needs resolution 6 — 36 km² — before a site hides among fifteen. Expressed
+without depending on the synthetic population: for a 74 ha cell to hide one site
+among five, EIA'd sites would have to occur about seven times per square
+kilometre, everywhere.
+
+So the library can answer "what habitats are typical around here", not "what is
+on this site".
+
+**Three things the doc does not mention, and one of them is a blocker.**
+Protected-species locations are themselves sensitive — the NBN Atlas blurs
+badger setts and great crested newt ponds because publishing them enables
+persecution — so a findings library is partly a map of where the protected
+species are, which anonymising the client does not fix. Contributor attribution
+and client anonymity are in tension, since a consultancy's client list is often
+on its own website. And an EIA is commissioned work that is generally the
+client's property, so a consultant may have no right to upload it at all. That
+last one is the same shape as the Sentinel-2 licence question: cheap to ask,
+expensive to get wrong, and nobody here can answer it.
+
+**What the feature could be instead** is in FINDINGS.md. The load-bearing change
+is publishing structured records rather than documents — extract a typed record
+and never pass prose through, so the schema is the safety boundary rather than a
+regex, because a field of type `habitat_type` cannot contain a developer's name.
+
+Two of the CI tests are deliberately inverted: they assert the redactor still
+fails. If somebody improves it enough to pass, that is a real result and the
+findings document is out of date, and a failing test is the right way to be told.
+
+**Not tested:** whether enough public-sector EIAs exist in machine-readable form
+to seed the library, which is the other thing that decides viability. The
+sandbox proxy refuses every host that could answer it.
+
+---
+
 ## 2026-08-07 — The three moat items, made real
 
 Worked from the competitive context doc, which says to default to items 1–3
@@ -131,8 +198,12 @@ rather than a coding one. The counter mechanism is there when that is settled.
 
 ### Test counts
 
-465 Python passing, 10 skipped (Postgres). 85 frontend passing, up from 59 —
+455 Python passing, 10 skipped (Postgres). 85 frontend passing, up from 59 —
 the 26 new ones are the permalink round trip and the confidence rendering.
+
+(The commit message for this session's first batch says 465. It is wrong; the
+figure was never verified against a summary line, only against a screen of
+dots. 455 is the counted number.)
 
 ---
 
