@@ -572,6 +572,8 @@ FACTOR_COVERAGE: Dict[str, tuple] = {
     **{fid: ("2000-02", None) for fid in MODIS_FACTORS},
     "lc_dominant": ("2020-01", "2021-12"),
     "lc_tree_pct": ("2020-01", "2021-12"),
+    # Surface water is added below, where its constants are defined and
+    # documented together — see gsw_group.
 }
 
 
@@ -701,6 +703,152 @@ def lc_tree_pct_series(geometry: dict, steps: List[str],
 
 
 # ---------------------------------------------------------------------------
+# JRC Global Surface Water — where the water is, and whether it is moving
+# ---------------------------------------------------------------------------
+#
+# Two products, and the split matters because they answer different questions.
+#
+# `GlobalSurfaceWater` is one static image summarising 1984–2021: how often
+# each pixel held water, how many months a year it typically held it, and how
+# much that changed between the first half of the record and the second. Those
+# are long-baseline statistics and they do not have an annual value — asking
+# for "seasonality in 2017" is asking for something the product does not
+# contain.
+#
+# `YearlyHistory` is a per-year classification, and it is where a genuine
+# annual series comes from.
+#
+# So seasonality and change are served as static values held across the
+# timeline and flagged carried-forward, exactly as the planning designations
+# are, and only occurrence varies year to year. Spreading a static statistic
+# across fifteen years as though it were measured each one would manufacture a
+# trend out of a constant — the failure `insights.py` already guards against
+# for carried-forward census figures.
+GSW_STATIC = "JRC/GSW1_4/GlobalSurfaceWater"
+GSW_YEARLY = "JRC/GSW1_4/YearlyHistory"
+
+# The record ends in 2021. The app's timeline runs to 2025, so the last four
+# years are gaps — the correct answer, not a bug to paper over.
+GSW_START, GSW_END = "1984-01", "2021-12"
+
+# YearlyHistory's `waterClass`: 0 no data, 1 not water, 2 seasonal, 3 permanent.
+GSW_SEASONAL, GSW_PERMANENT = 2, 3
+
+GSW_FACTORS = ("water_occurrence", "water_seasonality", "water_change")
+
+
+def _gsw_static(ee, geom) -> Dict[str, Optional[float]]:
+    """Long-baseline seasonality and change, averaged over the AOI.
+
+    `change_norm` is a percentage change in occurrence between 1984–1999 and
+    2000–2021, already normalised by the JRC — it is not recomputed here, and
+    it is the one band in this file that is legitimately negative.
+    """
+    img = ee.Image(GSW_STATIC).select(["seasonality", "change_norm"])
+    stats = img.reduceRegion(
+        reducer=ee.Reducer.mean(), geometry=geom,
+        scale=30, maxPixels=1e9, bestEffort=True,
+    ).getInfo() or {}
+
+    def read(band: str, lo: float, hi: float) -> Optional[float]:
+        v = stats.get(band)
+        if v is None:
+            return None
+        # Outside the declared range means the band was misread, not that the
+        # water did something remarkable. Better a gap than a wrong number.
+        return round(float(v), 2) if lo <= float(v) <= hi else None
+
+    return {
+        "water_seasonality": read("seasonality", 0.0, 12.0),
+        "water_change": read("change_norm", -100.0, 100.0),
+    }
+
+
+def _gsw_year_extent(ee, geom, year: int) -> Optional[float]:
+    """Share of the AOI classed as water in one year, seasonal or permanent.
+
+    Area-weighted rather than pixel-counted. GSW is a 30 m product in an equal-
+    area-ish projection, but a count is still a count of pixels in whatever
+    projection the reduction lands in, and this file has been caught by that
+    once already — see the `pixelArea` note in HANDOFF.md. Summing `pixelArea`
+    is projection-independent and cannot inflate at England's latitude.
+    """
+    coll = (ee.ImageCollection(GSW_YEARLY)
+            .filterDate(f"{year}-01-01", f"{year}-12-31"))
+    img = ee.Image(ee.Algorithms.If(coll.size().gt(0), coll.first(), None))
+    if img is None:
+        return None
+
+    cls = img.select("waterClass")
+    water = cls.gte(GSW_SEASONAL)
+    observed = cls.gt(0)
+    area = ee.Image.pixelArea()
+    stats = (area.updateMask(water).rename("wet")
+             .addBands(area.updateMask(observed).rename("seen"))
+             .reduceRegion(reducer=ee.Reducer.sum(), geometry=geom,
+                           scale=30, maxPixels=1e9, bestEffort=True)
+             .getInfo()) or {}
+
+    seen = stats.get("seen")
+    wet = stats.get("wet")
+    # No observed pixels is no answer. Reporting 0% water because the year had
+    # no usable classification would say "this site is dry" on no evidence.
+    if not seen:
+        return None
+    return round(100.0 * float(wet or 0.0) / float(seen), 2)
+
+
+def gsw_group(geometry: dict, steps: List[str],
+              area_ha: float) -> Dict[str, List[Dict[str, Any]]]:
+    """All three surface-water factors from one pass.
+
+    Selecting all three costs one static reduction plus one per distinct year,
+    the same sharing the Sentinel-2 indices already do.
+    """
+    key = _group_key("gsw", geometry, steps)
+
+    def compute() -> Dict[str, List[Dict[str, Any]]]:
+        import ee
+
+        geom = ee.Geometry(geometry)
+        in_range = [s for s in steps if GSW_START <= s <= GSW_END]
+        if not in_range:
+            return {fid: [_gap(s) for s in steps] for fid in GSW_FACTORS}
+
+        static = _gsw_static(ee, geom)
+        occurrence = _annual_points(
+            in_range, lambda y: _gsw_year_extent(ee, geom, y))
+
+        out: Dict[str, List[Dict[str, Any]]] = {}
+        by_step = {p["t"]: p for p in occurrence}
+        out["water_occurrence"] = [by_step.get(s) or _gap(s) for s in steps]
+
+        for fid in ("water_seasonality", "water_change"):
+            value = static.get(fid)
+            points = []
+            for i, s in enumerate(steps):
+                if not (GSW_START <= s <= GSW_END) or value is None:
+                    points.append(_gap(s))
+                    continue
+                points.append({
+                    "t": s, "value": value, "valid_fraction": 1.0,
+                    # Every month after the first says it is carried forward,
+                    # so nothing downstream reads a constant as a measurement
+                    # repeated fifteen times.
+                    "interpolated": i > 0,
+                })
+            out[fid] = points
+        return out
+
+    return _cached_group(key, compute)
+
+
+# Declared here rather than in the literal above so the window sits beside the
+# comment explaining why the record stops in 2021.
+FACTOR_COVERAGE.update({fid: (GSW_START, GSW_END) for fid in GSW_FACTORS})
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 # factor id -> callable(geometry, steps, area_ha) -> list of points.
@@ -719,6 +867,9 @@ REAL_SERIES: Dict[str, Callable[[dict, List[str], float], List[Dict[str, Any]]]]
     **{fid: _group_factor(modis_lst_group, fid) for fid in MODIS_FACTORS},
     "lc_dominant": lc_dominant_series,
     "lc_tree_pct": lc_tree_pct_series,
+    # Surface water. Three factors, one pass, and two of them deliberately
+    # static — see the note above gsw_group.
+    **{fid: _group_factor(gsw_group, fid) for fid in GSW_FACTORS},
 }
 
 
