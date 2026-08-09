@@ -8,6 +8,7 @@ import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
 import FactorBrowser from './components/FactorBrowser'
 import Findings from './components/Findings'
+import Gallery from './components/Gallery'
 import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
 import PlaceSearch from './components/PlaceSearch'
@@ -42,6 +43,9 @@ const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: R
 
 export default function App() {
   const catalog = useStore((s) => s.catalog)
+  // Used only by the panel title, which says what the panel is showing rather
+  // than what the map is not.
+  const saved = useStore((s) => s.saved)
   const catalogError = useStore((s) => s.catalogError)
   const setCatalog = useStore((s) => s.setCatalog)
   const setCatalogError = useStore((s) => s.setCatalogError)
@@ -219,7 +223,7 @@ export default function App() {
       <aside className="data-panel">
         <div className="panel-head">
           <div className="panel-title">
-            {aoi ? 'Site report' : 'No area drawn'}
+            {aoi ? 'Site report' : saved.length ? 'Your sites' : 'Start here'}
             {data && <span className="panel-sub mono">{formatArea(data.area_ha)}</span>}
             <button className="icon-btn panel-hide" onClick={() => setPanelOpen(false)}
                     title="Hide the report" aria-label="Hide the report">
@@ -260,25 +264,12 @@ export default function App() {
             </div>
           )}
 
-          {!catalogError && !aoi && (
-            <div className="placeholder">
-              <p>Draw a rectangle, circle or freehand shape on the map.</p>
-              <p className="placeholder-sub">
-                Or open <strong>Templates</strong> in the sidebar for a worked
-                starting point — development appraisal, flood exposure, grid
-                connection, farm appraisal and twenty more.
-              </p>
-              <p className="placeholder-sub">
-                The attribute table and charts generate themselves — no extra steps.
-              </p>
-              {catalog && (
-                <p className="placeholder-meta mono">
-                  {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly
-                  steps · {catalog.time.start.slice(0, 4)}–{catalog.time.end.slice(0, 4)}
-                </p>
-              )}
-            </div>
-          )}
+          {/* No shape drawn: show the user's own sites rather than an
+              instruction. A returning user lands on their work; a first-time
+              user gets the one sentence that matters, because until there is a
+              shape on the map nothing else in the app is reachable. See
+              components/Gallery.tsx. */}
+          {!catalogError && !aoi && <Gallery />}
 
           {error && (
             <div className="notice notice-error">

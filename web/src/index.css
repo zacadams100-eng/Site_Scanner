@@ -1493,3 +1493,116 @@ td.cov-severe { color: var(--text-dim); }
   .vs-row { grid-template-columns: minmax(0, 1fr) 2.6em; }
   .vs-phrase { grid-column: 1 / -1; text-align: left; }
 }
+
+/* ---------------------------------------------------------------------------
+   Gallery — the home screen
+
+   Cards on paper, not floating tiles. BRAND.md rules out shadows, gradients
+   and blur, and a gallery is exactly where a designer reaches for all three:
+   depth is carried by a hairline rule and the accent stays rationed to the
+   thing under the cursor.
+
+   The thumbnail is the site's own traced outline (lib/thumbnail.ts), drawn in
+   moss on paper like a survey notebook sketch — it is the only ink on the
+   card, because it is the only thing anyone is scanning for.
+   --------------------------------------------------------------------------- */
+.gallery { padding: 22px 20px 28px; }
+
+.gallery-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+}
+.gallery-title {
+  font-size: 15px; font-weight: 600; letter-spacing: -.005em; margin: 0;
+}
+
+.gallery-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+
+.site-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  overflow: hidden;
+  transition: border-color var(--fast) var(--ease);
+}
+.site-card:hover { border-color: var(--line-strong); }
+.site-card:focus-within { border-color: var(--accent); }
+
+.site-open {
+  display: block; width: 100%; padding: 0;
+  background: var(--paper-100);
+  border: 0; border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.site-thumb { display: block; }
+/* The traced boundary. Filled faintly so a shape reads at a glance, stroked
+   so a long thin site is still visible when the fill is a sliver. */
+.site-outline {
+  fill: var(--structure-quiet);
+  stroke: var(--structure);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.site-open:hover .site-outline { stroke: var(--accent); fill: var(--accent-quiet); }
+.site-thumb-none {
+  font-family: var(--font-ui); font-size: 9.5px; fill: var(--text-faint);
+}
+
+.site-meta { padding: 9px 10px 10px; }
+.site-name {
+  display: block; width: 100%; text-align: left;
+  padding: 0; background: none; border: 0;
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600;
+  color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.site-name:hover { color: var(--accent); }
+.site-rename {
+  width: 100%; padding: 1px 4px;
+  font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--accent); border-radius: 3px;
+  background: var(--layer-2); color: var(--text);
+}
+.site-facts, .site-when {
+  margin: 3px 0 0; font-size: 10.5px; color: var(--text-faint);
+}
+.site-facts .sep { margin: 0 4px; }
+
+/* Only on hover or keyboard focus: a delete button that is always visible on
+   every card turns a wall of work into a wall of X's. */
+.site-delete {
+  position: absolute; top: 6px; right: 6px;
+  opacity: 0; color: var(--text-faint);
+  background: var(--layer-2); border-radius: 3px;
+  transition: opacity var(--fast) var(--ease);
+}
+.site-card:hover .site-delete, .site-delete:focus-visible { opacity: 1; }
+.site-delete:hover { color: var(--bad); }
+
+/* The empty state. A first-time user has no sites, and for them this screen is
+   pure obstacle — so it says one thing and offers one button. */
+.gallery-empty { padding: 44px 26px; text-align: center; }
+.gallery-empty-title {
+  font-size: 17px; font-weight: 600; letter-spacing: -.01em;
+  margin: 0 0 8px; text-wrap: balance;
+}
+.gallery-empty-sub {
+  margin: 0 auto 18px; max-width: 30ch;
+  font-size: 12.5px; line-height: 1.6; color: var(--text-faint);
+}
+.gallery-empty-meta {
+  margin: 20px 0 0; font-size: 10px; color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-card, .site-delete { transition: none; }
+  /* Never hide a control from someone who may be navigating by keyboard and
+     has asked for no movement. */
+  .site-delete { opacity: 1; }
+}

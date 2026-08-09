@@ -460,3 +460,54 @@ is tested first.
 Onboarding last is not a deferral. A tour written against a changing interface
 gets rewritten every sprint, and writing it at the end forces you to notice
 which parts still need explaining — those are the parts to redesign instead.
+
+---
+
+## Gallery home screen
+
+**Status: first cut, in the panel.** `web/src/components/Gallery.tsx`.
+
+You land on your work rather than on an empty canvas. The idea is Procreate's,
+and the part worth borrowing is not the grid — it is that opening the app puts
+your own things in front of you instead of a blank document and a file menu.
+
+### The thumbnail is the site's own outline
+
+People do not recognise a site by its name. "Manor Farm" and "Manor Farm 2" are
+indistinguishable in a list; a long roadside strip and a fat rectangle are not.
+
+Each card draws the traced boundary from the geometry already in
+`localStorage` — no tiles, no network, no screenshot to capture or store, works
+offline, costs nothing. `lib/thumbnail.ts` does the projection, and two details
+in it are load-bearing:
+
+- **Longitude is corrected for latitude.** At 51°N a degree of longitude covers
+  about 0.63 of the ground a degree of latitude does, so normalising raw
+  coordinates stretches every English site sideways by roughly 1.6x. A square
+  field would draw as a landscape rectangle, and the shape is the whole point.
+- **North goes at the top.** SVG y grows downward and latitude grows upward.
+  Getting it wrong draws every site upside down — subtle enough to ship, and
+  fatal for recognition.
+
+One scale is used for both axes, so a long thin site stays long and thin.
+
+### The empty state is the one that matters
+
+A first-time user has no sites, and for them a gallery is pure obstacle.
+`docs/USER-TESTING.md` names the measurement that decides this product —
+seconds until they draw a shape — so with nothing saved the screen says one
+sentence and offers one button. It deliberately does not explain the
+catalogue, the templates or the timeline: none of them are reachable before
+there is a shape on the map, and explaining them first is how thirty seconds
+becomes two minutes.
+
+### Open question: should it take the whole window?
+
+It currently lives in the report panel, where the old placeholder was. That is
+honest for a first cut and wrong in the long run: a *home screen* that occupies
+440px while a map fills the rest is confused, because the map has nothing to
+show until a site is open.
+
+Taking the window means the frame gains a mode — gallery, then workspace — and
+that is a real layout change rather than a component. Worth doing, worth
+deciding deliberately, and not worth smuggling in under "add a gallery".
