@@ -23,6 +23,7 @@ import redaction
 
 import baselines
 import catalog
+import licensing
 import insights
 import nlq
 import series as series_mod
@@ -366,6 +367,32 @@ def _baseline_for(factor_id: str, series: Dict[str, Any]) -> Optional[Dict[str, 
     return baselines.compare(factor_id, latest)
 
 
+def _unavailable(factor_id: str, clearance: Dict[str, Any]) -> Dict[str, Any]:
+    """A factor that exists but may not be served.
+
+    Deliberately shaped like a real series with every point a gap, so every
+    chart, table and export already handles it — the alternative is a special
+    case in nine places, and the ninth is the one that leaks. It carries no
+    values at all: a blocked source that returns a plausible-looking number
+    with a flag beside it is one careless template away from being sold.
+    """
+    meta = catalog.resolve(factor_id)
+    return {
+        "factor_id": factor_id,
+        "source": "unavailable",
+        "unavailable_reason": clearance.get("reason") or
+                              "not cleared for customer-facing use",
+        "clearance": clearance,
+        "kind": meta["kind"],
+        "cadence": meta["cadence"],
+        "unit": meta["unit"],
+        "points": [],
+        "annual": [],
+        "meta": meta,
+        "baseline": None,
+    }
+
+
 @router.post("/api/series")
 def get_series(req: SeriesRequest) -> Dict[str, Any]:
     """Monthly series plus the annual rollup, for every requested factor.
@@ -390,10 +417,18 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
 
     out: Dict[str, Any] = {}
     for fid in req.factor_ids:
+        # Commercial clearance is checked before the data is fetched, not
+        # after. A blocked source must not be queried, cached or rendered —
+        # and the refusal has to happen here rather than in a licensing
+        # document, because a document does not stop a number reaching a PDF.
+        if licensing.is_blocked(fid):
+            out[fid] = _unavailable(fid, licensing.clearance(fid))
+            continue
         s = _series_for(fid, req.geometry, centroid, area_ha, steps)
         s["annual"] = series_mod.annual_rollup(s)
         s["meta"] = catalog.resolve(fid)
         s["baseline"] = _baseline_for(fid, s)
+        s["clearance"] = licensing.clearance(fid)
         out[fid] = s
 
     real_ids = [k for k, v in out.items()

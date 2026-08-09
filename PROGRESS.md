@@ -5,6 +5,115 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Legal & Licensing Audit — 2026-08-09
+
+**Not legal advice, and one constraint shaped everything: this environment
+cannot reach a single licence page.** So nothing here records what a licence
+says. It records what the code does — fully verifiable — and what the
+repository asserts, marked as unverified throughout.
+
+Writing licence terms from memory into a permanent legal document would be
+fabricating sourced-looking content in the highest-stakes place available. It
+is the same failure this project spent the day learning to avoid.
+
+### Completed
+
+- Repository audit of every external source, API and AI call site.
+- `DATA_LICENSING.md`, **generated** from `catalog.py` by
+  `scripts/build_licensing_doc.py` rather than hand-written, so it cannot rot
+  as bases are added.
+- `licensing.py` — four-state commercial clearance (`cleared`, `conditional`,
+  `unknown`, `blocked`), **enforced at the API boundary**, with 12 tests.
+- `docs/EARTH_ENGINE_COMPLIANCE.md`, `docs/AI_RISK.md`,
+  `docs/CLAIMS_AUDIT.md`, `LEGAL_RISK_REGISTER.md`, `LEGAL_ACTION_PLAN.md`.
+
+### Confirmed commercial data sources
+
+41 of 45 bases record a licence that appears to permit commercial use — OGL
+v3, CC BY 4.0, public domain, Copernicus, BGS Open. **Appears** is doing real
+work in that sentence: every string was written from documentation by a
+non-lawyer and none has been checked.
+
+### Conditional / uncertain sources
+
+- `sentinel2_sr`, `sentinel1_sar` — CC BY-SA 3.0 IGO, `commercial="verify"`.
+  Share-alike on a commercial derived product would be a genuine constraint.
+- `os_ngd_buildings` — OS Data Hub terms vary by plan.
+- `neso_grid` — varies by distribution network operator.
+
+### Blocked sources
+
+**None, deliberately.** Nothing has been *established* as prohibited; the
+risks are unresolved rather than settled. Marking a source blocked on
+suspicion removes a working factor on no evidence, which is the mirror image
+of shipping one on no evidence. The mechanism exists, is tested, and is empty.
+
+### Technical safeguards added
+
+- A blocked base's factors are **refused before the source is queried** — not
+  suppressed afterwards. Tests assert a blocked factor returns no points, no
+  annual rows, no baseline percentile, no findings, and is not counted in
+  `real_factors`.
+- The unavailable state is shaped like a real series with every point a gap,
+  so every chart, table and export already handles it. The alternative is a
+  special case in nine places, and the ninth is the one that leaks.
+- `clearance` travels with every served factor, and says in its own payload
+  that it is not a legal opinion.
+
+### Legal review required
+
+Earth Engine commercial terms · the `getMapId` tile path · Sentinel-2
+share-alike · OS Data Hub · NESO/DNO · Terms of Service · Privacy Policy · the
+accuracy of all 45 recorded licence strings.
+
+### Highest priority next steps
+
+1. Send the ESA enquiry — drafted, unsent, five minutes.
+2. Send the Google enquiry — same, and it decides half the real catalogue.
+3. Decide on the `getMapId` tile path — yours alone, no waiting.
+
+Those three cost under an hour and shrink two of the four blockers.
+
+### Potential costs
+
+**Unknown, deliberately.** Guessing at a price is the same failure as guessing
+at a licence. What is known: if a paid Earth Engine tier is required, 27 of 55
+real factors depend on it. Plus solicitor time for Terms and Privacy.
+
+Nothing was enabled, purchased or agreed.
+
+### Remaining risks
+
+Two findings worth carrying forward:
+
+**All 30 judgement-shaped factors are generated.** `solar_farm_suitability`,
+`contamination_flag`, `subsidence_risk`, `insurance_peril_score` — every one
+is `series.py` output. They are labelled demo data correctly, but **a demo
+label protects a measurement better than it protects a recommendation**: a
+reader discounts the number and keeps the belief that this product assesses
+contamination. That belief is false, and the caveat does not reach it.
+
+**The AI position is genuinely strong and was verified, not assumed.** No
+geometry, coordinates, postcode, site name or marker text ever reaches the
+model — only computed aggregates and finished sentences. The model is never
+asked what a number is, `answered_from` stays `series` regardless, and the
+deployed URL has no API key at all.
+
+### Phases not completed, and why
+
+`docs/IP_AUDIT.md` (dependency licences) — needs `pip-licenses` and
+`license-checker` output; not run. `docs/PRIVACY_DATA_MAP.md` — the data map
+is in the risk register as L10 rather than a separate document, because with
+no accounts, no uploads and no database there is very little to map.
+`MARKETING_CLAIMS_AUDIT.md` — there is no marketing copy in this repository to
+audit. `data_registry/` — `catalog.py` already is one, and adding a second
+would create two sources of truth. Phase 3's provenance structure already
+exists as `Provenance` plus the new `clearance`.
+
+612 passing, 10 skipped.
+
+---
+
 ## 2026-08-09 (fourth pass) — Compared with England
 
 The user's idea, and the best accessibility change in the product so far.
