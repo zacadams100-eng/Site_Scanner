@@ -10,11 +10,20 @@ Tests: 426 passing, 10 skipped (they need a Postgres server) · 59 frontend
 
 ## Read this first
 
-**Everything below is now one command.** On any machine with ordinary internet:
+**Everything below is now one command.** In Cloud Shell, which has ordinary
+internet where the development sandbox does not:
 
 ```bash
+cd ~ && [ -d Site_Scanner ] || git clone https://github.com/zacadams100-eng/Site_Scanner.git
+cd ~/Site_Scanner && git checkout claude/site-scanner-priorities-uk2q8r && git pull
+
 python3 scripts/verify.py
 ```
+
+The first two lines are the session opener — `docs/CLOUD-SHELL.md` explains why
+they are needed every time, and lists what else is worth running. A fresh shell
+starts in `~` and `main` has no `scripts/` directory, so the same "no such
+file" error has two unrelated causes and both have cost an evening.
 
 It runs all four checks, prints one scoreboard, and writes `verify-report.md` —
 paste that file into a coding session and the fixes can be made straight from
