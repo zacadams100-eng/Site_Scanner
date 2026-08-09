@@ -240,3 +240,53 @@ backs off and retries rather than reporting all five as broken.
 really a setup step: `GOOGLE_APPLICATION_CREDENTIALS_JSON` was not loaded.
 `verify.py` now checks the variable the app actually reads and says
 `source ./setup.sh` instead of showing red.
+
+### 2026-08-09 (second run) — the planning designations
+
+`check_open_data.py --source planning`, same AOI. **12 of 13 passed, and that
+number is misleading.**
+
+| Factor | Observed | Promoted? |
+| --- | --- | --- |
+| `conservation_area_pct` | 53.3% | yes |
+| `scheduled_monument_pct` | 0.9% | yes |
+| `green_belt_pct` | 0.8% | yes |
+| `article4_pct` | 0.0% | no |
+| `national_park_pct` | 0.0% | no |
+| `aonb_pct` | 0.0% | no |
+| `sssi_pct` | 0.0% | no |
+| `ancient_woodland_pct` | 0.0% | no |
+| `listed_building_density` | 0.0 | no |
+| `tpo_density` | 0.0 | no |
+| `flood_zone2_pct` | 0.0% | no |
+| `flood_zone3_pct` | 0.0% | no |
+| `brownfield_register_pct` | **TypeError** | bug, fixed |
+
+**Why ten passes were not promoted.** `planning_series` returns 0.0 when the
+platform sends back no entities. That is the right answer for a Guildford site
+with no SSSI on it — and it is also exactly what a *misspelled dataset name*
+returns. The two are indistinguishable from outside, so a run that only ever
+saw zero has confirmed the code path and established nothing about whether we
+asked for the right dataset.
+
+Only the three non-zero results prove the query finds and clips real entities.
+`check_open_data.py` now marks an all-zero result `~ok` and says so, rather
+than letting it read as a verification.
+
+**To settle the other nine:** run over somewhere they must be non-zero.
+
+```bash
+python3 scripts/check_open_data.py --source planning --lat 50.90 --lon -0.60
+```
+
+That is inside the South Downs — national park and AONB both have to be
+non-zero there, and a zero would be a real finding.
+
+**The bug.** `brownfield_register_pct` died with
+`TypeError: object of type 'float' has no len()`. The brownfield land register
+publishes **points**, not polygons, and every fixture in the test suite was
+written as a polygon, so `_coverage` reached `len()` on a coordinate. Fixed —
+and deliberately fixed to *raise* rather than skip the points and return 0.0,
+because "no brownfield land here" is a claim and "we cannot read this answer"
+is a different one. The factor now falls back to labelled demo data until
+someone implements it against the register's area attribute.

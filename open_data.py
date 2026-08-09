@@ -276,6 +276,27 @@ def _coverage(geometry: dict, features: List[dict]) -> float:
     ys = [p[1] for p in ring]
     west, east, south, north = min(xs), max(xs), min(ys), max(ys)
 
+    # Only areal features can cover anything. The brownfield land register
+    # publishes **points**, not polygons, and feeding one to `_in_polygon`
+    # reached `len()` on a float and took the whole factor down with a
+    # TypeError — found by the first live run, not by any fixture, because
+    # every fixture in the test suite was written as a polygon.
+    areal = [f for f in features
+             if (f.get("geometry") or {}).get("type") in ("Polygon", "MultiPolygon")
+             and (f.get("geometry") or {}).get("coordinates")]
+
+    if features and not areal:
+        # The dataset answered, and nothing it returned can be measured as
+        # coverage. Reporting 0.0 here would say "no brownfield land on this
+        # site" on the strength of not knowing how to read the answer — the
+        # same false-zero this file already refuses for flood risk. Raising
+        # falls back to the generator, which labels itself demo data.
+        kinds = sorted({(f.get("geometry") or {}).get("type") for f in features})
+        raise OpenDataError(
+            f"{len(features)} entities returned, all {'/'.join(str(k) for k in kinds)} "
+            f"— coverage needs polygons. This dataset probably wants a density "
+            f"or an area attribute rather than a coverage estimate.")
+
     inside_aoi = 0
     covered = 0
     for i in range(SAMPLE_GRID):
@@ -285,11 +306,9 @@ def _coverage(geometry: dict, features: List[dict]) -> float:
             if not _in_polygon(x, y, [ring], "Polygon"):
                 continue
             inside_aoi += 1
-            for f in features:
-                geom = f.get("geometry") or {}
-                if not geom.get("coordinates"):
-                    continue
-                if _in_polygon(x, y, geom["coordinates"], geom.get("type", "Polygon")):
+            for f in areal:
+                if _in_polygon(x, y, f["geometry"]["coordinates"],
+                               f["geometry"]["type"]):
                     covered += 1
                     break
 
@@ -800,7 +819,31 @@ VERIFIED: Dict[str, str] = {
     "burglary_density": "5.0 per km² for 2026-05",
     "violent_crime_share": "24.6% for 2026-05",
     "antisocial_share": "16.7% for 2026-05",
+
+    # planning.data.gov.uk designations. Only the three that came back with a
+    # real measurement are here.
+    #
+    # Twelve of the thirteen planning checks "passed", and ten of those
+    # returned 0.0 — which is the correct answer for a Guildford site with no
+    # SSSI on it, and *also* precisely what a misspelled dataset name returns,
+    # because `planning_series` reports no-entities as zero coverage. A zero
+    # confirms the code path and says nothing about whether we asked for the
+    # right dataset, so promoting all twelve would have claimed ten things
+    # nobody has established.
+    "conservation_area_pct": "53.3% of the AOI — the measurement that proves "
+                             "the query finds and clips real entities",
+    "green_belt_pct": "0.8% of the AOI",
+    "scheduled_monument_pct": "0.9% of the AOI",
 }
+
+# Ran clean, returned only zeros, still `written`. To settle these, run
+# `scripts/check_open_data.py --source planning --lat 50.90 --lon -0.60` over
+# the South Downs, where national park and AONB must be non-zero:
+#   article4_pct, national_park_pct, aonb_pct, sssi_pct, ancient_woodland_pct,
+#   listed_building_density, tpo_density, flood_zone2_pct, flood_zone3_pct
+#
+# The flood pair is the frustrating one — the *attribute name* is confirmed by
+# the discovery script, but no run has yet found a site with flood zone on it.
 
 # `price_change_yoy` and `price_growth_5yr` are deliberately absent. They are
 # derived from twelve and sixty months of history respectively, and the check

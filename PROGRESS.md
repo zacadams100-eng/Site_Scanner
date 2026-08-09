@@ -72,10 +72,42 @@ a figure that was actually seen.
 
 `docs/OPEN-DATA.md` carries the full log.
 
-**Still to promote:** `avg_sale_price`, eleven planning designations and both
-flood-zone factors, once a re-run captures their lines.
+### The planning run: 12 of 13 "passed", and the number is misleading
 
-520 passing, 10 skipped.
+**Only three were promoted.** `conservation_area_pct` came back 53.3%,
+`scheduled_monument_pct` 0.9%, `green_belt_pct` 0.8% — real measurements that
+prove the query finds and clips real entities. The other ten returned **0.0**.
+
+That is the correct answer for a Guildford site with no SSSI on it. It is also
+exactly what a **misspelled dataset name** returns, because `planning_series`
+reports no-entities-found as zero coverage. The two are indistinguishable from
+outside, so a run that only ever saw zero has confirmed the code path and
+established nothing about whether we asked for the right dataset.
+
+Promoting all twelve would have been the third overclaim of the day. Instead,
+`check_open_data.py` now marks an all-zero result `~ok`, says why, and names an
+AOI that would settle it — the South Downs, where national park and AONB have
+to be non-zero.
+
+### And a real bug, which is what a live run is for
+
+`brownfield_register_pct` died with
+`TypeError: object of type 'float' has no len()`. The brownfield land register
+publishes **points**, not polygons, and every fixture in the test suite was
+written as a polygon — so `_coverage` reached `len()` on a coordinate. Three
+weeks of green tests could not have found this.
+
+Fixed to **raise rather than skip**. Filtering the points out and returning 0.0
+was the easy repair and would have said "no brownfield land on this site" on
+the strength of not knowing how to read the answer. Raising falls back to the
+generator, which labels itself demo data — the same rule as the flood-zone
+attribute.
+
+**Verified: 1 → 12.** Still to settle: nine designations that need a
+non-empty test area, `avg_sale_price`, and the two derived price factors that
+need a 72-month window.
+
+523 passing, 10 skipped.
 
 ---
 

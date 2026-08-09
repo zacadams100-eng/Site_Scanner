@@ -97,6 +97,8 @@ class Result:
         self.detail = ""
         self.seconds = 0.0
         self.sample = None
+        # Ran clean but proved nothing — see the note in check_factor.
+        self.inconclusive = False
 
 
 def check_factor(factor_id: str, fn, geometry: dict, steps: list, area_ha: float) -> Result:
@@ -136,6 +138,23 @@ def check_factor(factor_id: str, fn, geometry: dict, steps: list, area_ha: float
     r.sample = {"t": real[-1]["t"], "value": real[-1]["value"],
                 "gaps": len(points) - len(real)}
     r.detail = f"{len(real)}/{len(points)} points"
+
+    # An all-zero result proves less than it looks like it proves.
+    #
+    # `planning_series` returns 0.0 when the platform sends back no entities —
+    # which is the correct answer for a site with no SSSI on it, and *also*
+    # exactly what a misspelled dataset name returns. The two are
+    # indistinguishable from the outside, so a run that only ever saw zero has
+    # confirmed the code path and nothing about whether we are asking for the
+    # right thing.
+    #
+    # Ten of the twelve planning designations came back 0.0 on the first live
+    # run. Reading that as twelve verified factors would have been the
+    # session's third overclaim.
+    if all(p["value"] == 0 for p in real if isinstance(p["value"], (int, float))):
+        r.inconclusive = True
+        r.detail += " — all zero, so this cannot tell a genuinely empty site "\
+                    "from a wrong dataset name"
     return r
 
 
@@ -237,7 +256,7 @@ def main() -> int:
             if source != last:
                 print(f"── {source}")
                 last = source
-            mark = "ok  " if r.ok else "FAIL"
+            mark = "FAIL" if not r.ok else ("~ok " if r.inconclusive else "ok  ")
             sample = ""
             if r.sample:
                 sample = f"  latest {r.sample['t']}={r.sample['value']}"
@@ -258,13 +277,28 @@ def main() -> int:
                   f"--months {worst} to test them.")
 
     failed = [r for _, r in results if not r.ok]
+    weak = [r for _, r in results if r.ok and r.inconclusive]
+    proved = [r for _, r in results if r.ok and not r.inconclusive]
     if not args.json:
-        print(f"\n{len(results) - len(failed)}/{len(results)} checks passed.")
-        if not failed and results:
+        print(f"\n{len(results) - len(failed)}/{len(results)} checks passed"
+              + (f", but {len(weak)} of those returned only zeros" if weak else "")
+              + ".")
+        if weak:
+            print("\nProved by a real measurement — safe to promote:")
+            for r in proved:
+                print(f"  {r.factor_id:<26} {r.sample['value']}")
+            print("\nRan clean but returned only zeros, which a wrong dataset "
+                  "name also does:")
+            for r in weak:
+                print(f"  {r.factor_id}")
+            print("  To settle these, re-run over an area where they should "
+                  "*not* be zero —")
+            print("  e.g. --lat 50.90 --lon -0.60 for the South Downs "
+                  "(national park, AONB).")
+        elif proved:
             print("\nThese factors can be promoted from 'written' to 'verified' "
-                  "in open_data.SOURCE_STATUS. Record the date and the AOI you "
-                  "ran against in docs/OPEN-DATA.md — a verification with no "
-                  "date is a claim, not a record.")
+                  "in open_data.VERIFIED. Record the observed figure — a "
+                  "verification with no number is a claim, not a record.")
     return 1 if failed else 0
 
 

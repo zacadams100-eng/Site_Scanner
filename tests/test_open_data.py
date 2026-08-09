@@ -130,6 +130,43 @@ def test_density_counts_features_per_square_kilometre(monkeypatch):
     assert pts[0]["value"] == 4.0
 
 
+def test_a_point_dataset_does_not_crash_the_factor(monkeypatch):
+    """Found by the first live run, not by any fixture.
+
+    The brownfield land register publishes points, not polygons, and every
+    fixture in this file was written as a polygon — so `_coverage` reached
+    `len()` on a float and `brownfield_register_pct` died with a TypeError.
+    """
+    pt = {"geometry": {"type": "Point", "coordinates": [-0.57, 51.24]}}
+    with pytest.raises(open_data.OpenDataError) as e:
+        open_data._coverage(GUILDFORD, [pt])
+    assert "coverage needs polygons" in str(e.value)
+
+
+def test_unmeasurable_features_raise_rather_than_read_as_zero(monkeypatch):
+    """The important half of that fix.
+
+    Skipping the points and returning 0.0 would have been the easy repair, and
+    it would say "no brownfield land on this site" on the strength of not
+    knowing how to read the answer. Raising falls back to the generator, which
+    labels itself demo data. Same rule as the flood-zone attribute.
+    """
+    fake_get(monkeypatch, {"planning.data.gov.uk": {"features": [
+        {"geometry": {"type": "Point", "coordinates": [-0.57, 51.24]}}]}})
+    with pytest.raises(open_data.OpenDataError):
+        open_data.planning_series("brownfield-land", "pct", GUILDFORD,
+                                  STEPS, 200.0)
+
+
+def test_a_polygon_beside_a_point_is_still_measured(monkeypatch):
+    """One unreadable feature must not discard the readable ones."""
+    features = [
+        {"geometry": {"type": "Point", "coordinates": [-0.57, 51.24]}},
+        _square(-0.58, 51.235, -0.57, 51.245),
+    ]
+    assert 45 <= open_data._coverage(GUILDFORD, features) <= 55
+
+
 def test_no_designation_is_zero_not_a_gap(monkeypatch):
     """Nothing intersecting is a measurement — "no conservation area here" —
     unlike a source that failed to answer."""
