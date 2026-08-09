@@ -1,8 +1,13 @@
 # Handoff — Site Scanner
 
-Branch: `claude/handoff-md-review-e6zlvw`
+Branch: `claude/site-scanner-priorities-lllrp6`
 Repo: `zacadams100-eng/Site_Scanner` (public)
-Tests: 426 passing, 10 skipped (they need a Postgres server) · 59 frontend
+Tests: 471 passing, 10 skipped (they need a Postgres server) · 107 frontend
+
+**`main` is a four-month-old prototype.** Every piece of work described here
+lives on feature branches; `main` still holds only the July baseline. A fresh
+session that clones and reads `main` starts from the wrong place — which is
+exactly what happened at the start of the session that wrote this line.
 
 **Live: https://site-scanner-pi.vercel.app**
 
@@ -63,6 +68,40 @@ eight sources would actually close that gap.
 
 ## What changed in the last session
 
+Three things, all verified by running them rather than by reading the code.
+
+**The map now draws how certain a month is.** `valid_fraction` was always in
+the data, and the table greyed a poor number out, but the map painted a month
+built from 8% of its pixels exactly as confidently as one built from 95%. Low
+confidence now hatches over the value; a month with no observation at all
+hatches the whole site, where before the overlay simply cleared and looked
+identical to nothing being selected. `web/src/lib/uncertainty.ts`, and the
+timeline chip now routes through the same threshold so the two cannot
+disagree.
+
+**The partial-year caveat is graded, and says which way a short year is
+wrong.** This settles open question 3 below. The dot stays for one or two
+missing months; beyond that the cell carries the month count and steps back.
+More usefully, `web/src/lib/coverage.ts` measures the factor's own seasonal
+shape from its own record and works out whether the missing months push the
+year's mean up or down — arithmetic over numbers already on screen, checked
+against the same noise floor `nlq.py` uses. It distinguishes a month this year
+happens to be missing from one the dataset never observes in any year: the
+first makes a row incomparable, the second means no year is a true annual mean
+but the years still compare with each other. NDVI is the standing case of the
+second.
+
+**Four rainfall factors are real**, from the EA Hydrology API — see below.
+
+It also found and fixed a documentation contradiction worth knowing about:
+`BLOCKERS.md §4` and `docs/DEPLOYMENT-STATUS.md` both still said there was no
+Vercel account and no live URL, two days after the deploy landed. Both now say
+what happened and when. If you read either before this fix, disregard it.
+
+---
+
+## The session before that
+
 Deployed the app, then added natural-language querying. The deploy took four
 rounds of configuration failures, all of one shape: an exclude list written
 for the repository root, applied by a matcher that ignores depth. `scripts/`
@@ -113,7 +152,7 @@ whole architecture.
 ## The single most important thing to know
 
 **Most of the catalogue is still generated demo data, and the app says so on
-every screen.** 46 of 269 factors return real observations — 17% today, 21%
+every screen.** 50 of 273 factors return real observations — 18% today, 21%
 once the ONS job has run. Exactly one of them, NDVI, has ever been checked
 against a live service. The rest are plausible-looking numbers from
 `series.py`.
@@ -150,6 +189,30 @@ Do not "tidy this up" by removing the labels.
 | MODIS thermal | 3 — LST day, night, diurnal range | full range |
 | ESA WorldCover | 2 — dominant class, tree cover % | 2020 and 2021 only |
 
+### Rainfall is measured, at a gauge
+
+`ea_hydrology.py` serves four factors from the Environment Agency's Hydrology
+API — monthly total, heaviest day, wet days and dry days, from the EA's own
+rain gauge network. Keyless, so they work on the deployed URL.
+
+They are **separate factors from `precip_total` and its siblings**, and that
+is the point. Those hang off HadUK-Grid, a 1 km gridded areal product; a rain
+gauge is a point. For a 20-hectare site the gridded figure is usually the
+better answer, so these do not replace it — they sit beside it, named
+"(gauge)", with provenance saying the reading may be several kilometres away.
+Serving gauge readings under HadUK-Grid's provenance is exactly the mislabel
+`scripts/audit_catalogue.py` exists to catch.
+
+`spi_3month` was deliberately left generated: real SPI needs a gamma fit per
+calendar month, and a z-score of three-month totals disagrees with it most in
+the dry tail the index exists to measure. The EA's flood zones and abstraction
+layers need WFS typenames that could not be confirmed from the sandbox, so
+they were not registered either — `BLOCKERS.md §7` has the one curl command
+that unblocks all six.
+
+Written, not verified. `scripts/check_environment_agency.py` is what promotes
+them.
+
 ### 22 more factors are real without any credentials
 
 `open_data.py` reads UK government open data over plain HTTPS: 11 planning
@@ -159,7 +222,7 @@ Earth Engine — so they work in the credential-free backend and in the
 serverless deployment too. Six EPC factors register themselves as soon as
 `EPC_API_EMAIL` and `EPC_API_KEY` exist.
 
-That takes the catalogue to 46 real of 269 (17%). **None of the 22 have been
+That takes the catalogue to 46 real of 273; four EA rainfall factors bring it to 50 (18%). **None of the 22 have been
 run against the live endpoints** — this environment's proxy denies all five
 hosts — so they are marked `written`, not `verified`, and that distinction is
 carried through `/api/catalog` into the UI. `scripts/check_open_data.py`
@@ -232,10 +295,10 @@ the cloud masking and compositing — a user going to the Copernicus Data Space
 would get a different number. And eleven designation factors were attributed
 to Natural England and Historic England while actually being served by
 planning.data.gov.uk. Provenance now carries publisher and endpoint
-separately; all 46 real factors differ between the two.
+separately; all 50 real factors differ between the two.
 
 The factor browser shows the ratio as a bar: real against generated, split
-into verified and written. Today that reads 46 of 269 (17%), of which one —
+into verified and written. Today that reads 50 of 273 (18%), of which one —
 NDVI — has been checked against a live service. A written factor's dot is
 hollow rather than filled.
 
@@ -298,7 +361,7 @@ heavy shadows or gradients, and keep colour at roughly 95% neutral.
 
 ### The catalogue now serves more than one profession
 
-269 factors across 25 groups and 44 bases. The first half is what the land is
+273 factors across 25 groups and 45 bases. The first half is what the land is
 like — vegetation, terrain, climate, water, habitat. The second half is what
 can be done with it and at what risk: planning and consents, property market,
 buildings and fabric, infrastructure, transport and access, community and
@@ -310,7 +373,7 @@ old ones, and almost all of them are `stored=False` — a planning register or
 an EPC lookup is an API call, not a raster we hold, so the storage argument in
 TECHNICAL_PLAN.md §8.2 is untouched (22 stored bases, 7 monthly).
 
-46 of the 269 are real today and every one of the rest is labelled. Do not
+50 of the 273 are real today and every one of the rest is labelled. Do not
 remove the labels; the answer is to implement more of them, and BLOCKERS.md §2
 lists the eight sources that would take it past half.
 
@@ -498,10 +561,14 @@ separate from the production project, and can be deleted without consequence.
    *between* places, which fights a draw-an-area interface. It probably wants
    its own view, or its own product.
 
-3. **How loudly to flag a caveat.** A year built from fewer than 12 months is
-   marked with a `·` and a tooltip. That caveat now survives into every export,
-   but a dot may still be too quiet for something that makes a row
-   non-comparable. Worth deciding once and applying everywhere.
+3. ~~**How loudly to flag a caveat.**~~ **Settled.** The answer turned out not
+   to be a volume but a grade, and not a count but a season. One or two
+   missing months keeps the quiet dot; beyond that the cell carries the month
+   count and steps back from the rows it cannot be compared with. The useful
+   part is that `web/src/lib/coverage.ts` measures the factor's own seasonal
+   shape and says *which way* a short year is wrong — and separates a month
+   this year is missing from one the dataset never observes at all, because
+   those have opposite conclusions. See `PROGRESS.md`.
 
 ---
 
@@ -539,7 +606,7 @@ is not the same as meeting its condition, and the app was doing the former.
 
 | File | What it holds |
 | --- | --- |
-| `catalog.py` | Single source of truth: 44 bases, 269 factors, licences, attribution |
+| `catalog.py` | Single source of truth: 45 bases, 273 factors, licences, attribution |
 | `ee_series.py` | Real Earth Engine queries, grouped so siblings share one pass |
 | `routes_catalog.py` | API contract and the per-factor series cache, mounted by both backends |
 | `web/src/store.ts` | One store; `timeIndex` is the only source of truth for "when" |
@@ -547,6 +614,9 @@ is not the same as meeting its condition, and the app was doing the former.
 | `web/src/lib/exports.ts` | Every way data leaves: CSV, Excel, GeoJSON, print, saved-site files |
 | `web/src/components/MapCanvas.tsx` | Drawing, editing, cell painting — and every MapLibre trap |
 | `open_data.py` | 22 live open-data factors, and what each source cannot answer |
+| `ea_hydrology.py` | Rainfall from EA gauges, and why it is not `precip_total` |
+| `web/src/lib/uncertainty.ts` | What the hatching on the map means, and why not transparency |
+| `web/src/lib/coverage.ts` | Which way a short year is wrong, measured from its own seasonality |
 | `ons/` + `ons_store.py` | The scheduled spreadsheet ingest and the store it writes |
 | `insights.py` | What the numbers say, in sentences — and the guards that keep it honest |
 | `nlq.py` | Plain-English questions. Parses the question, computes the answer from the series; a model may only rephrase |

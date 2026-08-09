@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { compact, confidenceBand, labelStep, seriesColor } from '../lib/format'
+import { compact, labelStep, seriesColor } from '../lib/format'
+import { certaintyOf, certaintyNote } from '../lib/uncertainty'
 
 /**
  * The timeline is not just a control — it is a data display.
@@ -249,17 +250,15 @@ export default function Timeline() {
         {readout && (
           <div className={`time-value${readout.gap ? ' is-gap' : ''}`}>
             {readout.gap ? 'No data' : readout.text}
-            {/* The map now fades its cells when a month is poorly observed,
-                so this has to say *why* — an overlay that goes pale with no
-                stated cause reads as a rendering bug. Shown for `fair` as
-                well as `poor`, because the fade starts being visible there
-                and an unexplained one is the thing to avoid. */}
-            {!readout.gap && readout.confidence !== undefined
-              && confidenceBand(readout.confidence) !== 'good' && (
-              <span className={`low-conf band-${confidenceBand(readout.confidence)}`}
-                    title={`${Math.round(readout.confidence * 100)}% of pixels were usable `
-                           + 'this month — the map fades to match'}>
-                {Math.round(readout.confidence * 100)}% observed
+            {/* The chip names the map. Whenever the overlay is hatched this is
+                what says why, and it carries the measured coverage rather than
+                an adjective — "12% of the site" can be checked, "low
+                confidence" cannot. The threshold comes from certaintyOf so the
+                chip and the hatch can never disagree. */}
+            {certaintyOf(point) === 'low' && (
+              <span className="low-conf"
+                    title={certaintyNote(point, labelStep(step ?? '')) ?? undefined}>
+                {Math.round((point?.valid_fraction ?? 0) * 100)}% observed
               </span>
             )}
           </div>

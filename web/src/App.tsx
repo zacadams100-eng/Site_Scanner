@@ -2,6 +2,7 @@ import { useCallback, useEffect, type ReactNode } from 'react'
 import { useStore } from './store'
 import { fetchCatalog } from './api'
 import MapCanvas from './components/MapCanvas'
+import CertaintyLegend from './components/CertaintyLegend'
 import Timeline from './components/Timeline'
 import AttributeTable from './components/AttributeTable'
 import ChartStack from './components/ChartStack'
@@ -164,6 +165,7 @@ export default function App() {
 
       <main className="stage">
         <MapCanvas />
+        <CertaintyLegend />
 
         {/* Map controls — one floating rectangle over the canvas, nothing else */}
         <div className="tool-rail">

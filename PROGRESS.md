@@ -661,6 +661,174 @@ the 26 new ones are the permalink round trip and the confidence rendering.
 figure was never verified against a summary line, only against a screen of
 dots. 455 is the counted number.)
 
+## 2026-08-07 — Uncertainty made visible, and rainfall made real
+
+### Orientation: the checkout was 39 commits stale
+
+The session started on a branch whose tip was a merge commit from 2026-08-05
+11:24, while the real tip of the project was `claude/handoff-md-review-e6zlvw`
+at 20:59 the same day — 39 commits and 16,650 lines ahead, carrying
+`PROGRESS.md`, `BLOCKERS.md`, `nlq.py`, `open_data.py`, `ons/` and `ratelimit.py`.
+`main` is still the July prototype, five commits of a different thing.
+
+Worth recording because it will happen again: **the newest work in this repo
+is never on `main`, and not reliably on the branch you are handed.** Compare
+every remote branch by commit date before starting.
+
+### Confidence is drawn on the map now
+
+`valid_fraction` has always been in the data and the map ignored it. A month
+where 8% of the site had a usable observation was painted exactly as
+confidently as one at 95%, and the colour is the claim.
+
+Two states are drawn that were not:
+
+- **Low confidence** — sparse 45° hatch over the cells, value still legible.
+- **No observation** — dense hatch over the AOI with no fill. Previously the
+  overlay just cleared, which is honest about the number and silent about the
+  reason: a blank site looked identical to one with nothing selected.
+  Sentinel-2 alone leaves 74 of 180 months in that state.
+
+**Why hatching rather than fading the uncertain cells.** The value ramp
+already starts near the paper colour, so a low value recedes into the page by
+design. Fading low-confidence cells would make "a small number" and "a number
+we do not trust" the same picture, and the reader cannot tell which they are
+looking at. Hatching is a separate channel, and it is the standing
+cartographic convention for unreliable data.
+
+The threshold is `confidenceBand`'s existing 0.4 cut, reused rather than
+redefined, and the timeline chip now goes through the same function — two
+definitions of "low confidence" is how a table and a map come to disagree
+about one number with no way to tell which is lying. The chip quotes the
+figure ("28% observed") because that can be checked and an adjective cannot.
+
+### Open question 3 is settled: grade the caveat, and name the direction
+
+A year built from fewer than twelve months was marked with a `·` everywhere,
+at one volume. That is wrong in both directions — a year missing one December
+is nearly comparable, and NDVI's first year is missing January and February,
+the two lowest months, so it reads as the highest vegetation on record.
+
+The grade: nothing at twelve, the dot at one or two missing, the month count
+(`8 mo`) and a stepped-back cell beyond that.
+
+**The better part is that the direction is computable.** Which months are
+missing matters more than how many — April and October cancel out, January and
+February do not. Every factor carries fifteen years of monthly values, so the
+seasonal shape is measured from the series itself: average each calendar month
+across the record, then ask whether the months a year did observe sit above or
+below that. Checked against the same year-to-year noise floor `nlq.py:_spread`
+uses, and silent below it.
+
+Three things the tests caught that the first design had wrong, all worth
+keeping in mind:
+
+1. **A 2-of-2 stub is not a complete year.** `months_total` counts months
+   inside the *requested range*, so grading against it called a two-month stub
+   at a range edge "complete". Grading is against twelve; the text tells the
+   two causes apart, because months never asked for are not missing data.
+2. **A month nobody ever observes is not this year's problem.** The generator
+   — and Sentinel-2 — return nothing for Jan, Feb or Dec in *any* year.
+   Measuring bias against a "true twelve-month mean" estimates the error from
+   a baseline carrying the same error. The baseline is now a typical year of
+   this factor as the record can measure it, and the dataset-wide hole is
+   reported separately with the conclusion that actually follows: no year is a
+   true annual mean, but the years are comparable with each other.
+3. **It has to survive the print.** A printed page has no tooltips, so severe
+   years are named in prose beneath the table.
+
+### Four rainfall factors are real
+
+`ea_hydrology.py`, against the EA Hydrology API — keyless, so it works on the
+deployed URL. Monthly total, heaviest day, wet days, dry days, from one gauge
+lookup and one readings query.
+
+**They are new factors, not the existing precipitation ones.** `precip_total`
+hangs off HadUK-Grid, a 1 km gridded areal product; a gauge is a point. Over a
+20-hectare site those answer different questions and for an area the gridded
+one is usually better, so these sit beside it named "(gauge)" under their own
+base. Serving gauge readings under HadUK-Grid's provenance would be the exact
+mislabel `audit_catalogue.py` exists to catch.
+
+Details that matter: the API's `dist` search is a filter and not an ordering,
+so results are re-sorted by true distance; readings flagged `Missing` or
+`Invalid` are dropped, because a broken gauge reads zero and zero is also the
+most common true value; a part-covered month reports the fraction it managed
+rather than being scaled up.
+
+Real coverage 46 → 50 of 273.
+
+**What was deliberately not built, and why it matters more than what was.**
+`spi_3month` needs a gamma fit per calendar month; a z-score of three-month
+totals is not SPI and they disagree most in the dry tail the index is for. The
+EA's flood zones, abstraction and water stress need WFS typenames that could
+not be confirmed from this sandbox, and BLOCKERS §2's rule applies — a factor
+registered against an endpoint that cannot answer it claims real data in the
+UI and then fails on every request. Six factors that 404 forever would have
+made the coverage figure look better than the product. `BLOCKERS.md §7` is new
+and carries the one curl command that unblocks all six.
+
+### Three bugs found by carrying the coverage work outward
+
+Doing the same reasoning in a second place is what surfaced these. Each was
+found by running something, not by reading.
+
+**`/api/ask` reported a missing autumn as a trend.** `nlq.py` never looked at
+`months_observed`, and a trend is the difference between two endpoints, so a
+short endpoint turns a coverage gap straight into a reported change. Seven
+identical years of a seasonal factor plus a current year holding January to
+August produced "Air temperature rose from 10.00 °C in 2019 to 10.87 °C in
+2026 (9%)" — for a series with no trend in it whatsoever. The existing noise
+floor cannot catch this: a stable series has a noise floor of zero, so any
+artefact clears it, which means the steadier the factor the more reliably the
+artefact is narrated. Ask the question any time before December and the
+current year is short.
+
+Years too thin to compare with their neighbours are now set aside, and named
+in the answer. The test is **relative to the series** — Sentinel-2 never sees
+a January, so an absolute twelve-month threshold would decline every question
+about vegetation in the catalogue.
+
+**Every fallback blamed Earth Engine.** "Earth Engine failed, showing demo
+data" was true when Earth Engine was the only real source and stopped being
+true when `open_data` landed. The registry now holds Earth Engine, five
+open-data hosts and the EA API, so the message was sending people to check
+credentials for a service that had never been called. Found by exercising the
+new EA factors, which fail on every request from here and reported a Google
+problem.
+
+**The frontend contradicted itself about NDVI.** Grading against a flat twelve
+marked every NDVI year "severe" — nine months is its maximum — and greyed out
+the entire column, while the caveat on the same cell said the years were
+comparable with each other. A factor's full year is twelve minus the months it
+never observes. That fix exposed a second one: the dataset-wide fact was being
+repeated on every row when it belongs to the column, so it now appears once
+beside the factor's name.
+
+`insights.py` was checked for the same class of bug and is clean — it fits a
+line over monthly points rather than comparing annual endpoints, and the
+seasonal variance inflates the standard error enough that an unbalanced tail
+cannot trip the t-test. Verified by construction rather than assumed.
+
+### A documentation contradiction, two days old
+
+`BLOCKERS.md §4` and `docs/DEPLOYMENT-STATUS.md` both still said there was no
+Vercel account and no live URL. The deploy landed 2026-08-05; those were
+written 2026-08-04 and nobody came back to them, while `HANDOFF.md` on the
+same page said the opposite. Both now say what happened and when, kept as
+history rather than deleted.
+
+Not re-verified from here — `vercel.com` is behind the same proxy block as
+everything else, so this records what the deploy session reported.
+
+### Still blocked, unchanged
+
+Every upstream is still unreachable (`curl` to all six returns `000`). So the
+two things that need a human are exactly what they were: send the ESA licence
+email, and run `check_open_data.py`, `ons.job --check` and now
+`check_environment_agency.py` somewhere with ordinary internet. Of 50 real
+factors, exactly one — NDVI — has ever met its live service.
+
 ---
 
 ## 2026-08-05 (second pass) — Phase 2, and the gaps the brief still had

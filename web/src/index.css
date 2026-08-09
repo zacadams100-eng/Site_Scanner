@@ -516,6 +516,53 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 .data-panel .icon-btn:hover:not(:disabled) { background: var(--paper-200); }
 
 /* ===========================================================================
+   CERTAINTY KEY — what the hatch on the map means, only while it is hatched
+   =========================================================================== */
+/* Bottom-left of the canvas, above the scale control and clear of the tool
+   rail. Not a floating card like the rail: this is a caption on a figure, so
+   it stays quiet — paper, hairline, no shadow competing with the map.
+
+   The offset is measured from --timeline-h the same way MapLibre's own
+   controls are, because the timeline is absolutely positioned inside .stage
+   and a fixed pixel offset puts the caption underneath it. */
+.certainty-key {
+  position: absolute; left: 14px; z-index: 6;
+  bottom: calc(var(--timeline-h) + 44px);
+  max-width: 340px;
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 10px;
+  background: var(--paper-000); border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-ui); font-size: 11px; line-height: 1.45;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+/* The swatch is the actual pattern, drawn in CSS at the same angle and
+   spacing as the tile the map uses. A key that does not look like the thing
+   it is keying is worse than no key. */
+.certainty-swatch {
+  flex: none; width: 16px; height: 16px; margin-top: 1px;
+  border: 1px solid var(--rule-400); border-radius: 2px;
+  background-color: var(--paper-100);
+}
+.certainty-swatch.is-low {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(35,35,35,.5) 0 1px, transparent 1px 4px);
+}
+.certainty-swatch.is-absent {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(35,35,35,.42) 0 1px, transparent 1px 2px);
+}
+.certainty-text { min-width: 0; }
+
+/* On a phone the map is small and the report sheet takes the bottom of the
+   screen; a 340px caption over the canvas would cover the site itself. The
+   timeline readout still carries the same figure. */
+@media (max-width: 720px) {
+  .certainty-key { display: none; }
+}
+
+/* ===========================================================================
    MAP CONTROLS — one small floating toolbar, nothing else
    =========================================================================== */
 .tool-rail {
@@ -927,7 +974,21 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
 .band-fair { color: var(--text-dim); }
 .band-poor { color: var(--text-faint); font-style: italic; }
 .gap { color: var(--absent); }
+/* The partial-year caveat, graded.
+   A slight gap keeps the old dot — a hint, with the detail in the tooltip. A
+   severe one carries the month count as a small chip, because a dot only says
+   "something is off" and this row is the last thing a reader sees before
+   quoting the number somewhere it cannot be corrected. */
 .partial { color: var(--warn); margin-left: 3px; }
+.partial.is-severe {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 500;
+  padding: 1px 4px; border-radius: 3px; margin-left: 5px;
+  background: var(--amber-100); color: var(--warn);
+  white-space: nowrap;
+}
+/* A severely short year is not a number you should read across a row, so the
+   cell itself steps back from the ones it is not comparable with. */
+td.cov-severe { color: var(--text-dim); }
 
 /* ---------- Charts ---------- */
 .chart-stack {

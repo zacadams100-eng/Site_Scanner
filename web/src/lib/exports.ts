@@ -1,11 +1,19 @@
 import type { SavedAoi, SitesFile } from '../store'
 import type { Factor, Insight, Marker, Series } from '../types'
-import { coverageHeader, coverageValue, formatValue, isPartialYear } from './format'
+import { coverageHeader, coverageValue, formatValue } from './format'
+import { coverageCaveat, coverageGrade, coverageMark, seriesCoverageNote } from './coverage'
 
-/** Explains the months-observed columns wherever a file has room to say it. */
+/** Explains the months-observed columns wherever a file has room to say it.
+ *
+ *  Names the seasonal mechanism rather than just the arithmetic: "fewer months"
+ *  sounds like a rounding concern, and the actual failure is directional — a
+ *  year missing its winter reads as a record high on any factor with a winter
+ *  minimum, which is exactly how someone quotes a number that is not there. */
 export const PARTIAL_YEAR_NOTE =
   'A year built from fewer than 12 months is not comparable to a full one — ' +
-  'the "months observed" columns say how many contributed.'
+  'the "months observed" columns say how many contributed. Where the missing ' +
+  'months fall on one side of the seasonal cycle, that year\'s figure is ' +
+  'biased in a knowable direction, not merely less precise.'
 
 /**
  * The notices the licences require, deduplicated.
@@ -272,15 +280,32 @@ export function printReport(ctx: ReportContext): void {
   const w = window.open('', '_blank')
   if (!w) return
 
+  // Years short enough to be non-comparable, collected so the document can
+  // name them in prose. A printed page has no tooltips: a mark whose meaning
+  // lives in a hover is a mark with no meaning at all once it is on paper.
   let anyPartial = false
+  const severe: string[] = []
+  // Column-level truths, said once each. On paper especially: fifteen rows
+  // repeating "never observed in January" is how a real caveat becomes
+  // wallpaper.
+  const columnNotes = cols
+    .map((c) => {
+      const note = seriesCoverageNote(c)
+      return note ? `<li><strong>${escapeHtml(c.meta.name)}.</strong> ${escapeHtml(note)}</li>` : ''
+    })
+    .filter(Boolean)
   const rows = (cols[0]?.annual ?? []).map((r0) => {
     const cells = cols.map((c) => {
       const r = c.annual.find((a) => a.year === r0.year)
-      const partial = r ? isPartialYear(r) : false
-      if (partial) anyPartial = true
-      return `<td>${formatValue(r?.value ?? null, c.meta as Factor)}` +
-             `${partial ? `<span class="p" title="${r!.months_observed} of ` +
-                          `${r!.months_total} months">*</span>` : ''}</td>`
+      const grade = r ? coverageGrade(r, c) : 'complete'
+      if (grade !== 'complete') anyPartial = true
+      if (grade === 'severe' && r) {
+        const caveat = coverageCaveat(c, r)
+        if (caveat) severe.push(`<li><strong>${escapeHtml(c.meta.name)}, ${r.year}.</strong> ${escapeHtml(caveat)}</li>`)
+      }
+      const mark = r ? coverageMark(r, c) : null
+      return `<td class="cov-${grade}">${formatValue(r?.value ?? null, c.meta as Factor)}` +
+             `${mark ? `<span class="p">${escapeHtml(mark === '·' ? '*' : mark)}</span>` : ''}</td>`
     }).join('')
     return `<tr><th>${r0.year}</th>${cells}</tr>`
   }).join('')
@@ -338,7 +363,13 @@ export function printReport(ctx: ReportContext): void {
  thead th{border-bottom:1.5px solid var(--moss);font-size:11px;color:var(--ink)}
  tbody tr:nth-child(odd) td,tbody tr:nth-child(odd) th{background:#faf9f6}
  .src{margin-top:10px;font-size:10px;color:var(--slate);line-height:1.6}
- .p{color:var(--amber);font-weight:600;margin-left:2px}
+ .p{color:var(--amber);font-weight:600;margin-left:2px;font-size:9px;white-space:nowrap}
+ /* A severely short year steps back from the ones it cannot be compared with.
+    On paper there is no tooltip to explain a mark, so the years themselves are
+    named in prose below the table — see .caveats. */
+ td.cov-severe{color:var(--slate)}
+ .caveats{margin:5px 0 0;padding-left:16px}
+ .caveats li{margin-bottom:3px}
  @media print{
    body{margin:12mm}
    /* Keep a section and its heading together; a table that splits mid-row
@@ -397,6 +428,10 @@ ${findings ? `<h2>What the data shows</h2>
    `<th>${escapeHtml(c.meta.name)}<br><span style="font-weight:400;color:#69706a;font-family:'IBM Plex Mono',monospace">${escapeHtml(c.unit)}</span></th>`).join('')}</tr></thead>
 <tbody>${rows}</tbody></table>
 ${anyPartial ? `<div class="src"><strong>* Partial year.</strong> ${PARTIAL_YEAR_NOTE}</div>` : ''}
+${severe.length ? `<div class="src"><strong>Years not comparable with a full one.</strong>
+<ul class="caveats">${severe.join('')}</ul></div>` : ''}
+${columnNotes.length ? `<div class="src"><strong>Coverage of these factors.</strong>
+<ul class="caveats">${columnNotes.join('')}</ul></div>` : ''}
 
 <h2>Sources and licences</h2>
 <div class="src"><strong>Datasets.</strong> ${[...new Set(cols.map((c) =>

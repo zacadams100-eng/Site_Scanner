@@ -32,8 +32,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py mock_ee_backend.py routes_catalog.py \
      catalog.py series.py ee_series.py \
      cache.py geometry.py redaction.py summary.py \
-     open_data.py ons_store.py insights.py nlq.py ratelimit.py \
-     telemetry.py baselines.py ./
+     open_data.py ea_hydrology.py ons_store.py insights.py nlq.py \
+     ratelimit.py telemetry.py baselines.py ./
 
 # Don't run as root. Cloud Run doesn't require it, but nothing here needs the
 # privileges and the container has network egress.

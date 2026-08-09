@@ -4,7 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
-import { confidenceAlpha, rampColor, rampPosition } from '../lib/format'
+import { rampColor, rampPosition } from '../lib/format'
+import { certaintyOf, hatchTile, HATCH_LOW, HATCH_ABSENT } from '../lib/uncertainty'
 import {
   GLYPHS,
   placeCutoff,
@@ -202,13 +203,30 @@ export default function MapCanvas() {
         id: 'cells-fill',
         type: 'fill',
         source: 'cells',
-        paint: {
-          'fill-color': ['get', 'color'],
-          // Opacity is the confidence channel: `alpha` comes from the month's
-          // valid_fraction, scaled by the user's overlay slider. Cells added
-          // before a repaint have no `alpha` yet, hence the coalesce.
-          'fill-opacity': ['*', ['coalesce', ['get', 'alpha'], 1], 0.72],
-        },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.72 },
+      })
+
+      // Uncertainty hatch, above the value it qualifies.
+      //
+      // Registered here rather than lazily because `fill-pattern` naming an
+      // image the style does not have makes MapLibre drop the layer silently —
+      // no error, no warning, just an overlay that never appears. Both images
+      // exist before any layer can reference them.
+      for (const [name, opts] of [
+        ['hatch-low', HATCH_LOW], ['hatch-absent', HATCH_ABSENT],
+      ] as const) {
+        if (!map.hasImage(name)) map.addImage(name, hatchTile(opts))
+      }
+
+      map.addLayer({
+        id: 'cells-uncertain',
+        type: 'fill',
+        source: 'cells',
+        // Only the cells the data itself calls poorly observed. The filter is
+        // on a feature property rather than on layer visibility so a partially
+        // observed site hatches only the part that needs it.
+        filter: ['==', ['get', 'certainty'], 'low'],
+        paint: { 'fill-pattern': 'hatch-low' },
       })
 
       map.addSource('aoi', { type: 'geojson', data: EMPTY })
@@ -217,6 +235,16 @@ export default function MapCanvas() {
         type: 'fill',
         source: 'aoi',
         paint: { 'fill-color': '#4d6048', 'fill-opacity': 0.07 },
+      })
+      // A month with no observation at all. Hidden until there is one, and
+      // drawn over the AOI rather than the cells because in that case there
+      // are no cells — that is the whole condition.
+      map.addLayer({
+        id: 'aoi-absent',
+        type: 'fill',
+        source: 'aoi',
+        layout: { visibility: 'none' },
+        paint: { 'fill-pattern': 'hatch-absent' },
       })
       map.addLayer({
         id: 'aoi-line',
@@ -906,11 +934,13 @@ export default function MapCanvas() {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready || !map.getLayer('cells-fill')) return
-    // The multiply, not a bare number: each cell carries an `alpha` set from
-    // the month's observed fraction, and overwriting the property with a plain
-    // value here would silently throw that away every time the slider moved.
-    map.setPaintProperty('cells-fill', 'fill-opacity',
-      ['*', ['coalesce', ['get', 'alpha'], 1], overlayOpacity] as never)
+    map.setPaintProperty('cells-fill', 'fill-opacity', overlayOpacity)
+    // The hatch fades with what it qualifies. Left at full opacity it would
+    // still be there after the user has faded the values away to look at the
+    // ground, reading as marks on the map itself.
+    if (map.getLayer('cells-uncertain')) {
+      map.setPaintProperty('cells-uncertain', 'fill-opacity', overlayOpacity)
+    }
     // Readable from a test, so "the slider moved" and "the map changed" can be
     // asserted separately rather than assumed to be the same thing.
     ;(window as unknown as { __cellsOpacity?: number }).__cellsOpacity = overlayOpacity
@@ -945,35 +975,44 @@ export default function MapCanvas() {
     const src = map.getSource('cells') as maplibregl.GeoJSONSource | undefined
     if (!src) return
 
+    // Whether the "not measured" hatch is showing. Cleared on every pass so a
+    // gap month cannot leave it stuck on over a month that has data.
+    const showAbsent = (on: boolean) => {
+      if (!map.getLayer('aoi-absent')) return
+      map.setLayoutProperty('aoi-absent', 'visibility', on ? 'visible' : 'none')
+      ;(window as unknown as { __absentHatch?: boolean }).__absentHatch = on
+    }
+
     const primary = selected[0]
     const series = data?.series[primary]
     const factor = catalog?.factors.find((f) => f.id === primary)
     if (!cells.length || !series || !factor || factor.kind === 'categorical') {
       src.setData(EMPTY)
+      showAbsent(false)
       return
     }
 
     const point = series.points[timeIndex]
-    if (!point || point.value === null || typeof point.value !== 'number') {
+    const certainty = certaintyOf(point)
+    if (certainty === 'absent' || typeof point?.value !== 'number') {
+      // No value to paint. The overlay clears — but the site is hatched, so
+      // "we asked and got nothing back" stops looking identical to "nothing is
+      // selected". Sentinel-2 alone leaves 74 of 180 months in this state.
       src.setData(EMPTY)
+      showAbsent(true)
       return
     }
+    showAbsent(false)
 
     const lo = factor.lo ?? 0
     const hi = factor.hi ?? 1
     const spread = (hi - lo) * 0.16
 
-    // How much of this month was actually observed. Carried onto every feature
-    // rather than set on the layer, so the overlay slider and the confidence
-    // weight multiply instead of overwriting one another — see the paint
-    // expression, which is `['*', ['get','alpha'], overlayOpacity]`.
-    const alpha = confidenceAlpha(point.valid_fraction)
-
     const features: GeoJSON.Feature[] = cells.map((c) => {
       const v = (point.value as number) + c.offset * spread
       return {
         type: 'Feature',
-        properties: { color: rampColor(rampPosition(v, factor)), alpha },
+        properties: { color: rampColor(rampPosition(v, factor)), certainty },
         geometry: {
           type: 'Polygon',
           coordinates: [[

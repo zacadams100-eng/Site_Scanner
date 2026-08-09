@@ -63,10 +63,16 @@ def test_the_catalogue_state_counts_earth_engine_too():
     """`ee_series` imports `ee` lazily but `install` does not, so counting by
     installing reported 24 real factors instead of 51 — wrong in the one place
     the script is supposed to be right."""
+    import catalog
+
     state = verify.catalogue_state()
-    assert "of 269 factors real" in state
+    # Not a hardcoded total. The catalogue grows — it went 269 to 273 the day
+    # a branch merge landed four Environment Agency rainfall factors — and a
+    # test that pins the number fails on good news.
+    assert f"of {len(catalog.FACTORS)} factors real" in state
+
     import re
-    real = int(re.match(r"(\d+) of 269", state).group(1))
+    real = int(re.match(r"(\d+) of ", state).group(1))
     assert real > 40, f"undercounted: {state!r}"
 
 

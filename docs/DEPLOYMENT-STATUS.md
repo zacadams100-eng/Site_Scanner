@@ -52,7 +52,21 @@ Two bugs were found by doing this rather than by reading:
   backend was Cloud Run; it would now produce a function that cannot import its
   own catalogue.
 
-## What is blocked, and why
+## Superseded: the deploy happened on 2026-08-05
+
+**Everything below this heading was true when it was written on 2026-08-04 and
+was overtaken the next day.** The app is live at
+https://site-scanner-pi.vercel.app; `npx vercel deploy --prod` ships a build.
+The deploy took four rounds of configuration failures, all of one shape — an
+exclude list written for the repository root applied by a matcher that ignores
+depth — and all three ignore files now have tests. See `HANDOFF.md`.
+
+The section that follows is kept as a record of what the blockers were, not as
+a statement of what they are. Read it as history.
+
+---
+
+## What was blocked, and why (as of 2026-08-04)
 
 **There is no live URL yet, and I cannot create one.** Two hard blockers, both
 external to the repository:

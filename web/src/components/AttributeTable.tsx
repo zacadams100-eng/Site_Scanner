@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { confidenceBand, formatValue, labelStep } from '../lib/format'
+import { coverageCaveat, coverageGrade, coverageMark, seriesCoverageNote } from '../lib/coverage'
 import { annualRows, exportAnnualCsv } from '../lib/exports'
 import type { Series } from '../types'
 import { isReal } from '../lib/format'
@@ -108,7 +109,11 @@ export default function AttributeTable() {
                         ? `\n\nLive Earth Engine data${c.elapsed_ms ? ` — ${(c.elapsed_ms / 1000).toFixed(1)}s to fetch` : ''}`
                         : c.error
                           ? `\n\n${c.error}`
-                          : '\n\nDemo data — not observed')}>
+                          : '\n\nDemo data — not observed') +
+                      /* Said once, at the top of the column. Repeating it in
+                         fifteen identical row tooltips would crowd out the
+                         caveats that are about a specific year. */
+                      (seriesCoverageNote(c) ? `\n\n${seriesCoverageNote(c)}` : '')}>
                   <span className="th-name">
                     {isReal(c.source) && <span className="live" title="Live Earth Engine data">●</span>}
                     {c.meta.name}
@@ -138,20 +143,35 @@ export default function AttributeTable() {
                       const r = c.annual.find((a) => a.year === y)
                       if (!r) return <td key={c.factor_id}>—</td>
                       const band = confidenceBand(r.confidence)
+                      const grade = coverageGrade(r, c)
+                      const mark = coverageMark(r, c)
+                      // One sentence, computed once, used by the tooltip here
+                      // and by every export. Four copies of this text is how
+                      // the table and the CSV came to disagree before.
+                      const caveat = coverageCaveat(c, r)
                       return (
                         <td
                           key={c.factor_id}
-                          className={`num band-${band}`}
+                          className={`num band-${band} cov-${grade}`}
                           title={
-                            r.value === null
-                              ? 'No usable observation this year'
-                              : `${r.months_observed} of ${r.months_total} months observed` +
-                                (r.min !== null ? ` · range ${formatValue(r.min, c.meta)}–${formatValue(r.max, c.meta)}` : '')
+                            [caveat,
+                             r.min !== null
+                               ? `Range ${formatValue(r.min, c.meta)}–${formatValue(r.max, c.meta)}`
+                               : null,
+                            ].filter(Boolean).join(' ') || undefined
                           }
                         >
                           {formatValue(r.value, c.meta)}
-                          {r.months_observed < r.months_total && r.value !== null && (
-                            <span className="partial" aria-hidden>·</span>
+                          {/* A severe gap gets the month count, not a dot. The
+                              dot hints that a problem exists; this states it,
+                              in the last place anyone looks before quoting the
+                              number. Not aria-hidden at that grade — a screen
+                              reader user needs it more, not less. */}
+                          {mark && (
+                            <span className={`partial is-${grade}`}
+                                  aria-hidden={grade === 'slight' || undefined}>
+                              {mark}
+                            </span>
                           )}
                         </td>
                       )

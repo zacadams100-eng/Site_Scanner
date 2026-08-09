@@ -243,7 +243,14 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
             # Never format the raw exception into a response. Earth Engine
             # puts the credentials dict into some of its error messages, and
             # this string is served straight to the browser.
-            s["error"] = ("Earth Engine failed, showing demo data: "
+            # Name the source that actually failed. This registry holds Earth
+            # Engine, five open-data hosts and the EA hydrology API, so a flat
+            # "Earth Engine failed" sends someone to check credentials for a
+            # service that was never called — the message was written when
+            # Earth Engine was the only real source and stopped being true
+            # when open_data landed.
+            who = (REAL_SOURCES.get(factor_id) or {}).get("endpoint") or "the data source"
+            s["error"] = (f"{who} failed, showing demo data: "
                           + redaction.safe_message(e))
             s["elapsed_ms"] = round((time.perf_counter() - t0) * 1000)
             s["cached"] = False
