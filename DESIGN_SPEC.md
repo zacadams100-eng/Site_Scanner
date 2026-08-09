@@ -501,13 +501,43 @@ catalogue, the templates or the timeline: none of them are reachable before
 there is a shape on the map, and explaining them first is how thirty seconds
 becomes two minutes.
 
-### Open question: should it take the whole window?
+### It takes the whole window — and the frame gains a mode
 
-It currently lives in the report panel, where the old placeholder was. That is
-honest for a first cut and wrong in the long run: a *home screen* that occupies
-440px while a map fills the rest is confused, because the map has nothing to
-show until a site is open.
+Settled. A *home screen* occupying 440px while a map fills the rest was two
+half-answers: the map had nothing to show until a site was open, and the
+gallery had no room to be a gallery. So the frame now has two modes, gallery
+and workspace, and `store.home` says which one is showing.
 
-Taking the window means the frame gains a mode — gallery, then workspace — and
-that is a real layout change rather than a component. Worth doing, worth
-deciding deliberately, and not worth smuggling in under "add a gallery".
+**Who gets which, and why it is not a preference.** `lib/home.ts` decides it at
+load from two facts, and each one alone sends you to the map:
+
+- **No saved sites → the map.** For a newcomer the gallery is pure obstacle, as
+  above. A full window listing nothing is a worse version of the same wall.
+  They get the map with the one-sentence empty state in the panel, exactly as
+  before — the change is invisible to a first-time user, which is the point.
+- **A shape in the URL → that shape.** A shared link is a specific site someone
+  was sent. Opening *your* gallery in front of *their* site shows the wrong
+  document to the one person guaranteed not to want it.
+
+Screen width is deliberately not one of them. A phone gets the gallery too, and
+arguably needs it more: a 390px map is harder to draw on than a card is to tap.
+
+The mode is not persisted. "Which mode was I in last Tuesday" is not state
+anyone wants restored; the two honest answers are "show me my work" and "here
+is the link I was sent", and both are computable at load.
+
+**It is an overlay, not a replacement.** The map stays mounted underneath.
+Unmounting it would cost a full MapLibre re-initialisation — context, style,
+tiles, position — on every trip back, which is the difference between a mode
+and a page load. Painting an opaque paper ground over it costs one repaint.
+
+**Every route out is wired, because a home screen with no exit is a modal.**
+Opening a card, drawing a new one, searching for a place, and Escape (only when
+a site is open, so it can never dismiss to a blank map) all leave; `Sites` in
+the top bar goes back. Deleting the last site hands the map back rather than
+leaving a full window of nothing.
+
+The status bar drops its readouts in gallery mode. Lat, scale, zoom and cell
+count describe a map that is behind an opaque overlay, and `Cells 0` reads as a
+failure rather than as "you have not opened anything". Only the connection
+state stays.

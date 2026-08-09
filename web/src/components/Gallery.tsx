@@ -28,17 +28,30 @@ import { relativeTime, thumbnailPath } from '../lib/thumbnail'
  * says the one thing that needs saying. It does not explain the catalogue, the
  * templates or the timeline; those are discoverable once there is a shape on
  * the map, and none of them are reachable before there is one.
+ *
+ * ## Two places, one component
+ *
+ * `screen` renders it as the full-window home screen; without it, it renders
+ * inside the report panel. The same list either way — the difference is only
+ * how much room it is given and, in `screen`, a way back to a site that is
+ * already open. Which one appears is `store.home`, and the reason a returning
+ * user gets the window while a newcomer gets the panel is documented on
+ * `openOnGallery` in the store.
  */
 
 const THUMB = { width: 148, height: 96 }
 
-export default function Gallery() {
+export default function Gallery({ screen = false }: { screen?: boolean }) {
   const saved = useStore((s) => s.saved)
   const loadSaved = useStore((s) => s.loadSaved)
   const deleteSaved = useStore((s) => s.deleteSaved)
   const renameSaved = useStore((s) => s.renameSaved)
   const setDrawMode = useStore((s) => s.setDrawMode)
   const catalog = useStore((s) => s.catalog)
+  // Only for the way back: with a site already open, the gallery is a detour
+  // and leaving it must not require drawing something.
+  const aoi = useStore((s) => s.aoi)
+  const setHome = useStore((s) => s.setHome)
 
   const [renaming, setRenaming] = useState<string | null>(null)
 
@@ -47,9 +60,11 @@ export default function Gallery() {
   const sites = useMemo(
     () => [...saved].sort((a, b) => b.savedAt - a.savedAt), [saved])
 
+  const cls = `gallery${screen ? ' gallery-screen' : ''}`
+
   if (!sites.length) {
     return (
-      <div className="gallery gallery-empty">
+      <div className={`${cls} gallery-empty`}>
         <h1 className="gallery-empty-title">Draw an area on the map</h1>
         <p className="gallery-empty-sub">
           Press and drag anywhere in England. Everything else — the layers, the
@@ -70,13 +85,26 @@ export default function Gallery() {
   }
 
   return (
-    <div className="gallery">
+    <div className={cls}>
       <div className="gallery-head">
-        <h1 className="gallery-title">Your sites</h1>
-        <button className="btn btn-secondary btn-sm"
-                onClick={() => setDrawMode('rect')}>
-          Draw a new one
-        </button>
+        <h1 className="gallery-title">
+          Your sites
+          <span className="gallery-count mono">{sites.length}</span>
+        </h1>
+        <div className="gallery-actions">
+          {/* Only when there is something to go back to. A "back to map"
+              button with an empty map behind it promises a place that isn't
+              there. */}
+          {screen && aoi && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setHome(false)}>
+              Back to the map
+            </button>
+          )}
+          <button className={`btn btn-sm ${screen ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setDrawMode('rect')}>
+            Draw a new one
+          </button>
+        </div>
       </div>
 
       <ul className="gallery-grid">

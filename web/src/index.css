@@ -640,6 +640,17 @@ h1, h2, h3 { font-family: var(--font-ui); font-weight: 600; margin: 0; }
   font-family: var(--font-ui); font-size: 12.5px;
 }
 .browser-toggle:hover, .browser-toggle.is-open { border-color: var(--line-strong); color: var(--text); }
+
+/* Back to the home screen. Quieter than the factor browser beside it — this is
+   navigation, and the accent stays rationed to the thing being worked on. */
+.topbar-home {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; background: none; color: var(--text-dim);
+  font-family: var(--font-ui); font-size: 12.5px;
+}
+.topbar-home:hover { border-color: var(--line); color: var(--text); }
+.topbar-home .mono { font-size: 10.5px; color: var(--text-faint); }
 .browser-toggle .count {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 4px;
   background: var(--structure); color: #fff;
@@ -1240,6 +1251,10 @@ td.cov-severe { color: var(--text-dim); }
   .place-search { flex: 1 1 auto; }
   .browser-toggle { padding: 7px 9px; }
   .browser-toggle span:last-child { display: none; }
+  /* The icon carries it. Four squares is the gallery symbol everywhere else a
+     person has used a gallery, and the word was costing 44px of a 390px bar. */
+  .topbar-home { padding: 7px 8px; font-size: 0; gap: 0; }
+  .topbar-home .mono { display: none; }
 
   /* The reopen tab sits by the rail rather than in the corner the zoom
      buttons already own. */
@@ -1512,14 +1527,72 @@ td.cov-severe { color: var(--text-dim); }
   display: flex; align-items: baseline; justify-content: space-between;
   gap: 12px; margin-bottom: 16px;
 }
+.gallery-actions { display: flex; align-items: center; gap: 8px; }
 .gallery-title {
   font-size: 15px; font-weight: 600; letter-spacing: -.005em; margin: 0;
+}
+/* The count sits with the title rather than under it: how many sites you have
+   is part of what the heading says, not a separate fact. */
+.gallery-count {
+  margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--text-faint);
 }
 
 .gallery-grid {
   list-style: none; margin: 0; padding: 0;
   display: grid; gap: 14px;
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+
+/* ---------------------------------------------------------------------------
+   The gallery as the whole window
+
+   The frame has two modes. This one takes the working area — rail, stage and
+   panel — and leaves the top bar and status bar in place, because that is
+   where the way out lives and a home screen with no exit is a modal.
+
+   It is an overlay, not a replacement: the map underneath stays mounted and
+   keeps its GL context and its tiles. Painting an opaque paper ground over it
+   costs one repaint; unmounting it would cost a full MapLibre re-init on every
+   trip back, which is the difference between a mode and a page load.
+
+   The measurements change with the room. In the panel a card is 168px because
+   440px is all there is; given the window, cards grow to 208px and the grid
+   gets a max width, since a gallery that stretches a 27" display into eleven
+   columns is a spreadsheet.
+   --------------------------------------------------------------------------- */
+.home-screen {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  z-index: 30;
+  overflow: auto;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.gallery-screen {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 32px 56px;
+}
+.gallery-screen .gallery-head { margin-bottom: 22px; }
+.gallery-screen .gallery-title { font-size: 21px; letter-spacing: -.015em; }
+.gallery-screen .gallery-count { font-size: 12px; }
+.gallery-screen .gallery-grid {
+  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+}
+.gallery-screen .site-name { font-size: 13.5px; }
+.gallery-screen .site-meta { padding: 11px 12px 12px; }
+
+@media (max-width: 900px) {
+  /* A phone has no room for a margin, and one column of full-width cards reads
+     better than two cramped ones. */
+  .gallery-screen { padding: 24px 16px 40px; }
+  .gallery-screen .gallery-head { flex-wrap: wrap; }
+  .gallery-screen .gallery-grid {
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
 }
 
 .site-card {

@@ -5,6 +5,42 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## The home screen takes the window — 2026-08-09
+
+The gallery was shipped inside the 440px report panel, with the question of
+whether it should own the window left open in `DESIGN_SPEC.md`. It should, and
+now does. The frame has two modes — gallery and workspace — held in
+`store.home`.
+
+**The interesting part is not the layout, it is who gets it.** A full-window
+gallery is right for someone with work and wrong for someone without it,
+because a newcomer needs the map visible to draw on, and `docs/USER-TESTING.md`
+names seconds-until-they-draw-a-shape as the measurement that decides this
+product. So `lib/home.ts` opens on the map when there are no saved sites, and
+also when the URL carries a shape — a shared link is a specific site someone
+was sent, and showing them your gallery instead is the wrong document. Six
+tests, and it is a separate module from the store precisely so it can have
+them.
+
+The gallery is an **overlay**, not a replacement: MapLibre stays mounted with
+its context, tiles and position, so returning to an open site is instant rather
+than a re-initialisation.
+
+Every route out is wired — opening a card, drawing a new one, searching for a
+place, Escape (only with a site open, so it can never dismiss to a blank map),
+and `Sites` in the top bar to go back. Deleting the last site hands the map back
+rather than leaving a full window of nothing. Two of those, the place search and
+the delete, were dead ends found by driving it in a browser rather than by
+reading it.
+
+The status bar drops its readouts in gallery mode: lat, scale, zoom and cell
+count describe a map behind an opaque overlay, and `Cells 0` reads as a failure
+rather than as "you have not opened anything".
+
+Checked in Chromium at 1440×900 and 390×844. Frontend tests 159 → 165.
+
+---
+
 ## Legal & Licensing Audit — 2026-08-09
 
 **Not legal advice, and one constraint shaped everything: this environment

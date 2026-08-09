@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Catalog, Cell, DrawMode, Factor, Marker, SeriesResponse } from './types'
 import { fetchCells, fetchSeries } from './api'
 import { decodeState, writeUrl, type Template } from './lib/permalink'
+import { openOnGallery } from './lib/home'
 
 /**
  * One store, and one rule that matters more than the rest:
@@ -94,6 +95,18 @@ interface State {
   /** The site currently open, if it was loaded from a saved one — shown in the
    *  top bar the way a document name is. */
   projectName: string | null
+
+  /**
+   * Gallery or workspace — which of the frame's two modes is showing.
+   *
+   * The gallery takes the whole window rather than sitting in the report
+   * panel, because a home screen occupying 440px beside a map that has nothing
+   * to show is two half-answers. The map is not unmounted underneath it: the
+   * gallery is an overlay, so MapLibre keeps its GL context, its tiles and its
+   * position, and opening a site is instant rather than a re-initialisation.
+   */
+  home: boolean
+  setHome: (o: boolean) => void
 
   /**
    * A pending map move, consumed by MapCanvas.
@@ -202,6 +215,10 @@ function persistSaved(list: SavedAoi[]): void {
   }
 }
 
+// Read once. `saved` and `home` are derived from the same list, and calling
+// loadSaved() twice would let them disagree if storage changed in between.
+const initialSaved = loadSaved()
+
 export const useStore = create<State>((set, get) => ({
   catalog: null,
   catalogError: null,
@@ -211,7 +228,7 @@ export const useStore = create<State>((set, get) => ({
   cells: [],
   past: [],
   future: [],
-  saved: loadSaved(),
+  saved: initialSaved,
   markers: [],
   selected: DEFAULT_FACTORS,
   data: null,
@@ -235,8 +252,14 @@ export const useStore = create<State>((set, get) => ({
   view: null,
   projectName: null,
   flyTo: null,
+  home: typeof window !== 'undefined' &&
+    openOnGallery(initialSaved.length, window.location.hash),
 
-  goTo: (lng, lat, zoom = 14) => set({ flyTo: { lng, lat, zoom, nonce: Date.now() } }),
+  // Searching for a place is a request to look at the map, so it leaves the
+  // gallery. Without this the search box on the home screen flies a map the
+  // user cannot see and reads as a dead control.
+  goTo: (lng, lat, zoom = 14) =>
+    set({ flyTo: { lng, lat, zoom, nonce: Date.now() }, home: false }),
 
   setCatalog: (c) => {
     // Land on the most recent step: users overwhelmingly want "now" first,
@@ -257,13 +280,23 @@ export const useStore = create<State>((set, get) => ({
     // happening, which reads as a broken tool.
     const narrow = typeof window !== 'undefined' && window.innerWidth <= 900
     set(m && narrow ? { drawMode: m, sidebarOpen: false } : { drawMode: m })
+    // Arming a tool is a statement about the map, so it always leaves the
+    // gallery. "Draw a new one" is the gallery's own primary button and this
+    // is what makes it go somewhere.
+    if (m) set({ home: false })
   },
+
+  setHome: (o) => set({ home: o }),
 
   setAoi: (g, opts) => {
     const { aoi, past } = get()
     set({
       aoi: g,
       drawMode: null,
+      // A shape on the map is the workspace by definition. This is also what
+      // dismisses the gallery when a card is opened, since loadSaved ends
+      // here — one rule rather than one per entry point.
+      home: g ? false : get().home,
       // Drawing somewhere else is a new site, not the saved one under a new
       // shape — so the document name goes with it unless we were told to keep
       // it (a restore, or an edit of the same site).
@@ -335,7 +368,9 @@ export const useStore = create<State>((set, get) => ({
   deleteSaved: (id) => {
     const next = get().saved.filter((s) => s.id !== id)
     persistSaved(next)
-    set({ saved: next })
+    // Deleting the last one turns the home screen into a full window of
+    // nothing. Hand the map back instead.
+    set(next.length ? { saved: next } : { saved: next, home: false })
   },
 
   renameSaved: (id, name) => {

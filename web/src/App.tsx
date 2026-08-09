@@ -43,9 +43,10 @@ const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: R
 
 export default function App() {
   const catalog = useStore((s) => s.catalog)
-  // Used only by the panel title, which says what the panel is showing rather
-  // than what the map is not.
+  // The panel title, and whether the top bar offers a way back to the gallery.
   const saved = useStore((s) => s.saved)
+  const home = useStore((s) => s.home)
+  const setHome = useStore((s) => s.setHome)
   const catalogError = useStore((s) => s.catalogError)
   const setCatalog = useStore((s) => s.setCatalog)
   const setCatalogError = useStore((s) => s.setCatalogError)
@@ -103,6 +104,12 @@ export default function App() {
         e.preventDefault()
         e.shiftKey ? redo() : undo()
       }
+      // Escape leaves the gallery, but only back to a site that is open.
+      // Otherwise it would dismiss the home screen to reveal a blank map and
+      // no obvious route back.
+      if (e.key === 'Escape' && useStore.getState().home && useStore.getState().aoi) {
+        setHome(false)
+      }
     }
     const stop = (e: DragEvent) => { e.preventDefault() }
     const onDrop = async (e: DragEvent) => {
@@ -125,7 +132,7 @@ export default function App() {
       window.removeEventListener('dragover', stop)
       window.removeEventListener('drop', onDrop)
     }
-  }, [undo, redo, setAoiFromDrop])
+  }, [undo, redo, setAoiFromDrop, setHome])
 
   const hint = drawMode
     ? TOOLS.find((t) => t.id === drawMode)!.hint
@@ -149,6 +156,23 @@ export default function App() {
         <PlaceSearch />
 
         <div className="topbar-right">
+          {/* The way back to the home screen. Present whenever there is work to
+              go back to and we are not already there — a gallery you can only
+              reach by reloading the page is a splash screen, not a home. */}
+          {!home && saved.length > 0 && (
+            <button className="topbar-home" onClick={() => setHome(true)}
+                    title="Your saved sites">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3.5" y="4.5" width="7" height="7" rx="1" />
+                <rect x="13.5" y="4.5" width="7" height="7" rx="1" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
+              </svg>
+              Sites
+              <span className="mono">{saved.length}</span>
+            </button>
+          )}
           {isMock && (
             <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
               demo data
@@ -223,7 +247,7 @@ export default function App() {
       <aside className="data-panel">
         <div className="panel-head">
           <div className="panel-title">
-            {aoi ? 'Site report' : saved.length ? 'Your sites' : 'Start here'}
+            {aoi ? 'Site report' : !home && saved.length ? 'Your sites' : 'Start here'}
             {data && <span className="panel-sub mono">{formatArea(data.area_ha)}</span>}
             <button className="icon-btn panel-hide" onClick={() => setPanelOpen(false)}
                     title="Hide the report" aria-label="Hide the report">
@@ -269,7 +293,7 @@ export default function App() {
               user gets the one sentence that matters, because until there is a
               shape on the map nothing else in the app is reachable. See
               components/Gallery.tsx. */}
-          {!catalogError && !aoi && <Gallery />}
+          {!catalogError && !aoi && !home && <Gallery />}
 
           {error && (
             <div className="notice notice-error">
@@ -302,6 +326,19 @@ export default function App() {
           )}
         </div>
       </aside>
+
+      {/* The home screen, over the workspace rather than instead of it.
+          Everything underneath stays mounted: MapLibre keeps its GL context,
+          its loaded tiles and its position, so opening a site is a fetch
+          rather than a map rebuild — and returning to an open site is
+          instant. It is placed in the same grid cells as the rail, stage and
+          panel, so it covers the working area and leaves the top bar and the
+          status bar visible, which is where the way out lives. */}
+      {home && !catalogError && (
+        <section className="home-screen" aria-label="Your saved sites">
+          <Gallery screen />
+        </section>
+      )}
 
       {!panelOpen && (
         <button className="panel-show" onClick={() => setPanelOpen(true)}>
