@@ -348,3 +348,55 @@ def test_the_extreme_answer_carries_the_caveat_too():
     got = ask(annual, intent="extreme")
     assert got["high_year"] != 2026
     assert "2026 was left out" in got["text"]
+
+
+# ---------------------------------------------------------------------------
+# The rewrite guard
+#
+# The system prompt tells the model not to alter a number and not to drop a
+# caveat. An instruction is not an enforcement. `_rewrite_is_faithful` is the
+# enforcement, and these are the cases that decide whether it is worth having.
+# ---------------------------------------------------------------------------
+def test_an_invented_number_discards_the_rewrite():
+    """The single failure the whole architecture is arranged to prevent. The
+    model is never asked what a figure is; if one appears anyway, the rewrite
+    is not used."""
+    assert not nlq._rewrite_is_faithful(
+        "Tree cover has fallen since 2019.",
+        "Tree cover has fallen 18% since 2019.")
+
+
+def test_dropping_a_number_is_allowed():
+    """A summary legitimately says less. Only invention is forbidden."""
+    assert nlq._rewrite_is_faithful(
+        "NDVI rose 12% since 2019.", "NDVI rose since 2019.")
+
+
+def test_a_faithful_rewrite_is_kept():
+    assert nlq._rewrite_is_faithful(
+        "NDVI rose 12% since 2019.",
+        "Vegetation vigour increased by 12% from 2019 onwards.")
+
+
+def test_a_dropped_demo_caveat_discards_the_rewrite():
+    """insights.py puts the caveat *inside* the sentence so no layout can drop
+    it. A rewrite is a layout that can. A fluent sentence that has quietly
+    shed the word "demo" is worse than a clumsy one that kept it."""
+    assert not nlq._rewrite_is_faithful(
+        "Tree cover fell 4% (demo data — generated, not observed).",
+        "Tree cover fell 4% over the period.")
+
+
+def test_a_caveat_carried_through_in_other_words_is_kept():
+    assert nlq._rewrite_is_faithful(
+        "Tree cover fell 4% (demo data).",
+        "Tree cover fell 4%. Note that this is demo data.")
+
+
+def test_the_guard_runs_on_the_real_path(monkeypatch):
+    """The check has to be wired in, not merely defined. A guard nobody calls
+    is a comment."""
+    import inspect
+    src = inspect.getsource(nlq)
+    assert "_rewrite_is_faithful(answer[" in src, \
+        "the rephrase path must gate on the guard"

@@ -27,6 +27,7 @@ name one it recognises.
 from __future__ import annotations
 
 import re
+import re as _re
 from typing import Any, Dict, List, Optional, Tuple
 
 import catalog
@@ -465,10 +466,45 @@ def rephrase(answer: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str,
             messages=[{"role": "user", "content": answer["answer"]}],
         )
         text = "".join(b.text for b in response.content if b.type == "text").strip()
-        if text:
+        if text and _rewrite_is_faithful(answer["answer"], text):
             return {**answer, "answer": text, "phrased_by": "claude"}
     except Exception:
         # A model that will not answer must never cost the user the answer that
         # was already computed without it.
         pass
     return answer
+
+
+# Digits, decimals, percentages and years, as they appear in a finished
+# sentence. Deliberately crude: this is a tripwire, not a parser.
+_NUMERALS = _re.compile(r"\d+(?:\.\d+)?")
+
+
+def _rewrite_is_faithful(original: str, rewritten: str) -> bool:
+    """Is this rewrite allowed to replace the computed sentence?
+
+    The system prompt tells the model not to alter a number and not to drop a
+    caveat. An instruction is not an enforcement, and this is the enforcement.
+    Both checks are one-way: a failure discards the rewrite and keeps the
+    deterministic text, so the worst case is prose that reads less well.
+
+    **No new numbers.** Every numeral in the rewrite must have appeared in the
+    computed answer. The model may drop one — a summary legitimately says less
+    — but inventing one is the single failure this whole architecture is
+    arranged to prevent, and "we told it not to" is not a control.
+
+    **The caveat survives.** `insights.py` puts "demo data — generated, not
+    observed" *inside* the sentence rather than in a sibling field, precisely
+    so no layout can drop it. A rewrite is a layout that can. If the computed
+    answer carried the caveat and the rewrite does not, the rewrite is
+    discarded — a fluent sentence that has quietly shed the word "demo" is
+    worse than a clumsy one that kept it.
+    """
+    invented = set(_NUMERALS.findall(rewritten)) - set(_NUMERALS.findall(original))
+    if invented:
+        return False
+
+    for caveat in ("demo data", "generated, not observed"):
+        if caveat in original.lower() and caveat not in rewritten.lower():
+            return False
+    return True
