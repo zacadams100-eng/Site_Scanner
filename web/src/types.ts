@@ -141,6 +141,14 @@ export interface Series {
   /** True when the server answered from its series cache rather than querying
    *  Earth Engine again. */
   cached?: boolean
+  /** How this site's latest reading compares with England.
+   *
+   *  Present only on a real column with a sampled baseline behind it — a
+   *  generated value is never ranked, because a percentile with a sourced
+   *  denominator and an invented numerator is the most convincing wrong
+   *  number this app could show. Absent is the common case; treat it as
+   *  "no yardstick", never as "average". */
+  baseline?: Baseline | null
   /** Set when the real path failed and the generator stood in. */
   error?: string
   kind: Kind
@@ -238,4 +246,22 @@ export interface AskResponse {
   suggestions?: string[]
   series?: Record<string, Series>
   area_ha?: number
+}
+
+/**
+ * A site's reading placed against a sample of England.
+ *
+ * `phrase` is the sentence to show; `percentile` is there for anyone who wants
+ * the number. `n` and `built` travel with both because a percentile from 60
+ * points and one from 6,000 are different claims.
+ */
+export interface Baseline {
+  percentile: number
+  median: number | null
+  p10: number | null
+  p90: number | null
+  n: number
+  built: string | null
+  basis: string
+  phrase: string
 }

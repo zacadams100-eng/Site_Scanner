@@ -5,6 +5,55 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-09 (fourth pass) — Compared with England
+
+The user's idea, and the best accessibility change in the product so far.
+`crime_density 230` means nothing to a land agent; "busier than four fifths of
+England" means something in one second, and it is the same figure.
+
+### The trap it is designed around
+
+The fast version is to run `series.py` over a few hundred points and call the
+spread a national average. It would cover all 269 factors in an afternoon and
+be worthless: a **fabricated yardstick against which a real measurement is
+compared** produces a percentile whose denominator is sourced and whose
+numerator is invented. That is the most convincing wrong number this codebase
+could emit, because every part of it looks sourced.
+
+So a baseline may only be built from real observations, and the refusal is
+enforced twice — `baselines.compare` returns None with no sample, and
+`routes_catalog._baseline_for` refuses any series whose own `source` is
+`generated`. Most factors show no comparison, which is honest and also quietly
+informative: the factors with a yardstick are exactly the factors with real
+data behind them, so the block grows as the catalogue becomes real.
+
+### What was built
+
+`baselines.py` stores percentiles rather than a mean, because these
+distributions are nowhere near normal — house prices are long-tailed and crime
+density is zero across most of the country, and a mean of either describes
+nowhere. Sample size and build date travel with every comparison, since a
+percentile from 60 points and one from 6,000 are different claims.
+
+`scripts/build_baselines.py` samples AOIs across eight English regions
+weighted by **land area rather than population** — a baseline that
+over-represented cities would make every rural site look extraordinary — and is
+seeded, so a rebuild produces the same sample rather than moving the yardstick
+under people. It writes `data/baselines.json`, which is committed.
+
+The UI block is deliberately quiet and states its own sample. `MIN_SAMPLE` is
+30: below that a percentile is noise wearing a number, and the UI would render
+it identically to a good one.
+
+**Not yet run.** The sampler needs ordinary internet, like everything else that
+touches these sources. Until it is, no factor has a baseline and the block does
+not appear — verified end to end against a stand-in, which was then deleted
+rather than committed.
+
+553 passing, 10 skipped.
+
+---
+
 ## 2026-08-09 (second pass) — The number moved
 
 **1 → 9 verified.** It had been 1 since NDVI.

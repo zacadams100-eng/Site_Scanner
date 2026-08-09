@@ -1,7 +1,7 @@
 import Ask from './Ask'
 import { useStore } from '../store'
 import { isReal } from '../lib/format'
-import type { Insight } from '../types'
+import type { Insight, Series } from '../types'
 
 /**
  * What the numbers say, in sentences.
@@ -77,6 +77,7 @@ export default function Findings() {
   return (
     <div className="findings">
       <Ask />
+      <VsEngland />
       <ol className="finding-list">
         {findings.map((f, i) => {
           const real = isReal(f.source)
@@ -114,5 +115,62 @@ export default function Findings() {
         </p>
       )}
     </div>
+  )
+}
+
+
+/**
+ * How this site sits against the rest of England.
+ *
+ * The single most useful thing that can be done to a number in this product.
+ * "Crime density 230" means nothing to a land agent; "busier than four fifths
+ * of England" means something in one second, and it is the same figure.
+ *
+ * Only real columns appear here, and only where a sampled baseline exists —
+ * both conditions enforced on the server. A generated value ranked against a
+ * real national distribution would produce a percentile whose denominator is
+ * sourced and whose numerator is invented, which is the most convincing wrong
+ * number this app could show.
+ *
+ * So the usual state of this block is absent, and that is correct. It appears
+ * as the catalogue becomes real, which makes it a quiet running total of how
+ * much of this product is grounded.
+ */
+function VsEngland() {
+  const data = useStore((s) => s.data)
+  const selected = useStore((s) => s.selected)
+  if (!data) return null
+
+  const rows = selected
+    .map((id) => data.series[id])
+    .filter((s): s is Series => !!s?.baseline)
+
+  if (!rows.length) return null
+
+  // Every row shares the same sample, so the provenance is stated once rather
+  // than repeated eight times — but it is stated, because a percentile from 60
+  // points and one from 6,000 are different claims.
+  const first = rows[0].baseline!
+
+  return (
+    <section className="vs-england">
+      <h3 className="vs-title">Compared with England</h3>
+      <ul className="vs-list">
+        {rows.map((s) => (
+          <li key={s.factor_id} className="vs-row">
+            <span className="vs-name">{s.meta.name}</span>
+            <span className="vs-phrase">{s.baseline!.phrase}</span>
+            <span className="vs-pct mono" title="percentile among the sampled areas">
+              {s.baseline!.percentile}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="vs-foot">
+        Against {first.n} areas sampled across England
+        {first.built ? ` in ${first.built.slice(0, 7)}` : ''}. Only factors with
+        real data appear here.
+      </p>
+    </section>
   )
 }

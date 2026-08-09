@@ -21,6 +21,7 @@ import time
 
 import redaction
 
+import baselines
 import catalog
 import insights
 import nlq
@@ -105,6 +106,10 @@ def get_catalog() -> Dict[str, Any]:
             "real_share": round(len(real_ids) / total, 4),
         },
         "coverage": {"name": "England", "bbox": _BBOX},
+        # Which factors can be compared with England, and on what sample. Sent
+        # with the catalogue so the UI can say "no yardstick for this one"
+        # without waiting for a query to come back empty.
+        "baselines": baselines.summary(),
         "time": {
             "start": catalog.TIME_START,
             "end": catalog.TIME_END,
@@ -331,6 +336,29 @@ def _point_in_ring(x: float, y: float, ring: List[Any]) -> bool:
     return inside
 
 
+def _baseline_for(factor_id: str, series: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """How this site's latest reading compares with England.
+
+    **Only for a factor whose own value is real.** Comparing a generated series
+    to a sampled national distribution would produce a percentile with a real
+    denominator and an invented numerator — the most convincing wrong number
+    this codebase could emit, because every part of it looks sourced. A demo
+    factor gets no comparison, and the absence is the honest signal.
+    """
+    if series.get("source") not in ("earth-engine", "open-data"):
+        return None
+
+    latest = None
+    for point in reversed(series.get("points") or []):
+        if isinstance(point.get("value"), (int, float)):
+            latest = point["value"]
+            break
+    if latest is None:
+        return None
+
+    return baselines.compare(factor_id, latest)
+
+
 @router.post("/api/series")
 def get_series(req: SeriesRequest) -> Dict[str, Any]:
     """Monthly series plus the annual rollup, for every requested factor.
@@ -358,6 +386,7 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         s = _series_for(fid, req.geometry, centroid, area_ha, steps)
         s["annual"] = series_mod.annual_rollup(s)
         s["meta"] = catalog.resolve(fid)
+        s["baseline"] = _baseline_for(fid, s)
         out[fid] = s
 
     real_ids = [k for k, v in out.items()
