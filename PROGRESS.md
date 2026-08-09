@@ -103,11 +103,53 @@ the strength of not knowing how to read the answer. Raising falls back to the
 generator, which labels itself demo data — the same rule as the flood-zone
 attribute.
 
-**Verified: 1 → 12.** Still to settle: nine designations that need a
-non-empty test area, `avg_sale_price`, and the two derived price factors that
-need a 72-month window.
+### The third run found the worst bug in the repository
 
-523 passing, 10 skipped.
+The South Downs run never reached a single designation:
+
+```
+FAIL  locate — OpenDataError: no postcode near this area
+```
+
+**`locate()` sent no `radius`, so postcodes.io used its 100 m default.** Any
+AOI whose centroid sits more than 100 m from a postcode raised — and almost
+every non-spatial source is keyed off that lookup, so roughly **twenty factors
+failed at once**.
+
+The AOIs that fail are farms, development plots, solar sites and woodland:
+open countryside, which is most of what this product is for. A land-analysis
+tool that could not locate a field.
+
+It could not have been found any other way. The sandbox cannot reach
+postcodes.io, so no fixture would have caught it, and the default test AOI is
+inside Guildford where a postcode is always within 100 m. Three weeks of green
+tests, a benchmark, an audit and a deployed URL did not surface it. One run
+over real countryside did, immediately.
+
+Fixed by widening — 100 m, 500 m, 2,000 m — then falling back to the outward
+code, which is coarser but is exactly what the Land Registry district query
+already uses. The result now carries `within_m` and `precision`, because a
+price index joined from 40 m away and one joined from 4 km away are different
+claims. An area with no outcode within 25 km still raises: widening a search
+must not turn a genuine "this is the sea" into a confident guess.
+
+### What the day actually produced
+
+Verified **1 → 12**, and three real bugs that only a live run could find:
+
+| | Found by |
+| --- | --- |
+| `check_open_data.py` crashed on its own first line | running it |
+| `brownfield_register_pct` dies on point geometries | a real API response |
+| every rural site fails to locate | a real rural coordinate |
+
+Plus two dead ONS URLs, one confirmed guess (the flood attribute), and three
+false alarms in my own tooling that are now fixed.
+
+Still to settle: nine designations needing a non-empty test area,
+`avg_sale_price`, and the derived price factors needing a 72-month window.
+
+527 passing, 10 skipped.
 
 ---
 

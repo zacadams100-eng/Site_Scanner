@@ -159,28 +159,82 @@ def _static(steps: List[str], value) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # postcodes.io — the join between a drawn shape and every statistical geography
 # ---------------------------------------------------------------------------
+"""Search radii for the postcode lookup, in metres.
+
+postcodes.io defaults to **100 m** and this function used to send no radius at
+all, so any AOI whose centroid sat more than 100 m from a postcode raised "no
+postcode near this area" — and since almost every non-spatial source is keyed
+off this lookup, that failed roughly twenty factors at once.
+
+The AOIs that fail are farms, development plots, solar sites and woodland:
+open countryside, which is most of what this product is for. It was found on
+the first run over the South Downs and could not have been found any other
+way, because the sandbox these integrations were written in cannot reach
+postcodes.io and the default test AOI is inside Guildford.
+
+2,000 m is the API's maximum for a postcode search; beyond that the outcode
+endpoint takes over.
+"""
+POSTCODE_RADII_M = (100, 500, 2000)
+
+
 def locate(geometry: dict) -> Dict[str, Any]:
     """Nearest postcode to the AOI centroid, with its administrative codes.
 
     Almost every non-spatial source here is published by postcode district or
     by local authority, so this is the hinge: without it a polygon cannot be
     joined to a price index or an earnings figure.
+
+    Widens its search rather than giving up, and reports how far it had to go.
+    That distance is not bookkeeping — a site joined to a price index from a
+    postcode 40 m away and one joined from 4 km away are different claims, and
+    the second should be visible to whoever reads the number.
     """
     ring = _ring(geometry)
     lng = sum(p[0] for p in ring) / len(ring)
     lat = sum(p[1] for p in ring) / len(ring)
+    params = {"lon": round(lng, 5), "lat": round(lat, 5), "limit": 1}
 
-    data = _get("https://api.postcodes.io/postcodes",
-                {"lon": round(lng, 5), "lat": round(lat, 5), "limit": 1})
+    for radius in POSTCODE_RADII_M:
+        data = _get("https://api.postcodes.io/postcodes",
+                    {**params, "radius": radius})
+        result = (data or {}).get("result")
+        if result:
+            r = result[0]
+            return {
+                "postcode": r["postcode"],
+                "district": r["postcode"].split()[0],
+                "admin_district": r.get("admin_district"),
+                "admin_district_code": (r.get("codes") or {}).get("admin_district"),
+                "within_m": radius,
+                "precision": "postcode",
+                "lng": lng, "lat": lat,
+            }
+
+    # Nothing within 2 km. Fall back to the outward code, which is coarser but
+    # is exactly what the Land Registry district query already uses — so the
+    # price factors keep working on a moor where the postcode search does not.
+    data = _get("https://api.postcodes.io/outcodes",
+                {**params, "radius": 25000})
     result = (data or {}).get("result")
     if not result:
-        raise OpenDataError("no postcode near this area")
+        raise OpenDataError(
+            f"no postcode within {POSTCODE_RADII_M[-1]} m and no outcode "
+            f"within 25 km of {lat:.4f}, {lng:.4f} — is this area offshore?")
+
     r = result[0]
+    districts = r.get("admin_district") or []
     return {
-        "postcode": r["postcode"],
-        "district": r["postcode"].split()[0],
-        "admin_district": r.get("admin_district"),
+        # There is no full postcode here, and inventing one would be worse
+        # than saying so: the outward code is what we actually know.
+        "postcode": r["outcode"],
+        "district": r["outcode"],
+        "admin_district": districts[0] if districts else None,
         "admin_district_code": (r.get("codes") or {}).get("admin_district"),
+        "within_m": 25000,
+        # Carried through so a caller can say the join is approximate. Nothing
+        # in this file quietly upgrades a coarse answer to a precise one.
+        "precision": "outcode",
         "lng": lng, "lat": lat,
     }
 

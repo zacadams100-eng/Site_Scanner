@@ -290,3 +290,40 @@ and deliberately fixed to *raise* rather than skip the points and return 0.0,
 because "no brownfield land here" is a claim and "we cannot read this answer"
 is a different one. The factor now falls back to labelled demo data until
 someone implements it against the register's area attribute.
+
+### 2026-08-09 (third run) — the biggest bug yet, found by a bad test location
+
+The South Downs run never reached a single designation:
+
+```
+FAIL  locate — OpenDataError: no postcode near this area
+Every other source is keyed off this lookup; stopping.
+```
+
+**`locate()` sent no `radius`, so postcodes.io used its 100 m default.** Any
+AOI whose centroid sat more than 100 m from a postcode raised — and almost
+every non-spatial source is keyed off this lookup, so roughly twenty factors
+failed at once.
+
+The AOIs that fail are farms, development plots, solar sites, woodland: open
+countryside, which is most of what this product is for. A land-analysis tool
+that cannot locate a field.
+
+It could not have been found any other way. The sandbox cannot reach
+postcodes.io, so no fixture would have caught it, and the default test AOI is
+inside Guildford where a postcode is always within 100 m. It took one run over
+real countryside.
+
+**Fixed** by widening the search — 100 m, 500 m, 2,000 m (the API maximum) —
+and then falling back to the outward-code endpoint, which is coarser but is
+exactly what the Land Registry district query already uses, so the price
+factors keep working on a moor.
+
+The result now carries `within_m` and `precision`. That is not bookkeeping: a
+site joined to a price index from a postcode 40 m away and one joined from
+4 km away are different claims, and the second should be visible to whoever
+reads the number. Surfacing it in the UI is not yet done.
+
+An area with no outcode within 25 km still raises, and says "is this area
+offshore?" — widening a search must not turn a genuine "this is the sea" into
+a confident guess at a district 30 km away.

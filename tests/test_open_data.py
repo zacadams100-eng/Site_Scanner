@@ -75,6 +75,80 @@ def test_locate_fails_loudly_when_there_is_no_postcode(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# The rural lookup — the bug the first live run over open countryside found
+# ---------------------------------------------------------------------------
+def test_a_rural_site_widens_the_search_instead_of_failing(monkeypatch):
+    """The most consequential bug this project has had.
+
+    postcodes.io defaults to a 100 m radius and `locate` sent no radius at
+    all, so any AOI whose centroid sat further than that from a postcode
+    raised "no postcode near this area" — and every non-spatial source is
+    keyed off this lookup, so roughly twenty factors failed at once.
+
+    The AOIs that fail are farms, development plots and solar sites: open
+    countryside, which is most of what this product is for.
+    """
+    seen = []
+
+    def by_radius(params):
+        seen.append(params.get("radius"))
+        # Nothing within 100 m or 500 m; a postcode at 2 km.
+        if params.get("radius", 0) >= 2000:
+            return POSTCODE_RESPONSE
+        return {"result": None}
+
+    fake_get(monkeypatch, {"postcodes.io": by_radius})
+    loc = open_data.locate(GUILDFORD)
+    assert loc["postcode"] == "GU2 7XH"
+    assert seen == [100, 500, 2000], "the search must widen, not give up"
+    assert loc["within_m"] == 2000
+    assert loc["precision"] == "postcode"
+
+
+def test_the_nearest_postcode_is_still_preferred(monkeypatch):
+    """Widening must not make every lookup coarse — a site inside a town
+    should still resolve on the first, tightest try."""
+    seen = []
+
+    def by_radius(params):
+        seen.append(params.get("radius"))
+        return POSTCODE_RESPONSE
+
+    fake_get(monkeypatch, {"postcodes.io": by_radius})
+    loc = open_data.locate(GUILDFORD)
+    assert seen == [100], "a close postcode must not trigger a wider search"
+    assert loc["within_m"] == 100
+
+
+def test_deep_countryside_falls_back_to_the_outward_code(monkeypatch):
+    """Nothing within 2 km. The outward code is coarser but it is exactly what
+    the Land Registry district query already uses, so the price factors keep
+    working on a moor."""
+    def router(url, params=None, auth=None):
+        if "outcodes" in url:
+            return {"result": [{"outcode": "RH20",
+                                "admin_district": ["Horsham"],
+                                "codes": {"admin_district": "E07000227"}}]}
+        return {"result": None}
+
+    monkeypatch.setattr(open_data, "_get", router)
+    loc = open_data.locate(GUILDFORD)
+    assert loc["district"] == "RH20"
+    assert loc["admin_district_code"] == "E07000227"
+    assert loc["precision"] == "outcode", \
+        "a coarse answer must say it is coarse"
+
+
+def test_an_offshore_area_still_fails_and_says_why(monkeypatch):
+    """Widening the search must not turn a genuine 'this is the sea' into a
+    silent guess at some district 30 km away."""
+    monkeypatch.setattr(open_data, "_get", lambda u, p=None, auth=None: {"result": None})
+    with pytest.raises(open_data.OpenDataError) as e:
+        open_data.locate(GUILDFORD)
+    assert "offshore" in str(e.value)
+
+
+# ---------------------------------------------------------------------------
 # planning.data.gov.uk — designations
 # ---------------------------------------------------------------------------
 def _square(w, s, e, n):
