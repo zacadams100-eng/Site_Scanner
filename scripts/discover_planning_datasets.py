@@ -194,7 +194,17 @@ def show_attributes(dataset: str, lat: float, lon: float) -> int:
     This is the mode that resolves the flood-zone question.
     """
     result = probe(dataset, lat, lon)
-    if not result.get("exists"):
+    # `exists` is tri-state and the difference is the whole point of this
+    # script: None means the platform could not be reached, False means it
+    # answered and said no. Testing them together — which this did — reports a
+    # train journey as a missing dataset, and there is a test in main() for
+    # exactly that conflation that did not cover this path.
+    if result.get("exists") is None:
+        print(f"  {dataset}: could not reach {BASE} ({result.get('error')})")
+        print("  Nothing was checked. This machine has no route to the "
+              "platform — see BLOCKERS.md §1.")
+        return 2
+    if not result["exists"]:
         print(f"  {dataset}: no such dataset on the platform")
         return 1
     if not result.get("features_here"):

@@ -180,7 +180,12 @@ def main() -> int:
     # so a failure here explains all the others and there is no point running
     # them.
     try:
-        place = open_data.locate(args.lon, args.lat)
+        # `locate` takes the AOI, not a coordinate pair. Passing (lon, lat)
+        # raised a TypeError on the first line of real work, so this script
+        # could never have reached a single endpoint — and because it exits 1
+        # with a plausible-looking FAIL line, it looked like a broken
+        # integration rather than a broken caller. Nobody had run it.
+        place = open_data.locate(geometry)
     except Exception as exc:                          # noqa: BLE001
         print(f"FAIL  locate — {type(exc).__name__}: {exc}", file=sys.stderr)
         print("\nEvery other source is keyed off this lookup; stopping.",

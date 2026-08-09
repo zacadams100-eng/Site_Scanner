@@ -20,3 +20,4 @@ venv/
 
 # Generated into the Vite build by vercel.json buildCommand
 web/public/demo.html
+verify-report.md

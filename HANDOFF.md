@@ -10,6 +10,16 @@ Tests: 426 passing, 10 skipped (they need a Postgres server) · 59 frontend
 
 ## Read this first
 
+**Everything below is now one command.** On any machine with ordinary internet:
+
+```bash
+python3 scripts/verify.py
+```
+
+It runs all four checks, prints one scoreboard, and writes `verify-report.md` —
+paste that file into a coding session and the fixes can be made straight from
+it. The scattering, not the difficulty, is why this never happened.
+
 **Three things need you, not another coding session.** Each is minutes of
 work and each unblocks something no amount of code can:
 

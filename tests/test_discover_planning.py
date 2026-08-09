@@ -112,6 +112,17 @@ def test_it_fails_loudly_on_a_wrong_filter_attribute(monkeypatch, capsys):
     assert "fix open_data.py" in out
 
 
+def test_the_attribute_mode_also_keeps_offline_apart_from_missing(monkeypatch):
+    """The same conflation, on the other code path.
+
+    `main()` had a test for this and `show_attributes` did not, so running the
+    flood check offline printed "no such dataset on the platform" about a
+    dataset the app reads in production. Exit 2 means "could not ask".
+    """
+    fake_http(monkeypatch, {"/dataset/": requests.ConnectionError})
+    assert discover.show_attributes("flood-risk-zone", 51.2, -0.5) == 2
+
+
 def test_it_reads_attributes_from_the_nested_form(monkeypatch):
     nested = {"properties": {"json": {"flood-risk-type": "Flood Zone 2"}}}
     assert "flood-risk-type" in discover.attribute_names(nested)

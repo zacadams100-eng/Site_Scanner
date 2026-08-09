@@ -5,6 +5,65 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-09 — Attacking the bottleneck instead of adding to it
+
+51 factors real, **1 verified**, and that number has not moved since NDVI.
+Every session — including the last four passes — added correctly-written,
+well-tested, never-run integrations. The pile of `written` grows and
+`verified` does not, and the reason was never that the verification was hard.
+It was that it was *scattered*: four scripts, four sets of output, four
+judgements, and no single answer to the only question that matters.
+
+So this session added no factors.
+
+### `scripts/verify.py`
+
+One command. Runs the open-data check, the flood-zone attribute check, the ONS
+URL check and Earth Engine, prints one scoreboard with an explicit next action
+against each failure, and writes `verify-report.md` — a file that can be pasted
+straight back into a session, because results sitting in a closed terminal are
+worth nothing and re-typing "police.uk returned a 500" from memory is how a
+real finding becomes a vague one.
+
+**Exit 2 means "nothing could be checked", not "everything failed."** The
+difference is load-bearing: reporting a train journey as twelve broken
+integrations is how a wasted trip becomes a to-do list of imaginary bugs.
+
+### It immediately found a real bug, which is the point
+
+`scripts/check_open_data.py` called `open_data.locate(args.lon, args.lat)`.
+`locate` takes a geometry. The script crashed with a `TypeError` on the first
+line of real work, printed a plausible-looking `FAIL locate` and exited 1 — so
+**it could never have reached a single endpoint**, and it looked like a broken
+integration rather than a broken caller.
+
+That script has been the headline recommendation in `HANDOFF.md` for several
+sessions. Anyone who had made the trip to a machine with open internet would
+have run it, seen a failure, and learned nothing. Fixed.
+
+A second one, in code written yesterday: `discover_planning_datasets.py
+--attributes` reported "no such dataset on the platform" when it simply could
+not reach the platform. `main()` had a test for exactly that conflation;
+`show_attributes` did not. Both paths now exit 2 and say so, and the test
+covers both.
+
+### `docs/USER-TESTING.md`
+
+The other half of the gap. Everything in this product has been built from
+inference about what a land agent wants; that inference has never been checked.
+Six questions, twenty minutes, no preparation, and one measurement that matters
+more than the rest — **how many seconds until they draw a shape**, because
+drawing is the entire interaction and if it takes more than about thirty
+seconds to discover, nothing else on the backlog is the top priority.
+
+It also records four predictions in advance, so they can be wrong on the record
+rather than confirmed in hindsight. `docs/user-tests/` is empty, which is
+currently the most informative thing in the repository.
+
+518 passing, 10 skipped.
+
+---
+
 ## 2026-08-07 (fourth pass) — Surface water, and the loading state
 
 ### JRC Global Surface Water: three more real factors
