@@ -204,6 +204,80 @@ def test_density_counts_features_per_square_kilometre(monkeypatch):
     assert pts[0]["value"] == 4.0
 
 
+# ---------------------------------------------------------------------------
+# The works-in-Guildford class: assumptions the small urban test AOI satisfies
+# and a real site does not. `locate` was the first of these; these are the rest.
+# ---------------------------------------------------------------------------
+def _traced(n: int) -> dict:
+    """A hand-traced boundary with n vertices, closed — what the freehand tool
+    produces and what neither the rectangle nor the circle tool ever will."""
+    ring = [[-0.57 + 0.001 * (i % 7), 51.24 + 0.001 * (i % 5)] for i in range(n)]
+    ring.append(ring[0])
+    return {"type": "Polygon", "coordinates": [ring]}
+
+
+@pytest.mark.parametrize("vertices", [61, 100, 121, 200, 359, 1000])
+def test_a_thinned_boundary_is_still_a_closed_polygon(vertices):
+    """`ring[::step]` only lands on the final vertex when the length divides
+    evenly, so a 200-point outline went out as 67 points that never returned
+    to the start — an open polyline where a polygon was meant."""
+    sent = open_data._police_poly(_traced(vertices)).split(":")
+    assert sent[0] == sent[-1], \
+        f"{vertices}-vertex boundary sent unclosed ({len(sent)} points)"
+
+
+def test_thinning_still_respects_the_length_limit():
+    """The reason thinning exists at all — police.uk rejects long strings."""
+    sent = open_data._police_poly(_traced(2000)).split(":")
+    assert len(sent) <= 62, f"sent {len(sent)} points"
+
+
+def test_a_truncated_planning_page_refuses_rather_than_undercounting(monkeypatch):
+    """A large AOI over a city intersects far more than a page of listed
+    buildings. The old code computed a density from whatever came back, so a
+    truncated answer produced a capped number with nothing to say it was
+    capped — invisible in a 1.2 km square, wrong on the 250,000 ha the app
+    permits."""
+    full_page = {"entities": [{"entity": i} for i in range(open_data.PLANNING_LIMIT)]}
+    fake_get(monkeypatch, {"planning.data.gov.uk": full_page})
+    with pytest.raises(open_data.OpenDataError) as e:
+        open_data.planning_series("listed-building-outline", "density",
+                                  GUILDFORD, STEPS, 200.0)
+    assert "page limit" in str(e.value)
+
+
+def test_a_truncated_coverage_page_refuses_too(monkeypatch):
+    full = {"features": [_square(-0.58, 51.235, -0.57, 51.245)
+                         for _ in range(open_data.PLANNING_LIMIT)]}
+    fake_get(monkeypatch, {"planning.data.gov.uk": full})
+    with pytest.raises(open_data.OpenDataError):
+        open_data.planning_series("green-belt", "pct", GUILDFORD, STEPS, 200.0)
+
+
+def test_a_short_planning_page_is_trusted(monkeypatch):
+    """The refusal must only fire at the limit. Ninety-nine entities is a
+    complete answer and has to stay one."""
+    page = {"entities": [{"entity": i} for i in range(open_data.PLANNING_LIMIT - 1)]}
+    fake_get(monkeypatch, {"planning.data.gov.uk": page})
+    pts = open_data.planning_series("listed-building-outline", "density",
+                                    GUILDFORD, STEPS, 200.0)
+    assert pts[0]["value"] > 0
+
+
+def test_a_truncated_price_query_refuses_rather_than_skewing_the_median(monkeypatch):
+    """Fifteen years of a busy district can exceed the query limit, and which
+    sales were dropped is not knowable from here. A median computed from an
+    unknown slice is exactly the number that quietly acquires authority it has
+    not earned."""
+    rows = [{"date": {"value": "2024-01-15"}, "amount": {"value": "350000"}}
+            for _ in range(open_data.PPD_LIMIT)]
+    fake_get(monkeypatch, {"postcodes.io": POSTCODE_RESPONSE,
+                           "landregistry": {"results": {"bindings": rows}}})
+    with pytest.raises(open_data.OpenDataError) as e:
+        open_data.ppd_group(GUILDFORD, STEPS, 200.0)
+    assert "query limit" in str(e.value)
+
+
 def test_a_point_dataset_does_not_crash_the_factor(monkeypatch):
     """Found by the first live run, not by any fixture.
 

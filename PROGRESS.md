@@ -146,10 +146,57 @@ Verified **1 → 12**, and three real bugs that only a live run could find:
 Plus two dead ONS URLs, one confirmed guess (the flood attribute), and three
 false alarms in my own tooling that are now fixed.
 
+### Hunting the rest of the works-in-Guildford class
+
+`locate` was correct in the only place it was ever exercised. That is a class,
+not an incident, so the rest of `open_data.py` got read with one question:
+what does this assume that a 1.2 km square in a town happens to satisfy?
+
+Three more, none of which any test or live run had reached.
+
+**Planning queries truncate silently.** `limit: 100`, and whatever came back
+was fed straight into a coverage or a density. A large AOI over a city
+intersects far more than a hundred listed-building outlines, so the number came
+out capped or low with nothing to say so. Now refuses at the page limit and
+falls back to labelled demo data, because a capped density that looks fine is
+worse than an honest gap. The app permits 250,000 ha; the test square is 144.
+
+**The price query truncates silently too.** `LIMIT 20000` over fifteen years
+of a busy district, and which sales were dropped is not knowable from here — so
+the median moves, the count caps, and the new-build share reflects whichever
+slice the store returned first. Same refusal.
+
+**A thinned boundary was sent unclosed.** `ring[::step]` only lands on the
+final vertex when the length divides evenly, so a 200-point freehand outline
+went to police.uk as 67 points that never returned to the start — an open
+polyline where a polygon was meant, relying on undocumented behaviour at the
+far end to close it. Rectangles and circles never hit it: they are under the
+thinning threshold. Only a hand-traced field boundary is long enough, which is
+exactly the shape this product is for.
+
+All three are the same mistake as `locate`: correct under the one condition
+they were ever tried under.
+
+### What the day actually produced
+
+Verified **1 → 12**, and six real bugs:
+
+| | Found by |
+| --- | --- |
+| `check_open_data.py` crashed on its own first line | running it |
+| `brownfield_register_pct` dies on point geometries | a real API response |
+| every rural site fails to locate | a real rural coordinate |
+| planning results truncate silently | reading for the same class |
+| price results truncate silently | " |
+| traced boundaries sent unclosed | " |
+
+Plus two dead ONS URLs, one confirmed guess (the flood attribute), and three
+false alarms in my own tooling, now fixed.
+
 Still to settle: nine designations needing a non-empty test area,
 `avg_sale_price`, and the derived price factors needing a 72-month window.
 
-527 passing, 10 skipped.
+538 passing, 10 skipped.
 
 ---
 

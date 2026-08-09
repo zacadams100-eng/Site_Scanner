@@ -123,10 +123,24 @@ def _wkt(geometry: dict) -> str:
 
 def _police_poly(geometry: dict, max_points: int = 60) -> str:
     """data.police.uk takes `lat,lng:lat,lng:…` and rejects very long strings,
-    so a traced field boundary has to be thinned before it is sent."""
+    so a traced field boundary has to be thinned before it is sent.
+
+    **The thinned ring is re-closed explicitly.** `ring[::step]` only lands on
+    the final vertex when the length divides evenly, so a 200-point freehand
+    outline was sent as 67 points that did not return to the start — an open
+    polyline where a polygon was meant. Whether the far end closes it for us is
+    undocumented, and a boundary that depends on undocumented behaviour is a
+    boundary that will move without warning.
+
+    Rectangles and circles never hit this: they are under the threshold and no
+    thinning happens. Only a hand-traced outline is long enough, which is why
+    it survived every test and every run over the default test square.
+    """
     ring = _ring(geometry)
     step = max(1, len(ring) // max_points)
     thinned = ring[::step]
+    if thinned[0] != thinned[-1]:
+        thinned = [*thinned, thinned[0]]
     return ":".join(f"{y:.5f},{x:.5f}" for x, y in thinned)
 
 
@@ -371,6 +385,33 @@ def _coverage(geometry: dict, features: List[dict]) -> float:
     return round(100.0 * covered / inside_aoi, 1)
 
 
+# Entities requested per planning query.
+#
+# The number matters less than what happens when it is reached. A large AOI
+# over a city intersects far more than a hundred listed-building outlines, and
+# the old code took whatever came back and computed a coverage or a density
+# from it — so a truncated answer produced a confidently wrong number with no
+# indication that anything had been left out. Densities came out capped;
+# coverage came out low.
+#
+# Invisible in the 1.2 km test square around Guildford, wrong on the 250,000 ha
+# AOI the app actually permits. Same shape as the `locate` bug: correct in the
+# one place it was ever exercised.
+PLANNING_LIMIT = 100
+
+
+def _refuse_if_truncated(dataset: str, returned: int) -> None:
+    """A full page back means there were probably more, and we cannot tell how
+    many. Refuse rather than report a number derived from an unknown fraction
+    of the answer — `_series_for` falls back to the generator, which labels
+    itself demo data, and a labelled estimate beats an unlabelled wrong one."""
+    if returned >= PLANNING_LIMIT:
+        raise OpenDataError(
+            f"{dataset}: {returned} entities returned, which is the page "
+            f"limit — the real count is unknown and any coverage or density "
+            f"computed from it would be too low. Draw a smaller area.")
+
+
 def _feature_fields(feature: dict) -> List[Any]:
     """Every place the platform might have put a dataset-specific attribute.
 
@@ -434,14 +475,16 @@ def planning_series(dataset: str, mode: str, geometry: dict, steps: List[str],
     fmt = "geojson" if mode == "pct" else "json"
     data = _get(f"https://www.planning.data.gov.uk/entity.{fmt}",
                 {"dataset": dataset, "geometry": _wkt(geometry),
-                 "geometry_relation": "intersects", "limit": 100})
+                 "geometry_relation": "intersects", "limit": PLANNING_LIMIT})
 
     if mode == "density":
         entities = (data or {}).get("entities", [])
+        _refuse_if_truncated(dataset, len(entities))
         km2 = max(0.01, area_ha / 100.0)
         return _static(steps, round(len(entities) / km2, 2))
 
     features = (data or {}).get("features", [])
+    _refuse_if_truncated(dataset, len(features))
     if field and features:
         # Before trusting the filter, check the attribute exists at all.
         #
@@ -488,8 +531,17 @@ WHERE {
   OPTIONAL { ?tx ppi:propertyType ?type }
   FILTER(?date >= "%(start)s"^^<http://www.w3.org/2001/XMLSchema#date>)
 }
-LIMIT 20000
+LIMIT %(limit)d
 """
+
+# Transactions requested per district.
+#
+# Fifteen years of a busy district can exceed this, and a truncated set makes
+# every figure built on it wrong in a way nobody can see: the median moves, the
+# count is capped, and the new-build share reflects whichever slice the store
+# happened to return first. The Guildford test window is six months, which
+# never comes close.
+PPD_LIMIT = 20000
 
 
 def ppd_group(geometry: dict, steps: List[str],
@@ -506,10 +558,21 @@ def ppd_group(geometry: dict, steps: List[str],
     average. A field has no sale price of its own; the district around it does.
     """
     loc = locate(geometry)
-    query = _PPD_QUERY % {"district": loc["district"], "start": steps[0] + "-01"}
+    query = _PPD_QUERY % {"district": loc["district"],
+                          "start": steps[0] + "-01",
+                          "limit": PPD_LIMIT}
     data = _get("https://landregistry.data.gov.uk/landregistry/query",
                 {"query": query, "output": "json"})
     rows = ((data or {}).get("results") or {}).get("bindings", [])
+    if len(rows) >= PPD_LIMIT:
+        # A full page back means there were probably more, and which ones were
+        # dropped is not knowable from here. A median computed from an unknown
+        # slice is the kind of number that quietly acquires authority it has
+        # not earned, so this refuses and falls back to labelled demo data.
+        raise OpenDataError(
+            f"{loc['district']}: {len(rows)} transactions returned, which is "
+            f"the query limit — the median and count would be computed from "
+            f"an unknown fraction of the sales. Ask for a shorter window.")
 
     by_month: Dict[str, List[Dict[str, Any]]] = {}
     for row in rows:
