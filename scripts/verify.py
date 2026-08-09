@@ -102,9 +102,24 @@ def _looks_offline(output: str) -> bool:
     return any(s in low for s in _OFFLINE)
 
 
-def _tail(output: str, lines: int = 14) -> str:
+def _tail(output: str, lines: int = 200) -> str:
+    """Keep the output, not a glimpse of it.
+
+    This was 14 lines, which is a sensible default for a terminal and the
+    wrong one for a file that exists to be pasted back. The open-data check
+    reports 24 factors one per line, so the first ten — every planning
+    designation — scrolled off, and the report showed only prices and police.
+    A reader could not tell whether the designations had passed, failed or
+    never run, which is the one thing the report is for.
+    """
     kept = [ln for ln in output.strip().splitlines() if ln.strip()]
-    return "\n".join(kept[-lines:])
+    if len(kept) <= lines:
+        return "\n".join(kept)
+    # Trim from the middle rather than the top: the first lines say what was
+    # checked and the last say how it ended, and both matter more than the run
+    # of `ok` in between.
+    head, tail = kept[: lines // 2], kept[-(lines // 2):]
+    return "\n".join(head + [f"… {len(kept) - lines} lines omitted …"] + tail)
 
 
 def check_open_data() -> Outcome:
@@ -154,10 +169,26 @@ def check_ons() -> Outcome:
 
 
 def check_earth_engine() -> Outcome:
+    """Earth Engine, if it can start at all.
+
+    The variable checked here is `GOOGLE_APPLICATION_CREDENTIALS_JSON`,
+    because that is the one `app.py` actually reads. The first version looked
+    for `EE_SERVICE_ACCOUNT_JSON` and a key file on disk, found the key file,
+    decided credentials were present, ran the check and reported a red FAIL —
+    when the real answer was "you have a key, you just have not loaded it".
+    A setup step reported as a data-layer failure is a wasted hour.
+    """
     import os
-    if not (os.environ.get("EE_SERVICE_ACCOUNT_JSON")
-            or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-            or list(pathlib.Path.home().glob("ee-backend/*.json"))):
+    if not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
+        has_key = list(pathlib.Path.home().glob("ee-backend/*.json"))
+        if has_key:
+            return Outcome(
+                "earth-engine", "Earth Engine (27 factors)", "skipped", 0.0,
+                "A service-account key is on disk but not loaded into the "
+                "environment.",
+                "Run `source ./setup.sh` (with `source`, not `./setup.sh`) "
+                "and then re-run this. That loads the key and sets the "
+                "project id.")
         return Outcome(
             "earth-engine", "Earth Engine (27 factors)", "skipped", 0.0,
             "No service-account credentials found.",

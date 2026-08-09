@@ -764,6 +764,53 @@ def _year_before(step: str) -> str:
 SOURCE_STATUS: Dict[str, Dict[str, str]] = {}
 
 
+# ---------------------------------------------------------------------------
+# What has actually been run against a live service
+# ---------------------------------------------------------------------------
+#
+# For most of this project's life this was empty and the honest count of
+# verified factors was 1 — NDVI, checked by hand. Everything else was written
+# against documented API shapes and covered by fixture tests, which proves the
+# parsing and proves nothing about whether the endpoint still answers.
+#
+# On 2026-08-09 `scripts/verify.py` was run from Google Cloud Shell, which has
+# ordinary outbound internet, and 21 of 24 open-data checks returned plausible
+# live values — right number of points, inside the catalogue's declared range,
+# not all gaps. The observed figures are recorded beside each group so a future
+# reader can tell a real verification from a tick.
+#
+# **Only add to this from an actual run.** A factor listed here claims, in the
+# UI and in every export, that a human has seen it work against the real
+# service. That claim is the one thing in this repository that cannot be
+# rebuilt from the code, so it must never be written from optimism.
+VERIFIED_ON = "2026-08-09"
+
+VERIFIED: Dict[str, str] = {
+    # HM Land Registry Price Paid, via one SPARQL query.
+    # `avg_sale_price` is deliberately absent: it is in the same group and
+    # almost certainly worked, but its line was not in the captured output and
+    # "almost certainly" is not the standard this list is held to.
+    "median_sale_price": "£425,000 for 2026-05",
+    "transaction_count": "32 transactions for 2026-05",
+    "new_build_share": "0.0% for 2026-05",
+    "flat_share": "50.0% for 2026-05",
+
+    # data.police.uk street-level crime, one call per month.
+    "crime_density": "230.0 per km² for 2026-05",
+    "burglary_density": "5.0 per km² for 2026-05",
+    "violent_crime_share": "24.6% for 2026-05",
+    "antisocial_share": "16.7% for 2026-05",
+}
+
+# `price_change_yoy` and `price_growth_5yr` are deliberately absent. They are
+# derived from twelve and sixty months of history respectively, and the check
+# asks for six — so every point was correctly a gap and nothing was verified.
+# That is the check's window being too short, not the integration failing, and
+# recording them as verified on the strength of a run that never exercised
+# them would be exactly the overclaim this file exists to prevent. Re-run with
+# `--months 72` to test them for real.
+
+
 def _mark(factors, source: str, status: str = "written", note: str = "",
           endpoint: str = "") -> None:
     """`endpoint` is the host actually queried, which is not always the
@@ -771,7 +818,14 @@ def _mark(factors, source: str, status: str = "written", note: str = "",
     from planning.data.gov.uk, and a user told only "Natural England" cannot
     reproduce the number they are looking at. Both belong in the answer."""
     for f in factors:
-        SOURCE_STATUS[f] = {"source": source, "status": status, "note": note,
+        status_now = "verified" if f in VERIFIED else status
+        note_now = note
+        if f in VERIFIED:
+            seen = VERIFIED[f]
+            note_now = (f"run against the live service on {VERIFIED_ON} — "
+                        f"{seen}" + (f"; {note}" if note else ""))
+        SOURCE_STATUS[f] = {"source": source, "status": status_now,
+                            "note": note_now,
                             "endpoint": endpoint or source}
 
 

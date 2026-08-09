@@ -134,20 +134,59 @@ def refresh(dataset: Dataset, *, source: Optional[pathlib.Path] = None,
 
 def check(dataset: Dataset) -> str:
     """Resolve the URL and report, without parsing. For finding dead links
-    before a real run, which is the failure this is most likely to hit."""
+    before a real run, which is the failure this is most likely to hit.
+
+    **429 is not a dead link.** The first live run of this returned 404 for two
+    datasets and 429 — Too Many Requests — for the other three, and reported
+    all five as FAIL. That is a materially wrong answer: a 404 means the URL
+    moved and needs a human to find the new one, and a 429 means ONS asked us
+    to slow down and the URL is probably fine. Told the first when the second
+    is true, somebody spends an evening hunting for replacement links that
+    were never lost.
+
+    The rate limiting is self-inflicted: five datasets, each making a HEAD and
+    sometimes a GET, all as fast as the loop runs. So the fix is to back off
+    and retry rather than to report a fault.
+    """
+    import time
+
     import requests
 
-    try:
+    def probe():
         r = requests.head(dataset.url, timeout=30, allow_redirects=True,
                           headers=HEADERS)
         if r.status_code >= 400 or "html" in r.headers.get("content-type", ""):
             r = requests.get(dataset.url, timeout=TIMEOUT, headers=HEADERS,
                              stream=True)
+        return r
+
+    try:
+        r = probe()
+        # Two retries with growing waits. ONS's window is short; this costs a
+        # few seconds and turns three false alarms into three real answers.
+        for wait in (2, 6):
+            if r.status_code != 429:
+                break
+            time.sleep(wait)
+            r = probe()
+
         ctype = r.headers.get("content-type", "?")
         size = r.headers.get("content-length", "?")
+
+        if r.status_code == 429:
+            return (f"SLOW {dataset.id:<16} HTTP 429 after 2 retries — "
+                    f"rate limited, not moved. Re-run in a few minutes; "
+                    f"the URL is probably fine.")
+
         ok = r.ok and "html" not in ctype
-        return (f"{'ok  ' if ok else 'FAIL'} {dataset.id:<16} "
-                f"HTTP {r.status_code}  {ctype}  {size} bytes")
+        mark = "ok  " if ok else "FAIL"
+        hint = ""
+        if r.status_code == 404:
+            hint = "  ← moved; open the dataset's `page` link and copy the new URL"
+        elif not ok and "html" in ctype:
+            hint = "  ← returned a web page, not a file; the link points at a landing page"
+        return (f"{mark} {dataset.id:<16} "
+                f"HTTP {r.status_code}  {ctype}  {size} bytes{hint}")
     except Exception as exc:                            # noqa: BLE001
         return f"FAIL {dataset.id:<16} {type(exc).__name__}: {exc}"
 
@@ -166,8 +205,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     wanted = [DATASET_BY_ID[i] for i in args.only] if args.only else DATASETS
 
     if args.check:
-        results = [check(d) for d in wanted]
+        import time
+
+        results = []
+        for i, d in enumerate(wanted):
+            if i:
+                # Space the datasets out. Firing five back-to-back is what
+                # earned the 429s in the first place.
+                time.sleep(1.5)
+            results.append(check(d))
         print("\n".join(results))
+
+        slow = [r for r in results if r.startswith("SLOW")]
+        if slow:
+            print(f"\n{len(slow)} rate limited rather than broken — "
+                  f"re-run `python3 -m ons.job --check` in a few minutes.")
+        # Only a real failure fails the run. Exiting 1 on a 429 would report a
+        # working URL as a dead one, which is the whole point of the split.
         return 1 if any(r.startswith("FAIL") for r in results) else 0
 
     if args.from_file and len(wanted) != 1:

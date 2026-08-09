@@ -5,6 +5,80 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## 2026-08-09 (second pass) — The number moved
+
+**1 → 9 verified.** It had been 1 since NDVI.
+
+The user ran `scripts/verify.py` from Google Cloud Shell, which has ordinary
+outbound internet, and pasted the report back. This is the first time any of
+this catalogue has been checked against reality since the project started.
+
+### What came back
+
+**21 of 24 open-data checks passed**, with real figures: median sale price
+£425,000, 32 transactions, crime density 230 per km², burglary 5.0 per km².
+Nine factors promoted, each recorded in `open_data.VERIFIED` with the value
+that was observed — a date and a tick is not a record.
+
+**The flood-zone attribute passed.** `flood-risk-type` is the real name. That
+was the riskiest unverified guess in the repository: taken from a published
+schema, never seen live, and if wrong the app was at risk of reporting 0% flood
+risk on a floodplain. It is right.
+
+### Three of the four failures were not what they looked like
+
+**`price_change_yoy` and `price_growth_5yr` — "every point is a gap".**
+Arithmetically correct, wrong question. They derive from 13 and 61 months of
+history and the check asked for six, so every point was a legitimate gap. The
+check now reports "not testable in this window" and names the `--months` value
+that would test it.
+
+**ONS: two moved, three rate limited.** 404 for `private_rents` and `imd_2019`
+— genuinely need new URLs. 429 for the other three, which is ONS asking us to
+slow down, not a dead link. The check reported all five as FAIL, which would
+have sent somebody hunting for replacement links that were never lost. It now
+backs off, retries, spaces the requests, and reports `SLOW` separately.
+
+**Earth Engine was never tested at all.** It reported a red failure that was
+really a setup step: `verify.py` looked for `EE_SERVICE_ACCOUNT_JSON` and a key
+file, found the key file, decided credentials were present and ran — but
+`app.py` reads `GOOGLE_APPLICATION_CREDENTIALS_JSON`, which was not loaded. It
+now checks the variable the app actually reads and says `source ./setup.sh`.
+
+So the honest scoreline of the first run is **one real problem found (two dead
+ONS URLs), one guess confirmed, nine factors verified, and three false alarms
+in my own tooling** — which is roughly what a first run should look like.
+
+### The mistake I made while writing the guard against it
+
+I wrote a comment saying "only add to this from an actual run… must never be
+written from optimism", and in the same edit added `avg_sale_price` to the
+verified list. It was not in the captured output. It is in the same group as
+four that passed and it almost certainly works, and "almost certainly" is not
+the standard. Removed.
+
+The cause was mine too: `verify.py` kept only the last 14 lines of each check,
+so the eleven planning designations and both flood factors scrolled off the
+report entirely. A reader could not tell whether they had passed, failed or
+never run — the one thing the report exists to say. It now keeps the whole
+output, trimming from the middle if it must.
+
+`tests/test_catalogue_audit.py` had a test asserting no open-data factor
+claims `verified`, with a docstring saying it should be "updated deliberately,
+not discovered to be failing" if anyone promoted them. That is exactly what
+happened. It now guards the new invariant instead: a factor may only claim
+`verified` if it is in `open_data.VERIFIED`, and every entry there must record
+a figure that was actually seen.
+
+`docs/OPEN-DATA.md` carries the full log.
+
+**Still to promote:** `avg_sale_price`, eleven planning designations and both
+flood-zone factors, once a re-run captures their lines.
+
+520 passing, 10 skipped.
+
+---
+
 ## 2026-08-09 — Attacking the bottleneck instead of adding to it
 
 51 factors real, **1 verified**, and that number has not moved since NDVI.

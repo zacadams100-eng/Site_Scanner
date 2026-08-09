@@ -56,20 +56,69 @@ def test_every_real_factor_says_whether_anyone_has_run_it(audited):
         assert status in ("verified", "written"), f"{factor_id}: {status!r}"
 
 
-def test_the_open_data_factors_are_not_yet_claimed_as_verified(audited):
-    """They have never been run against a live endpoint — this environment
-    cannot reach any of the five hosts. If someone promotes them, they should
-    have run scripts/check_open_data.py first and this test should be updated
-    deliberately, not discovered to be failing."""
+def test_only_factors_from_a_real_run_are_claimed_as_verified(audited):
+    """Updated deliberately on 2026-08-09, which is what the previous version
+    of this test asked for.
+
+    It used to assert that *no* open-data factor claimed `verified`, because
+    none had ever been run — this environment cannot reach any of the five
+    hosts. On 2026-08-09 `scripts/verify.py` was run from Google Cloud Shell
+    and 21 of 24 checks returned plausible live values, so the blanket ban
+    became false and the guard has to change shape rather than be deleted.
+
+    What it guards now is the thing that actually matters: a factor may only
+    claim `verified` if it appears in `open_data.VERIFIED`, which is a
+    hand-maintained record of what a human watched work. The list is the
+    bottleneck on the claim, deliberately, because it is the one thing in this
+    repository that cannot be regenerated from the code.
+    """
+    import open_data
+
     _, provenance, _, _ = audited
     open_data_factors = [f for f, p in provenance.items()
                          if "earthengine" not in p["endpoint"]]
     assert open_data_factors, "the open-data factors did not register at all"
-    claimed = [f for f in open_data_factors
-               if provenance[f]["status"] == "verified"]
-    assert not claimed, (
-        f"{claimed} claim to be verified; run scripts/check_open_data.py and "
-        "record the run in docs/OPEN-DATA.md before promoting them")
+
+    claimed = {f for f in open_data_factors
+               if provenance[f]["status"] == "verified"}
+    unbacked = claimed - set(open_data.VERIFIED)
+    assert not unbacked, (
+        f"{sorted(unbacked)} claim to be verified but are not in "
+        "open_data.VERIFIED. Run scripts/verify.py, and add only what you "
+        "actually saw pass.")
+
+
+def test_every_verified_entry_records_what_was_observed(audited):
+    """A date and a tick is not a record.
+
+    Each entry carries the figure that came back, so a later reader can tell a
+    real verification from somebody having felt confident. This is the same
+    lesson as `check_real_ndvi.py` printing a tick for a series of unmasked
+    cloud — see HANDOFF.md, "A tick is not a verification".
+    """
+    import open_data
+
+    assert open_data.VERIFIED_ON, "the run date must be recorded"
+    for factor_id, observed in open_data.VERIFIED.items():
+        assert len(observed) > 8, \
+            f"{factor_id}: {observed!r} does not say what was seen"
+        assert any(c.isdigit() for c in observed), \
+            f"{factor_id}: {observed!r} records no figure"
+
+
+def test_the_derived_price_factors_are_not_claimed(audited):
+    """They were reported FAIL by the first live run — "every point is a gap"
+    — because a year-on-year change needs thirteen months of history and the
+    check asked for six. That is the window being too short, not the
+    integration working. Neither outcome justifies `verified`, and the
+    tempting reading (it is probably fine, it is in the same group as four
+    that passed) is exactly the one to refuse."""
+    import open_data
+
+    for factor_id in ("price_change_yoy", "price_growth_5yr", "avg_sale_price"):
+        assert factor_id not in open_data.VERIFIED, (
+            f"{factor_id} was never observed working; re-run "
+            "scripts/check_open_data.py --months 72 before claiming it")
 
 
 def test_the_publisher_and_the_endpoint_are_both_recorded(audited):

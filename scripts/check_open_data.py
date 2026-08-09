@@ -162,6 +162,17 @@ def main() -> int:
         print("No factors registered — is `requests` installed?", file=sys.stderr)
         return 1
 
+    # How many months of history a factor needs before it can produce a single
+    # value. A year-on-year change needs thirteen months to compare two of
+    # them; a five-year growth needs sixty-one.
+    #
+    # Without this the default six-month window reported `price_change_yoy`
+    # and `price_growth_5yr` as FAIL — "every point is a gap" — which is the
+    # arithmetically correct answer to a question that could not be answered
+    # and reads as a broken integration. The first live run wasted two of its
+    # three failures on exactly that.
+    NEEDS_MONTHS = {"price_change_yoy": 13, "price_growth_5yr": 61}
+
     groups = {
         "planning": [f for f in registry if f in open_data.PLANNING_DATASETS],
         "prices": ["avg_sale_price", "median_sale_price", "transaction_count",
@@ -196,12 +207,18 @@ def main() -> int:
               f"/ {place.get('district')} ({place.get('admin_district_code')})")
         print(f"Window  {steps[0]} … {steps[-1]}\n")
 
-    results, skipped = [], []
+    results, skipped, needs_more = [], [], []
     for name in wanted:
         for factor_id in groups.get(name, []):
             fn = registry.get(factor_id)
             if fn is None:
                 skipped.append((factor_id, name))
+                continue
+            need = NEEDS_MONTHS.get(factor_id)
+            if need and len(steps) < need:
+                # Not a failure and not a pass — the window cannot answer the
+                # question. Saying so is the honest third state.
+                needs_more.append((factor_id, need))
                 continue
             results.append((name, check_factor(factor_id, fn, geometry, steps, area_ha)))
 
@@ -232,6 +249,13 @@ def main() -> int:
             if any(n == "epc" for _, n in skipped):
                 print("  EPC needs EPC_API_EMAIL and EPC_API_KEY — free from "
                       "epc.opendatacommunities.org/docs/api")
+        if needs_more:
+            worst = max(n for _, n in needs_more)
+            print(f"\nNot testable in a {len(steps)}-month window: "
+                  f"{', '.join(f for f, _ in needs_more)}")
+            print(f"  These derive from earlier months, so a short window "
+                  f"makes every point a legitimate gap. Re-run with "
+                  f"--months {worst} to test them.")
 
     failed = [r for _, r in results if not r.ok]
     if not args.json:

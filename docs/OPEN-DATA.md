@@ -182,3 +182,61 @@ dead endpoint costs one factor its realness for that request — it never blanks
 a report that has eleven other factors in it. `tests/test_open_data.py` covers
 that contract end to end, because it is the property that makes a half-real
 catalogue safe to ship.
+
+---
+
+## Verification log
+
+A verification with no date is a claim, not a record. Each run goes here.
+
+### 2026-08-09 — first live run
+
+Run from Google Cloud Shell (ordinary outbound internet; the usual development
+sandbox reaches none of these hosts). AOI: 1.2 km square near Guildford,
+51.235 N 0.570 W. Window: six months ending 2026-05.
+
+**21 of 24 open-data checks passed.** Observed values, so a later reader can
+tell this from a tick:
+
+| Factor | Observed 2026-05 |
+| --- | --- |
+| `median_sale_price` | £425,000 |
+| `transaction_count` | 32 |
+| `new_build_share` | 0.0% |
+| `flat_share` | 50.0% |
+| `crime_density` | 230.0 per km² |
+| `burglary_density` | 5.0 per km² |
+| `violent_crime_share` | 24.6% |
+| `antisocial_share` | 16.7% |
+
+Nine factors promoted to `verified` in `open_data.VERIFIED`. The catalogue's
+verified count moved from **1 to 9** — the first time it has moved since NDVI.
+
+**Not promoted, and why.** `avg_sale_price` is in the same group and almost
+certainly worked, but its line was outside the captured output and "almost
+certainly" is not the standard. The eleven planning designations and the two
+flood-zone factors are in the same position: the report kept only the last 14
+lines of the check, so their results scrolled off. `verify.py` now keeps the
+whole output. Re-run and they can be promoted properly.
+
+**`price_change_yoy` and `price_growth_5yr` reported FAIL** — "every point is a
+gap". Correct arithmetic, wrong question: they derive from 13 and 61 months of
+history and the check asked for six. `check_open_data.py` now reports that as
+"not testable in this window" and names the `--months` value that would test
+it, rather than as a failure.
+
+**The flood-zone attribute check passed**, confirming `flood-risk-type` is the
+real attribute name on planning.data.gov.uk. That was the riskiest unverified
+guess in the repository — it was taken from a published schema and had never
+been seen in a live response, and had it been wrong the app would have been at
+risk of reporting 0% flood risk on a floodplain.
+
+**ONS: two moved, three rate limited.** `private_rents` and `imd_2019` return
+404 and genuinely need new URLs. `affordability`, `earnings` and `census_2021`
+returned 429 — Too Many Requests — which is not a dead link, and the check now
+backs off and retries rather than reporting all five as broken.
+
+**Earth Engine was never actually tested.** It reported a failure that was
+really a setup step: `GOOGLE_APPLICATION_CREDENTIALS_JSON` was not loaded.
+`verify.py` now checks the variable the app actually reads and says
+`source ./setup.sh` instead of showing red.
