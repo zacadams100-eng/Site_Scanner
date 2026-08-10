@@ -36,6 +36,13 @@ COPY app.py mock_ee_backend.py routes_catalog.py \
      ratelimit.py telemetry.py baselines.py licensing.py radar.py \
      comparison.py ./
 
+# The historical package, as a package. It needs its own COPY: a single COPY
+# with several sources sends all of them to one destination, so folding a
+# directory into the list above would flatten its modules into /app and the
+# `historical.metrics` import would fail at container start — exactly the class
+# of omission tests/test_docker_context.py exists to catch.
+COPY historical/ ./historical/
+
 # Don't run as root. Cloud Run doesn't require it, but nothing here needs the
 # privileges and the container has network egress.
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin contour

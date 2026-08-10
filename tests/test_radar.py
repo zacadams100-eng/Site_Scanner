@@ -561,3 +561,54 @@ def test_capabilities_agrees_with_the_radar_about_which_factors_it_reads():
     claimed = {r["factor"] for r in body["factors"] if r["supports_radar"]}
     actual = {f for rule in radar.RULES for f in rule.needs}
     assert claimed == actual
+
+
+def test_converging_evidence_requires_different_factors_not_just_two_rules():
+    """Two methods on one measurement is not converging evidence.
+
+    A trend test and a baseline-change test over the same NDVI series both
+    raise an ecological appraisal, and promoting on that counts the same
+    evidence twice. It is indistinguishable from genuine convergence in the
+    payload, which is why the condition is on the factors rather than on the
+    flag count.
+
+    Driven through `_investigations` directly: the two real NDVI rules measure
+    percentage change differently and cannot both land on `medium` for any
+    input, so an end-to-end version of this test would be asserting a
+    coincidence of two severity mappings rather than the promotion rule.
+    """
+    def flag(fid, factor):
+        return {"id": fid, "severity": "medium", "factors": [factor],
+                "text": f"{fid} fired", "investigations": ["ecology_survey"]}
+
+    same = radar._investigations([flag("vegetation_decline", "ndvi"),
+                                  flag("historical_vegetation_decline", "ndvi")])
+    survey = next(i for i in same if i["id"] == "ecology_survey")
+    assert len(survey["why"]) == 2, "both flags must still be listed"
+    assert survey["priority"] == "medium", "same factor is not convergence"
+    assert survey["evidence_factors"] == ["ndvi"]
+
+    different = radar._investigations([flag("standing_water", "water_occurrence"),
+                                       flag("tpo", "tpo_density")])
+    survey = next(i for i in different if i["id"] == "ecology_survey")
+    assert survey["priority"] == "high", "independent factors do converge"
+
+
+def test_both_ndvi_rules_can_fire_without_inflating_each_other():
+    """The end-to-end half: two rules on one factor, and the investigation's
+    priority is theirs rather than a product of there being two of them."""
+    falling = [0.60 - 0.0016 * i for i in range(132)]
+    ndvi = series(falling, unit="index", source="earth-engine", name="NDVI")
+    result = radar.assess(report(ndvi=ndvi))
+
+    raised = [f for f in result["flags"]
+              if "ecology_survey" in f["investigations"]]
+    assert len(raised) == 2, [f["id"] for f in raised]
+
+    survey = next(i for i in result["investigations"]
+                  if i["id"] == "ecology_survey")
+    assert survey["evidence_factors"] == ["ndvi"]
+    # High because one of the two flags is high on its own merits, not because
+    # two flags pointed at the same survey.
+    assert survey["priority"] == min((f["severity"] for f in raised),
+                                     key=radar._rank)

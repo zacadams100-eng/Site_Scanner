@@ -5,6 +5,56 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Historical rules — step 4 — 2026-08-10
+
+One rule, and the whole chain proven: Sentinel-2 → metric → rule → radar →
+finding → investigation → assessment log.
+
+    MEDIUM  Vegetation vigour has declined 23% relative to the historical
+            baseline (0.61 in 2011–2013 to 0.47 in 2024–2026). A decline of
+            this size is worth establishing the cause of.
+
+            threshold      20% decline (Contour reporting threshold)
+            years observed 16 of 16 · method hist-1
+            → Preliminary ecological appraisal
+
+**The threshold is the only product decision in step 4, and it is named,
+signed and explained.** `VEGETATION_CHANGE_INVESTIGATION_THRESHOLD = -20.0`,
+with the rationale beside the constant rather than in a commit message: it is a
+Contour reporting threshold, product-defined, **not a regulatory or scientific
+standard**, and it identifies changes large enough to warrant professional
+investigation rather than evidence of ecological degradation. That text ships
+in `rule_meta` on every flag, so the evidence drawer can show the difference
+between *the measurement* and *Contour's decision to surface it*.
+
+Sign convention fixed too: `change_pct` is negative for a decline, so the test
+reads `change_pct <= -20` and never `abs(...) >= 20`. An increase and a decline
+do not warrant the same investigation.
+
+**Two engine changes, both general rather than historical-specific:**
+
+- **A rule may now declare insufficient evidence.** Returning `None` means
+  "checked, found nothing" — so a live NDVI series with two usable years would
+  have produced a `clear`, because the arithmetic works fine on two years. Any
+  rule may now return `{"insufficient": ...}` and the engine routes it to
+  `not_assessed` / `no_data`. `_state_of` cannot see this: it knows whether
+  inputs exist and are real, not that a rule needed six usable years.
+- **Converging evidence now requires different factors.** Wiring the rule
+  revealed that the trend test and the baseline test — two methods on one NDVI
+  series — were promoting an ecological appraisal from medium to high as though
+  they were independent observations. They are not; that is counting the same
+  evidence twice, and it looks identical in the payload.
+
+`radar.py` gained no branch that knows what a historical rule is. It collects
+rules from a contributing package by calling `build(Rule)` — the class passed
+in, so the package never imports the engine — and a test asserts `assess()`
+contains no mention of historical, Sentinel or MODIS.
+
+757 Python tests (+19), 165 frontend. Step 5, the historical UI, is next and
+must read state it never computes (EM11).
+
+---
+
 ## Historical metrics — step 3 — 2026-08-10
 
 A deliberately boring transcription of the frozen methodology. `historical/`

@@ -260,7 +260,8 @@ class Rule:
     def __init__(self, id: str, topic: str, needs: Sequence[str],
                  test: Callable[[Dict[str, Dict[str, Any]]], Optional[Dict[str, Any]]],
                  investigations: Sequence[str], asks: str,
-                 kind: str = "flag") -> None:
+                 kind: str = "flag",
+                 meta: Optional[Dict[str, Any]] = None) -> None:
         self.id = id
         self.topic = topic
         self.needs = tuple(needs)
@@ -276,6 +277,11 @@ class Rule:
         #: this site averages 61 m elevation" is a fabricated fact about a real
         #: place whether or not anyone would act on it.
         self.kind = kind
+        #: What the rule is, for the evidence drawer — its threshold, what kind
+        #: of threshold that is, and what it is for. Carried onto every flag it
+        #: raises, so the distinction between *the measurement* and *Contour's
+        #: decision to surface the measurement* is visible rather than implied.
+        self.meta = dict(meta or {})
 
 
 def _pct(v: float) -> str:
@@ -656,6 +662,33 @@ RULES: Tuple[Rule, ...] = (
 )
 
 
+def _rules_from(module_name: str) -> Tuple[Rule, ...]:
+    """Rules contributed by another package.
+
+    The engine collects rules; it does not know what they measure. There is no
+    branch anywhere below that asks whether a rule came from here — a
+    contributed rule is an ordinary `Rule` and travels the identical path, which
+    is the architectural point of `HISTORICAL_EVIDENCE_MODEL.md`.
+
+    `build(Rule)` is called with the class rather than the package importing
+    `radar` itself, so the direction of knowledge stays one-way and there is no
+    circular import to work around.
+
+    A contributing package that fails to import must not take the radar down
+    with it: the rules it would have added are simply absent, and every topic
+    they served reports `not_assessed` — which is the honest outcome and the
+    one the whole model is built to produce.
+    """
+    try:
+        module = __import__(module_name, fromlist=["build"])
+        return tuple(module.build(Rule))
+    except Exception:                                       # noqa: BLE001
+        return ()
+
+
+RULES = RULES + _rules_from("historical.rules")
+
+
 # ---------------------------------------------------------------------------
 # Assembly
 # ---------------------------------------------------------------------------
@@ -850,6 +883,36 @@ def assess(report: Dict[str, Any],
             # insights.for_series.
             continue
 
+        # A rule that ran but could not evaluate is not a clear result.
+        #
+        # `_state_of` can only see whether the inputs exist and are real; it
+        # cannot know that a rule needs six usable years and found two. Without
+        # this branch, such a rule returns None and the engine reads it as
+        # "checked, nothing found" — the same false zero as EM6, arriving one
+        # layer higher. General on purpose: any rule may declare insufficient
+        # evidence, and the engine does not know or care which one did.
+        if isinstance(found, dict) and found.get("insufficient"):
+            topic_states.setdefault(rule.topic, []).append("not_assessed")
+            for check in topic_checks.get(rule.topic, []):
+                if check["rule"] == rule.id:
+                    check["assessed"] = False
+                    check["reason"] = "no_data"
+            for f in rule.needs:
+                record(f, "no_data")
+            unavailable.append({
+                "rule": rule.id,
+                "topic": rule.topic,
+                "topic_name": TOPICS.get(rule.topic, rule.topic),
+                "asks": rule.asks,
+                "reason": "no_data",
+                "factors": list(rule.needs),
+                "factor_names": [
+                    (series.get(f) or {}).get("meta", {}).get("name")
+                    or _catalog_name(f) for f in rule.needs],
+                "text": f"Not assessed — {rule.asks}. {found['insufficient']}",
+            })
+            continue
+
         checked.setdefault(rule.topic, []).extend(rule.needs)
         for f in rule.needs:
             record(f, "assessed")
@@ -887,6 +950,7 @@ def assess(report: Dict[str, Any],
             "factors": list(rule.needs),
             "provenance": _provenance_for(rule.needs, series),
             "investigations": list(rule.investigations),
+            "rule_meta": rule.meta,
             "assessed_at": at,
         })
 
@@ -1049,12 +1113,20 @@ def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """The checks the flags prompt, ranked, each naming what raised it.
 
     Priority is the strongest severity among the flags that raised it, with one
-    promotion: a `medium` raised by two or more separate flags becomes `high`.
-    Converging evidence from independent observations is genuinely stronger
-    than either alone — standing water *and* a brownfield entry both pointing
-    at ground investigation is a different case from one of them. The promotion
-    only ever runs medium → high; a pile of low-severity flags never becomes
-    urgent by accumulation, because that is how a checklist turns into noise.
+    promotion: a `medium` raised by two or more flags **resting on different
+    factors** becomes `high`.
+
+    The factor condition is the whole of it. Standing water *and* a brownfield
+    register entry both pointing at ground investigation is genuinely stronger
+    than either alone, because they are independent observations. Two rules
+    reading the same NDVI series — a trend test and a baseline-change test —
+    are two methods on one measurement, and promoting on that is counting the
+    same evidence twice. It looks identical in the payload, which is why the
+    condition is on the factors rather than on the flag count.
+
+    The promotion only ever runs medium → high; a pile of low-severity flags
+    never becomes urgent by accumulation, because that is how a checklist turns
+    into noise.
     """
     raised: Dict[str, List[Dict[str, Any]]] = {}
     for flag in flags:
@@ -1067,7 +1139,8 @@ def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not meta:
             continue
         priority = min((c["severity"] for c in causes), key=_rank)
-        if priority == "medium" and len({c["id"] for c in causes}) >= 2:
+        independent = {f for c in causes for f in c["factors"]}
+        if priority == "medium" and len(independent) >= 2:
             priority = "high"
         out.append({
             "id": inv_id,
