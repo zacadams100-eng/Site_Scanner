@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
-import type { Flag, RadarTopic, Unassessed } from '../types'
+import type { Coverage, Flag, InfoFinding, RadarTopic, Unassessed } from '../types'
 
 /**
  * The investigation radar.
@@ -48,6 +48,8 @@ export default function Radar() {
   const toggleFactor = useStore((s) => s.toggleFactor)
   const selected = useStore((s) => s.selected)
   const [openFlag, setOpenFlag] = useState<string | null>(null)
+  const [openInv, setOpenInv] = useState<string | null>(null)
+  const [logOpen, setLogOpen] = useState(false)
 
   const radar = data?.radar
 
@@ -64,12 +66,37 @@ export default function Radar() {
 
   if (!radar) return null
 
-  const { flags, topics, investigations, not_assessed, counts } = radar
+  const { flags, topics, investigations, not_assessed, counts,
+          informational, coverage, log } = radar
   const blocked = not_assessed.filter((u) => u.reason === 'demo_data')
 
   return (
     <div className="radar">
-      {/* Coverage first. What was looked at decides how to read what follows. */}
+      {/* Coverage first. What was looked at decides how to read what follows,
+          and the note under it is not optional — a percentage on a screen
+          becomes a score in a reader's head within about two seconds. */}
+      <section className="radar-cover-head" aria-label="Assessment coverage">
+        <div className="cover-top">
+          <h3 className="cover-title">Assessment coverage</h3>
+          <span className="cover-pct mono">{Math.round(coverage.share * 100)}%</span>
+        </div>
+        <p className="cover-sub mono">
+          {coverage.assessed} / {coverage.relevant} relevant factors assessed
+        </p>
+        <CoverageBar coverage={coverage} />
+        <ul className="cover-legend">
+          <li><span className="radar-dot is-flagged" aria-hidden />
+            {coverage.flagged} flagged</li>
+          <li><span className="radar-dot is-clear" aria-hidden />
+            {coverage.clear} clear</li>
+          <li><span className="radar-dot is-info" aria-hidden />
+            {coverage.informational} informational</li>
+          <li><span className="radar-dot is-not_assessed" aria-hidden />
+            {coverage.not_assessed} not assessed</li>
+        </ul>
+        <p className="cover-note">{coverage.note}</p>
+      </section>
+
       <section className="radar-coverage" aria-label="What was assessed">
         <ul className="radar-topics">
           {topics.map((t) => (
@@ -79,14 +106,18 @@ export default function Radar() {
               <span className="radar-topic-state">
                 {t.state === 'flagged'
                   ? `${t.flags} flag${t.flags === 1 ? '' : 's'}`
-                  : t.state === 'clear' ? 'checked · clear' : 'not assessed'}
+                  : t.state === 'clear' ? 'checked · clear'
+                  /* Some checks ran, others could not. Calling that clear
+                     would be the same overstatement as a generated zero. */
+                  : t.state === 'partial' ? 'partly checked'
+                  : 'not assessed'}
               </span>
             </li>
           ))}
         </ul>
         <p className="radar-coverage-sum mono">
           {counts.topics_flagged} flagged · {counts.topics_clear} clear ·{' '}
-          {counts.topics_not_assessed} not assessed
+          {counts.topics_partial} partial · {counts.topics_not_assessed} not assessed
         </p>
       </section>
 
@@ -113,6 +144,22 @@ export default function Radar() {
         </p>
       )}
 
+      {/* Measured, and neither good nor bad. Deliberately after the flags and
+          set quieter: the radar should still prioritise what needs action. */}
+      {informational.length > 0 && (
+        <section aria-label="Site facts">
+          <h3 className="radar-head">Site facts</h3>
+          <ul className="info-list">
+            {informational.map((i: InfoFinding) => (
+              <li key={i.id} className="info-row">
+                <span className="info-text">{i.text}</span>
+                <span className="info-topic">{i.topic_name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Investigations */}
       {investigations.length > 0 && (
         <section aria-label="Recommended next investigations">
@@ -128,7 +175,14 @@ export default function Radar() {
                 <ul className="inv-list">
                   {group.map((inv) => (
                     <li key={inv.id} className="inv">
-                      <p className="inv-name">{inv.name}</p>
+                      <button className="inv-head"
+                              aria-expanded={openInv === inv.id}
+                              onClick={() => setOpenInv(openInv === inv.id ? null : inv.id)}>
+                        <span className="inv-name">{inv.name}</span>
+                        <span className="inv-count mono">
+                          {inv.why.length} finding{inv.why.length === 1 ? '' : 's'}
+                        </span>
+                      </button>
                       <p className="inv-blurb">{inv.blurb}</p>
                       {/* Every recommendation walks back to a number. Without
                           this the list is advice; with it, it is a
@@ -138,6 +192,22 @@ export default function Radar() {
                           <li key={i}>{why}</li>
                         ))}
                       </ul>
+                      {openInv === inv.id && (
+                        <div className="inv-more">
+                          {inv.next_step && (
+                            <p className="inv-step">
+                              <span className="inv-step-label">Next step</span>
+                              {inv.next_step}
+                            </p>
+                          )}
+                          {!!inv.evidence_factors?.length && (
+                            <p className="inv-evidence">
+                              <span className="inv-step-label">Evidence</span>
+                              {inv.evidence_factors.join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -200,7 +270,67 @@ export default function Radar() {
         </section>
       )}
 
+      {/* The audit trail. A professional coming back in three months needs to
+          know why the report said what it said, not to trust that it did. */}
+      {log.length > 0 && (
+        <section className="radar-log" aria-label="Assessment log">
+          <button className="log-toggle" aria-expanded={logOpen}
+                  onClick={() => setLogOpen(!logOpen)}>
+            Assessment log
+            <span className="mono">{log.length}</span>
+          </button>
+          {logOpen && (
+            <>
+              <p className="log-when mono">
+                Assessed {new Date(radar.assessed_at).toLocaleString('en-GB')}
+              </p>
+              <table className="log-table">
+                <tbody>
+                  {log.map((row) => (
+                    <tr key={row.factor} className={`log-${row.state}`}>
+                      <td>{row.name}</td>
+                      <td className="log-state">
+                        {row.state === 'assessed' ? 'assessed'
+                          : row.state === 'generated' ? 'no live source'
+                          : 'not loaded'}
+                      </td>
+                      <td className="log-who">
+                        {row.state === 'assessed'
+                          ? <>{row.publisher ?? 'unknown publisher'}
+                              {row.status === 'verified' && ' · live'}</>
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* The philosophy, in the product rather than in a design document. */}
+      <p className="radar-principle">{radar.principle}</p>
       <p className="radar-limits">{radar.limits}</p>
+    </div>
+  )
+}
+
+/**
+ * Proportions of what was looked at — deliberately a stacked bar and never a
+ * gauge or a dial. A gauge has a good end and a bad end, and this measurement
+ * has neither: it says how much we could see, not how the site scored.
+ */
+function CoverageBar({ coverage }: { coverage: Coverage }) {
+  const total = Math.max(1, coverage.relevant)
+  const seg = (n: number) => ({ width: `${(n / total) * 100}%` })
+  return (
+    <div className="cover-bar" role="img"
+         aria-label={`${coverage.assessed} of ${coverage.relevant} relevant factors assessed`}>
+      <span className="cover-seg is-flagged" style={seg(coverage.flagged)} />
+      <span className="cover-seg is-clear" style={seg(coverage.clear)} />
+      <span className="cover-seg is-info" style={seg(coverage.informational)} />
+      <span className="cover-seg is-gap" style={seg(coverage.not_assessed)} />
     </div>
   )
 }

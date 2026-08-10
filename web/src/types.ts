@@ -216,7 +216,9 @@ export interface Flag {
 export interface RadarTopic {
   id: string
   name: string
-  state: 'flagged' | 'clear' | 'not_assessed'
+  /** `partial` — some of this topic's checks ran and others could not. A topic
+   *  with two checks where only one ran is not a clear topic. */
+  state: 'flagged' | 'clear' | 'partial' | 'not_assessed'
   flags: number
   checked: string[]
 }
@@ -243,20 +245,82 @@ export interface Investigation {
   /** Flag ids. Never empty — no recommendation exists without a flag. */
   why: string[]
   why_text: string[]
+  /** What to actually do. A recommendation that stops at naming a survey
+   *  leaves the reader to work out who to ring. */
+  next_step?: string
+  evidence_factors?: string[]
+}
+
+/** A measured fact that is neither good nor bad. Bound by the same real-data
+ *  rule as a flag: a generated informational finding is still a fabricated
+ *  fact about a real place. */
+export interface InfoFinding {
+  id: string
+  topic: string
+  topic_name: string
+  text: string
+  evidence: Record<string, string | number>
+  factors: string[]
+  provenance: FlagProvenance[]
+}
+
+/** One row of the audit trail: a factor a rule wanted, and what became of it. */
+export interface LogRow {
+  factor: string
+  name: string
+  state: 'assessed' | 'not_selected' | 'generated'
+  publisher?: string | null
+  endpoint?: string | null
+  status?: 'verified' | 'written' | null
+  source?: string | null
+  at: string
+}
+
+/**
+ * How much of this site we were able to look at.
+ *
+ * Deliberately **not** a score, and `note` says so. A site at 90% is not
+ * better than one at 50% — we simply know more about it. Collapsing this into
+ * "Site health: 72/100" is the most commercially attractive wrong turn
+ * available to this product, because a score hides its own inputs and the
+ * entire argument for this tool is that it shows them.
+ */
+export interface Coverage {
+  relevant: number
+  assessed: number
+  /** 0–1. */
+  share: number
+  flagged: number
+  clear: number
+  informational: number
+  not_assessed: number
+  /** Split by cause: one is a click, the other is a wall. */
+  not_selected: number
+  generated: number
+  verified: number
+  note: string
 }
 
 export interface Radar {
   flags: Flag[]
+  informational: InfoFinding[]
   topics: RadarTopic[]
   investigations: Investigation[]
   not_assessed: Unassessed[]
+  log: LogRow[]
+  assessed_at: string
+  coverage: Coverage
   counts: {
     flags: number
     high: number
+    informational: number
     topics_flagged: number
     topics_clear: number
+    topics_partial: number
     topics_not_assessed: number
   }
+  /** "A clear result means we checked. An empty result means we could not." */
+  principle: string
   limits: string
 }
 

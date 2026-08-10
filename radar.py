@@ -30,19 +30,31 @@ protects a *recommendation* ("commission a ground investigation, demo data").
 The first invites a check; the second has already done the damage by the time
 anyone reads the parenthesis.
 
-## 2. Three outcomes, never two
+## 2. Four outcomes, never one
 
-Every topic reports `flagged`, `clear`, or `not_assessed`. A radar that lists
-only what it found reads as "we looked at everything and this is what is
-wrong". Silence would then mean safety, and here silence usually means
-**Terrain: every slope factor in this catalogue is generated**. Saying "not
-assessed, and here is why" is the entire difference between a tool that helps
-and a tool that gets someone sued.
+A radar that lists only what it found reads as "we looked at everything and
+this is what is wrong". Silence would then mean safety, and here silence
+usually means **Terrain: every slope factor in this catalogue is generated**.
+So a finding is one of four things:
 
-`not_assessed` distinguishes two causes, because one is fixable in a click:
+- `flagged` — crossed a threshold, and it is worth acting on.
+- `clear` — **checked against a real source and found below threshold.**
+- `informational` — measured, and neither good nor bad. Site area, mean NDVI,
+  dominant land cover. Without these the radar is only a problem-finder, and a
+  tool that can exclusively deliver bad news is one people stop opening.
+- `not_assessed` — not looked at. Split by cause, because one is a click and
+  the other is a wall: `not_selected` (add the layer and re-run) and
+  `demo_data` (the factor is generated; nothing the user can do).
 
-- `not_selected` — the layer isn't in this report. Add it and re-run.
-- `demo_data` — the factor exists but is generated. Nothing the user can do.
+**`clear` is the load-bearing one.** "Generated data indicates no flood risk"
+is not the same claim as "we checked the Environment Agency's dataset and found
+none", and the two must never render as the same green tick. So `clear`
+requires real *and* assessed *and* below threshold. Anything else is
+`not_assessed`. `test_generated_data_can_never_produce_a_clear` guards it.
+
+A topic gets `partial` when some of its checks ran and others could not — a
+topic with two checks where only one ran is not a clear topic, and calling it
+one is the same overstatement one level up.
 
 ## 3. An investigation must trace to a flag
 
@@ -61,12 +73,20 @@ crossed a threshold in the layers you loaded" and never "this site is fine".
 
 from __future__ import annotations
 
+import datetime as _dt
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import insights
 
 #: Severity of a flag, worst first. Also the priority scale for investigations.
 SEVERITIES = ("high", "medium", "low")
+
+#: The product's whole philosophy in two sentences, served with every report so
+#: it travels into any UI, export or integration rather than living in a design
+#: document nobody reads. It is also the answer to "what makes you different
+#: from a risk score", which is the question a professional buyer asks.
+PRINCIPLE = ("A clear result means we checked. "
+             "An empty result means we could not.")
 
 
 def _rank(sev: str) -> int:
@@ -101,63 +121,76 @@ INVESTIGATIONS: Dict[str, Dict[str, str]] = {
         "name": "Flood risk assessment",
         "blurb": "A site-specific FRA is normally required where any part of a "
                  "site falls in Flood Zone 2 or 3.",
+        "next_step": "Commission or review a site-specific flood risk assessment.",
     },
     "drainage_strategy": {
         "name": "Drainage strategy and SuDS",
         "blurb": "How surface water leaves the site, and where it goes.",
+        "next_step": "Ask a drainage engineer for an outline surface-water strategy.",
     },
     "watercourse_check": {
         "name": "Watercourse and consent check",
         "blurb": "Standing or seasonal water may bring ordinary watercourse "
                  "consent, byelaw margins or a land drainage consent.",
+        "next_step": "Check the lead local flood authority's ordinary watercourse register.",
     },
     "ground_investigation": {
         "name": "Ground investigation",
         "blurb": "Intrusive site investigation — boreholes, trial pits, "
                  "geotechnical and contamination sampling.",
+        "next_step": "Scope an intrusive site investigation with a geotechnical engineer.",
     },
     "contamination_desk_study": {
         "name": "Phase 1 contamination desk study",
         "blurb": "Historical maps, landfill records and previous uses, to "
                  "establish whether intrusive work is warranted.",
+        "next_step": "Order a Phase 1 desk study with historical mapping.",
     },
     "topographic_survey": {
         "name": "Topographic survey",
         "blurb": "Measured levels across the site. The only reliable source of "
                  "slope and fall.",
+        "next_step": "Commission a measured topographic survey.",
     },
     "ecology_survey": {
         "name": "Preliminary ecological appraisal",
         "blurb": "Habitat survey, protected species scoping, and the baseline "
                  "a BNG calculation is built on.",
+        "next_step": "Instruct a preliminary ecological appraisal, ideally in season.",
     },
     "arboricultural_survey": {
         "name": "Arboricultural survey",
         "blurb": "Tree survey to BS 5837, and the constraints protected trees "
                  "place on a layout.",
+        "next_step": "Commission a BS 5837 tree survey before fixing a layout.",
     },
     "planning_history": {
         "name": "Planning history review",
         "blurb": "What has been applied for here and nearby, what was granted, "
                  "and on what grounds anything was refused.",
+        "next_step": "Search the local authority's planning register for this site and its neighbours.",
     },
     "heritage_statement": {
         "name": "Heritage statement",
         "blurb": "Assessment of effect on designated heritage assets and their "
                  "setting.",
+        "next_step": "Instruct a heritage consultant to assess setting and significance.",
     },
     "landscape_appraisal": {
         "name": "Landscape and visual appraisal",
         "blurb": "How the site reads in a protected or sensitive landscape.",
+        "next_step": "Commission a landscape and visual appraisal.",
     },
     "policy_review": {
         "name": "Planning policy review",
         "blurb": "The development plan position for this parcel, and what it "
                  "permits in principle.",
+        "next_step": "Read the adopted local plan allocation and policies for this parcel.",
     },
     "utilities_search": {
         "name": "Utilities search",
         "blurb": "Buried services, easements and wayleaves crossing the site.",
+        "next_step": "Order a utilities search from the statutory undertakers.",
     },
 }
 
@@ -216,7 +249,8 @@ class Rule:
 
     def __init__(self, id: str, topic: str, needs: Sequence[str],
                  test: Callable[[Dict[str, Dict[str, Any]]], Optional[Dict[str, Any]]],
-                 investigations: Sequence[str], asks: str) -> None:
+                 investigations: Sequence[str], asks: str,
+                 kind: str = "flag") -> None:
         self.id = id
         self.topic = topic
         self.needs = tuple(needs)
@@ -225,6 +259,13 @@ class Rule:
         #: What this rule is looking for, in one line. Shown against a topic
         #: that could not be assessed, so "not assessed" says what was missed.
         self.asks = asks
+        #: `flag` — crosses a threshold and may raise an investigation.
+        #: `info` — a measured fact that is neither good nor bad. An info rule
+        #: never raises an investigation and never sets a topic to flagged; it
+        #: is still bound by the real-data rule, because "generated data says
+        #: this site averages 61 m elevation" is a fabricated fact about a real
+        #: place whether or not anyone would act on it.
+        self.kind = kind
 
 
 def _pct(v: float) -> str:
@@ -489,7 +530,46 @@ def _planning_pressure(s: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]
     }
 
 
+# --- Informational ----------------------------------------------------------
+def _info(field: str, topic: str, rule_id: str, label: str, asks: str,
+          fmt: Callable[[float], str] = lambda v: f"{v:,.1f}") -> Rule:
+    """A measured fact, stated without judgement.
+
+    These exist so the radar is not exclusively a problem-finder. A tool that
+    can only ever deliver bad news is one people stop opening, and "78%
+    grassland" is the sort of thing a land agent writes down first.
+
+    Bound by the same real-data rule as a flag. A generated informational
+    finding is still a fabricated fact about a real place — it merely omits the
+    step where someone acts on it.
+    """
+    def test(s: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        level = _level(s[field])
+        if level is None:
+            return None
+        period, value = level
+        return {
+            "text": f"{label}: {fmt(value)}",
+            "evidence": {field: value, "as_of": period},
+        }
+
+    return Rule(rule_id, topic, [field], test, (), asks, kind="info")
+
+
 RULES: Tuple[Rule, ...] = (
+    # Informational first in the source, so it is obvious they are part of the
+    # model rather than an afterthought bolted on beside the warnings.
+    _info("lc_dominant", "vegetation", "info_land_cover", "Dominant land cover",
+          "what the site is mostly covered by", fmt=lambda v: str(v)),
+    _info("lc_tree_pct", "vegetation", "info_tree_cover", "Tree cover",
+          "how much of the site is trees", fmt=lambda v: f"{v:.0f}% of the site"),
+    _info("ndvi", "vegetation", "info_ndvi", "Mean vegetation vigour (NDVI)",
+          "the site's average greenness", fmt=lambda v: f"{v:.2f}"),
+    _info("elevation_mean", "terrain", "info_elevation", "Mean elevation",
+          "how high the site sits", fmt=lambda v: f"{v:,.0f} m"),
+    _info("built_pct", "ground", "info_built", "Built surface",
+          "how much of the site is built on",
+          fmt=lambda v: f"{v:.0f}% of the site"),
     Rule("flood_zone3", "flood", ["flood_zone3_pct"], _flood,
          ["flood_risk_assessment", "drainage_strategy"],
          "whether any of the site lies in Flood Zone 3"),
@@ -655,23 +735,51 @@ def assess(report: Dict[str, Any],
     implementation for; pass it so an "add this layer" suggestion is never made
     for a layer that would come back generated. See `_state_of`.
 
-    Rules that raise are flags; rules that ran and found nothing make their
-    topic `clear`; rules that could not run make it `not_assessed`. A topic
-    takes the strongest of those three, in that order, so one clear check
-    never hides a flag and one flag is never softened by four clear ones.
+    A rule either raises a flag, states an informational fact, comes back clear,
+    or could not run. A topic takes the strongest of those, and gets `partial`
+    when some of its checks ran and others could not — a topic with two checks
+    where only one ran is not a clear topic.
     """
     series = (report or {}).get("series") or {}
+    at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
 
     flags: List[Dict[str, Any]] = []
+    info: List[Dict[str, Any]] = []
     # topic -> the states its rules reached
     topic_states: Dict[str, List[str]] = {t: [] for t in TOPICS}
     checked: Dict[str, List[str]] = {t: [] for t in TOPICS}
     unavailable: List[Dict[str, Any]] = []
+    # The audit trail: one row per factor any rule wanted, and what became of
+    # it. Written here rather than reconstructed by the UI, because "why did
+    # the report say that in August" is a question with one correct answer and
+    # the server is the only place that knows it.
+    log: Dict[str, Dict[str, Any]] = {}
+
+    def record(fid: str, state: str) -> None:
+        if fid in log and log[fid]["state"] == "assessed":
+            return
+        s = series.get(fid) or {}
+        prov = s.get("provenance") or {}
+        log[fid] = {
+            "factor": fid,
+            "name": (s.get("meta") or {}).get("name") or _catalog_name(fid),
+            "state": state,
+            "publisher": prov.get("source"),
+            "endpoint": prov.get("endpoint"),
+            # `verified` means someone ran it against the live service and
+            # checked the answer. `written` does not.
+            "status": prov.get("status") if state == "assessed" else None,
+            "source": s.get("source"),
+            "at": at,
+        }
 
     for rule in RULES:
         state, reason, blocking = _state_of(rule, series, real_capable)
         if state == "not_assessed":
             topic_states.setdefault(rule.topic, []).append("not_assessed")
+            for f in rule.needs:
+                record(f, "generated" if (reason == "demo_data" and f in blocking)
+                       else "not_selected" if f in blocking else "assessed")
             unavailable.append({
                 "rule": rule.id,
                 "topic": rule.topic,
@@ -702,8 +810,28 @@ def assess(report: Dict[str, Any],
             continue
 
         checked.setdefault(rule.topic, []).extend(rule.needs)
+        for f in rule.needs:
+            record(f, "assessed")
+
         if not found:
-            topic_states.setdefault(rule.topic, []).append("clear")
+            # Reached only when every factor the rule needed was real and
+            # present — see _state_of. This is the one place `clear` is
+            # produced, which is what makes the invariant checkable.
+            topic_states.setdefault(rule.topic, []).append(
+                "clear" if rule.kind == "flag" else "info")
+            continue
+
+        if rule.kind == "info":
+            topic_states.setdefault(rule.topic, []).append("info")
+            info.append({
+                "id": rule.id,
+                "topic": rule.topic,
+                "topic_name": TOPICS.get(rule.topic, rule.topic),
+                "text": found["text"],
+                "evidence": found.get("evidence", {}),
+                "factors": list(rule.needs),
+                "provenance": _provenance_for(rule.needs, series),
+            })
             continue
 
         topic_states.setdefault(rule.topic, []).append("flagged")
@@ -714,9 +842,11 @@ def assess(report: Dict[str, Any],
             "severity": found["severity"],
             "text": found["text"],
             "evidence": found.get("evidence", {}),
+            "threshold": found.get("evidence", {}).get("threshold"),
             "factors": list(rule.needs),
             "provenance": _provenance_for(rule.needs, series),
             "investigations": list(rule.investigations),
+            "assessed_at": at,
         })
 
     flags.sort(key=lambda f: (_rank(f["severity"]), f["topic"]))
@@ -724,9 +854,14 @@ def assess(report: Dict[str, Any],
     topics = []
     for tid, name in TOPICS.items():
         states = topic_states.get(tid, [])
+        gaps = "not_assessed" in states
         if "flagged" in states:
             state = "flagged"
         elif "clear" in states:
+            # Some checks ran and some did not. Calling that clear is the same
+            # overstatement as calling a generated zero clear, one level up.
+            state = "partial" if gaps else "clear"
+        elif "info" in states and not gaps:
             state = "clear"
         else:
             state = "not_assessed"
@@ -738,20 +873,81 @@ def assess(report: Dict[str, Any],
             "checked": sorted(set(checked.get(tid, []))),
         })
 
+    rows = sorted(log.values(), key=lambda r: (r["state"] != "assessed", r["name"]))
+    assessed = [r for r in rows if r["state"] == "assessed"]
+
     return {
         "flags": flags,
+        "informational": info,
         "topics": topics,
         "investigations": _investigations(flags),
         "not_assessed": unavailable,
+        # The audit trail. Every factor a rule wanted, what became of it, and
+        # who published it — so a report read three months later can be
+        # understood rather than trusted.
+        "log": rows,
+        "assessed_at": at,
+        "coverage": _coverage(rows, assessed, flags, info),
         "counts": {
             "flags": len(flags),
             "high": sum(1 for f in flags if f["severity"] == "high"),
+            "informational": len(info),
             "topics_flagged": sum(1 for t in topics if t["state"] == "flagged"),
             "topics_clear": sum(1 for t in topics if t["state"] == "clear"),
+            "topics_partial": sum(1 for t in topics if t["state"] == "partial"),
             "topics_not_assessed": sum(1 for t in topics
                                        if t["state"] == "not_assessed"),
         },
+        "principle": PRINCIPLE,
         "limits": LIMITS,
+    }
+
+
+#: Said wherever coverage is shown, and deliberately not optional. A percentage
+#: on a screen becomes a score in a reader's head within about two seconds, and
+#: a score is exactly what this number is not.
+COVERAGE_NOTE = (
+    "Coverage is how much of this site we were able to look at — not how good "
+    "the site is. A site at 90% is not better than one at 50%; we simply know "
+    "more about it."
+)
+
+
+def _coverage(rows: Sequence[Dict[str, Any]], assessed: Sequence[Dict[str, Any]],
+              flags: Sequence[Dict[str, Any]],
+              info: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """How much of what this radar knows how to check, it actually checked.
+
+    Denominator is the factors the rules wanted for *this* report, not the 273
+    in the catalogue — "42 of 273" would be a meaningless number that made
+    every site look unexamined.
+
+    Deliberately **not** a score, and `COVERAGE_NOTE` travels with it saying so.
+    The temptation to collapse this into "Site health: 72/100" is the single
+    most commercially attractive wrong turn available to this product: a score
+    hides its own inputs, and the entire argument for this tool is that it
+    shows them.
+    """
+    total = len(rows)
+    n_assessed = len(assessed)
+    flagged_factors = {f for flag in flags for f in flag["factors"]}
+    info_factors = {f for i in info for f in i["factors"]}
+    clear = sum(1 for r in assessed
+                if r["factor"] not in flagged_factors
+                and r["factor"] not in info_factors)
+    return {
+        "relevant": total,
+        "assessed": n_assessed,
+        "share": round(n_assessed / total, 3) if total else 0.0,
+        "flagged": len(flagged_factors),
+        "clear": clear,
+        "informational": len(info_factors),
+        "not_assessed": total - n_assessed,
+        # Split by cause, because one number is actionable and the other is not.
+        "not_selected": sum(1 for r in rows if r["state"] == "not_selected"),
+        "generated": sum(1 for r in rows if r["state"] == "generated"),
+        "verified": sum(1 for r in assessed if r.get("status") == "verified"),
+        "note": COVERAGE_NOTE,
     }
 
 
@@ -783,6 +979,12 @@ def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "id": inv_id,
             "name": meta["name"],
             "blurb": meta["blurb"],
+            # What to actually do. A recommendation that stops at naming a
+            # survey leaves the reader to work out who to ring.
+            "next_step": meta.get("next_step", ""),
+            # The factors behind it, so a reader can open the evidence rather
+            # than take the recommendation on faith.
+            "evidence_factors": sorted({f for c in causes for f in c["factors"]}),
             "priority": priority,
             "why": [c["id"] for c in causes],
             "why_text": [c["text"] for c in causes],

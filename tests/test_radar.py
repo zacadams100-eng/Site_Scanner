@@ -87,8 +87,12 @@ def test_a_topic_that_was_checked_and_found_nothing_says_clear():
     "0% of this site is in Flood Zone 3, and we checked" is a real answer.
     Collapsing it into the same silence as "we could not look" throws away the
     only thing that distinguishes a screened site from an unscreened one.
+
+    Both flood checks are loaded, because `clear` means *every* check in the
+    topic ran — see test_clear_is_only_produced_where_every_check_in_the_topic_ran.
     """
-    result = radar.assess(report(flood_zone3_pct=const(0.0)))
+    result = radar.assess(report(flood_zone3_pct=const(0.0),
+                                 flood_zone2_pct=const(0.0)))
     assert result["flags"] == []
     assert topic(result, "flood")["state"] == "clear"
 
@@ -373,4 +377,187 @@ def test_counts_add_up():
     assert counts["high"] == sum(1 for f in result["flags"]
                                  if f["severity"] == "high")
     assert (counts["topics_flagged"] + counts["topics_clear"]
+            + counts["topics_partial"]
             + counts["topics_not_assessed"]) == len(radar.TOPICS)
+
+
+# ---------------------------------------------------------------------------
+# `clear` is a claim, and it has to be earned
+# ---------------------------------------------------------------------------
+def test_generated_data_can_never_produce_a_clear():
+    """The load-bearing invariant.
+
+    "Generated data indicates no flood risk" is not the same claim as "we
+    checked the Environment Agency's dataset and found none", and the two must
+    never render as the same green tick. `clear` requires real *and* assessed
+    *and* below threshold; anything else is `not_assessed`.
+    """
+    for value in (0.0, 0.5, 4.9):
+        result = radar.assess(report(
+            flood_zone3_pct=const(value, source="generated"),
+            flood_zone2_pct=const(value, source="generated"),
+        ))
+        assert topic(result, "flood")["state"] == "not_assessed", value
+        assert result["coverage"]["clear"] == 0
+
+
+def test_clear_is_only_produced_where_every_check_in_the_topic_ran():
+    """A topic with two checks where only one ran is not a clear topic."""
+    partial = radar.assess(report(flood_zone3_pct=const(0.0)))
+    assert topic(partial, "flood")["state"] == "partial"
+
+    whole = radar.assess(report(flood_zone3_pct=const(0.0),
+                                flood_zone2_pct=const(0.0)))
+    assert topic(whole, "flood")["state"] == "clear"
+
+
+# ---------------------------------------------------------------------------
+# Coverage — a measure of what we looked at, never a score
+# ---------------------------------------------------------------------------
+def test_coverage_counts_what_the_rules_wanted_not_the_whole_catalogue():
+    result = radar.assess(report(flood_zone3_pct=const(31.0)))
+    cov = result["coverage"]
+    import catalog
+    assert cov["relevant"] < len(catalog.FACTORS)
+    assert cov["assessed"] == 1
+    assert cov["not_assessed"] == cov["relevant"] - 1
+    assert 0 < cov["share"] < 1
+
+
+def test_coverage_splits_not_assessed_by_cause():
+    result = radar.assess(report(), real_capable={"flood_zone3_pct"})
+    cov = result["coverage"]
+    assert cov["not_selected"] >= 1
+    assert cov["generated"] >= 1
+    assert cov["not_selected"] + cov["generated"] == cov["not_assessed"]
+
+
+def test_coverage_says_in_its_own_payload_that_it_is_not_a_score():
+    """The temptation to collapse this into "Site health: 72/100" is the most
+    commercially attractive wrong turn available to this product."""
+    cov = radar.assess(report(flood_zone3_pct=const(0.0)))["coverage"]
+    assert "not how good the site is" in cov["note"]
+    assert "we simply know more about it" in cov["note"]
+
+
+def test_there_is_no_overall_score_anywhere_in_the_payload():
+    result = radar.assess(report(flood_zone3_pct=const(31.0)))
+    banned = ("score", "rating", "grade", "suitability", "overall")
+    flat = repr(sorted(result.keys())) + repr(sorted(result["coverage"].keys()))
+    for word in banned:
+        assert word not in flat.lower(), f"payload exposes a {word}"
+
+
+# ---------------------------------------------------------------------------
+# Informational findings
+# ---------------------------------------------------------------------------
+def test_informational_findings_are_not_flags():
+    """A radar that can only ever deliver bad news is one people stop opening."""
+    result = radar.assess(report(
+        ndvi=const(0.48, unit="index", source="earth-engine", name="NDVI")))
+    assert result["flags"] == []
+    assert result["investigations"] == []
+    info = next(i for i in result["informational"] if i["id"] == "info_ndvi")
+    assert "0.48" in info["text"]
+    assert "severity" not in info
+
+
+def test_informational_data_obeys_the_same_real_data_rule():
+    """A generated informational finding is still a fabricated fact about a
+    real place — it merely omits the step where someone acts on it."""
+    result = radar.assess(report(
+        ndvi=const(0.48, unit="index", source="generated")))
+    assert result["informational"] == []
+
+
+def test_an_informational_finding_never_makes_a_topic_flagged():
+    result = radar.assess(report(
+        elevation_mean=const(61.0, unit="m", source="earth-engine")))
+    assert topic(result, "terrain")["state"] != "flagged"
+
+
+# ---------------------------------------------------------------------------
+# The assessment log
+# ---------------------------------------------------------------------------
+def test_the_log_records_every_factor_and_what_became_of_it():
+    result = radar.assess(report(flood_zone3_pct=const(31.0)),
+                          real_capable={"flood_zone3_pct", "flood_zone2_pct"})
+    by_id = {r["factor"]: r for r in result["log"]}
+    assert by_id["flood_zone3_pct"]["state"] == "assessed"
+    assert by_id["flood_zone3_pct"]["publisher"] == "planning.data.gov.uk"
+    assert by_id["flood_zone2_pct"]["state"] == "not_selected"
+    assert by_id["slope_max"]["state"] == "generated"
+    # Every row is timestamped, so a report read in three months can be
+    # understood rather than trusted.
+    assert all(r["at"] == result["assessed_at"] for r in result["log"])
+
+
+def test_the_log_records_status_only_where_something_was_assessed():
+    """`verified` on a factor nobody read is a claim about nothing."""
+    result = radar.assess(report(flood_zone3_pct=const(31.0)))
+    for row in result["log"]:
+        if row["state"] != "assessed":
+            assert row["status"] is None
+
+
+def test_investigations_carry_a_next_step_and_their_evidence():
+    result = radar.assess(report(flood_zone3_pct=const(31.0)))
+    inv = next(i for i in result["investigations"]
+               if i["id"] == "flood_risk_assessment")
+    assert inv["next_step"].startswith("Commission")
+    assert inv["evidence_factors"] == ["flood_zone3_pct"]
+
+
+def test_every_investigation_has_a_next_step():
+    for key, meta in radar.INVESTIGATIONS.items():
+        assert meta.get("next_step"), f"{key} has no next step"
+
+
+def test_the_principle_travels_with_every_report():
+    result = radar.assess(report())
+    assert result["principle"] == radar.PRINCIPLE
+    assert "clear result means we checked" in result["principle"]
+
+
+# ---------------------------------------------------------------------------
+# The capability registry — the UI must never have to guess
+# ---------------------------------------------------------------------------
+def test_capabilities_never_claims_more_than_the_process_can_do():
+    """`implemented`, `real` and `verified` answer three different questions.
+
+    Conflating them is how "add this layer" started promising checks that could
+    not be delivered. A deployment with no Earth Engine credentials implements
+    27 factors and can prove none of them.
+    """
+    from fastapi.testclient import TestClient
+    import mock_ee_backend
+
+    body = TestClient(mock_ee_backend.app).get("/api/capabilities").json()
+    rows = {r["factor"]: r for r in body["factors"]}
+
+    import catalog
+    assert len(rows) == len(catalog.FACTORS)
+
+    for row in rows.values():
+        # A factor cannot be verified unless it is real.
+        if row["verified"]:
+            assert row["real"], row["factor"]
+        # Nothing generated may claim a live status.
+        if not row["real"]:
+            assert row["status"] == "generated", row["factor"]
+        # An investigation-capable factor must be radar-capable.
+        if row["supports_investigation"]:
+            assert row["supports_radar"], row["factor"]
+
+    assert body["summary"]["provable"] <= body["summary"]["total"]
+    assert body["summary"]["radar_provable"] <= body["summary"]["radar_factors"]
+
+
+def test_capabilities_agrees_with_the_radar_about_which_factors_it_reads():
+    from fastapi.testclient import TestClient
+    import mock_ee_backend
+
+    body = TestClient(mock_ee_backend.app).get("/api/capabilities").json()
+    claimed = {r["factor"] for r in body["factors"] if r["supports_radar"]}
+    actual = {f for rule in radar.RULES for f in rule.needs}
+    assert claimed == actual

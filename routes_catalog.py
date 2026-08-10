@@ -194,6 +194,89 @@ def metrics() -> Dict[str, Any]:
     return snap
 
 
+@router.get("/api/capabilities")
+def capabilities() -> Dict[str, Any]:
+    """What this instance can actually prove, factor by factor.
+
+    The UI should never imply an evidence capability the backend does not
+    possess. That was learned the hard way: the radar offered "add this layer"
+    for factors with no real implementation, so the button led straight to
+    "not assessed — demo data". The fix there was to pass the registry into
+    `radar.assess`; this is the same fix generalised, so nothing else has to
+    guess either.
+
+    Every field answers a different question, and they are kept apart because
+    conflating them is how the guessing starts:
+
+    - `implemented` — is there code to fetch this for real?
+    - `real` — did that code get installed in *this* process? A deployment with
+      no Earth Engine credentials implements 27 factors and has none of them.
+    - `verified` — has anyone run it against the live service and checked the
+      answer? 12 of 55, and `implemented` is not evidence for it.
+    - `licence` — the commercial clearance state. A `blocked` factor is refused
+      before it is fetched, so it can never reach a radar flag.
+    - `supports_radar` / `supports_investigation` — does any rule read it, and
+      can that rule raise an investigation. A factor can be perfectly real and
+      still have no rule behind it.
+
+    Deliberately not cached: it describes the running process, and a stale
+    answer to "what can you prove" is worse than a slow one.
+    """
+    rows = []
+    for f in catalog.FACTORS:
+        fid = f["id"]
+        prov = REAL_SOURCES.get(fid) or {}
+        real = fid in REAL_SERIES
+        rules = [r for r in radar.RULES if fid in r.needs]
+        clearance = licensing.clearance(fid)
+        rows.append({
+            "factor": fid,
+            "name": f["name"],
+            "category": f["group"],
+            "unit": f["unit"],
+            "base": f["base"],
+            "publisher": prov.get("source") or (
+                catalog.BASE_BY_ID.get(f["base"], {}) or {}).get("source"),
+            "endpoint": prov.get("endpoint"),
+            "implemented": real,
+            "real": real,
+            # Gated on `real`, not read straight off the provenance registry.
+            # The two can disagree: `REAL_SOURCES` keeps an entry once an
+            # installer has written one, while `REAL_SERIES` is what this
+            # process can actually call — so a factor whose implementation was
+            # never installed here would otherwise report itself verified, and
+            # a capability endpoint that over-claims is worse than none.
+            "verified": real and prov.get("status") == "verified",
+            "status": (prov.get("status", "unknown") if real else "generated"),
+            # The clearance state (`cleared`/`conditional`/`unknown`/`blocked`)
+            # and the licence it rests on, kept apart: "OGL v3" is a fact about
+            # the data, "cleared" is this project's unverified reading of it.
+            "licence_status": clearance.get("status"),
+            "licence": clearance.get("licence"),
+            "blocked": licensing.is_blocked(fid),
+            "supports_radar": bool(rules),
+            "supports_investigation": any(r.investigations for r in rules),
+            "radar_rules": [r.id for r in rules],
+        })
+
+    provable = [r for r in rows if r["real"] and not r["blocked"]]
+    return {
+        "factors": rows,
+        "summary": {
+            "total": len(rows),
+            # The honest headline: what can be proved right now, in this
+            # process, with this deployment's credentials.
+            "provable": len(provable),
+            "verified": sum(1 for r in rows if r["verified"]),
+            "generated": len(rows) - len(provable),
+            "radar_factors": sum(1 for r in rows if r["supports_radar"]),
+            "radar_provable": sum(1 for r in provable if r["supports_radar"]),
+            "blocked": sum(1 for r in rows if r["blocked"]),
+        },
+        "principle": radar.PRINCIPLE,
+    }
+
+
 def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
                 steps: List[str]) -> Dict[str, Any]:
     """Real data where we have it, generated where we don't.

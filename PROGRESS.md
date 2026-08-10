@@ -5,6 +5,58 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Radar, second pass — coverage, informational findings, the log — 2026-08-10
+
+Four changes from a product review, one of which was a real bug in my own
+work.
+
+**Assessment coverage, stated as coverage and never as a score.** "8 / 24
+relevant factors assessed", a stacked bar, and a note that ships in the API
+payload rather than the design system: *coverage is how much of this site we
+were able to look at — not how good the site is. A site at 90% is not better
+than one at 50%; we simply know more about it.* A test asserts the payload
+exposes no `score`, `rating`, `grade` or `overall` anywhere, because
+collapsing this into "Site health: 72/100" is the most commercially attractive
+wrong turn available to this product — a score hides its own inputs, and the
+entire argument for the tool is that it shows them.
+
+**A fourth finding type: informational.** Mean NDVI, dominant land cover, tree
+cover, mean elevation. Bound by the same real-data rule as a flag, because a
+generated informational finding is still a fabricated fact about a real place
+— it merely omits the step where someone acts on it. Set quieter than the
+flags and placed after them: the radar should still prioritise what needs
+action, but a tool that can only ever deliver bad news is one people stop
+opening.
+
+**`clear` had to be earned, and in one place it was not.** Generated data
+already could not produce a `clear` — that was an accident of ordering rather
+than a stated invariant, and it now has a test named after it. But *topics*
+were overstating: Flood reported `clear` when only Zone 3 had been loaded and
+Zone 2 was never checked. Topics now report `partial` when some of their
+checks ran and others could not, which is the same honesty one level up.
+
+**The capability registry**, `/api/capabilities`. Every factor's
+`implemented` / `real` / `verified` / `licence_status` / `supports_radar` /
+`supports_investigation`, so the UI never has to guess what the backend can
+prove. Writing its test found a genuine bug: `verified` was read straight off
+the provenance registry, which keeps an entry once an installer has written
+one — so a factor whose implementation was never installed in *this* process
+reported itself verified. A capability endpoint that over-claims is worse than
+none.
+
+**The assessment log.** One row per factor any rule wanted, timestamped, with
+publisher and live status. A professional coming back in three months can see
+why the report said what it said rather than trusting that it did. With the
+permalink already restoring exact state, that is reproducible site
+intelligence.
+
+`PRINCIPLE` now ships in every report and sits at the foot of the panel:
+**"A clear result means we checked. An empty result means we could not."**
+
+663 Python tests (+16), 165 frontend.
+
+---
+
 ## Investigation radar — 2026-08-10
 
 The move from "here is the data" to "here is what deserves a closer look".
