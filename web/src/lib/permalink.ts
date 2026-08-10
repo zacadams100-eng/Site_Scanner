@@ -188,6 +188,24 @@ export function shareUrl(s: UrlState): string {
  *
  * Each one picks factors that genuinely belong together in that trade's
  * screen. None of them draws the area for you; the shape is still the user's.
+ *
+ * ## Every name and blurb states what Contour investigates, never what to decide
+ *
+ * This list is the first thing a new user reads, so it is the product's
+ * positioning whether or not anyone intended it that way — and it used to
+ * open with *"Development appraisal — is this site worth pursuing?"*. That is
+ * a suitability question, which is the one question Contour exists not to
+ * answer: it promised a verdict on the first screen and made the tool
+ * indistinguishable from a land-opportunity platform.
+ *
+ * The rule now: a template names a **body of evidence**, not a decision and
+ * not an outcome. "Solar site evidence", never "Solar farm". "Recorded
+ * irradiance, slope, shading", never "Would an array work here". The factors
+ * behind each one are unchanged — the job being promised is what changed.
+ *
+ * Also gone: "appraisal" (a judgement of worth), "quality" (a judgement of the
+ * place), and blurbs that predicted cost, yield or value, none of which
+ * Contour measures or can support.
  */
 export interface Template {
   id: string
@@ -202,8 +220,8 @@ export const TEMPLATES: Template[] = [
   // --- Property & development -------------------------------------------
   {
     id: 'site-appraisal',
-    name: 'Development appraisal',
-    blurb: 'Is this site worth pursuing — value, constraints and consent history?',
+    name: 'Development evidence',
+    blurb: 'What evidence should be considered before pursuing this site: value context, constraints and consent history.',
     sector: 'Property & development',
     factors: ['median_sale_price', 'land_value_residential', 'planning_approval_rate',
               'flood_zone3_pct', 'green_belt_pct', 'developable_area'],
@@ -211,8 +229,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'planning-risk',
-    name: 'Planning risk',
-    blurb: 'What would stand in the way of a permission here?',
+    name: 'Planning constraints',
+    blurb: 'What designations and consent history are recorded against this land.',
     sector: 'Property & development',
     factors: ['conservation_area_pct', 'listed_building_density', 'article4_pct',
               'tpo_density', 'scheduled_monument_pct', 'planning_decision_days'],
@@ -220,8 +238,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'residential-market',
-    name: 'Residential market',
-    blurb: 'What sells here, at what price, and how fast?',
+    name: 'Residential market evidence',
+    blurb: 'What the local market record shows: prices, rents, turnover and affordability.',
     sector: 'Property & development',
     factors: ['median_sale_price', 'price_growth_5yr', 'sales_velocity',
               'rental_median', 'gross_yield', 'affordability_ratio'],
@@ -229,8 +247,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'ground-conditions',
-    name: 'Ground conditions',
-    blurb: 'What is under the site, and what will it cost to build on?',
+    name: 'Ground conditions evidence',
+    blurb: 'What is recorded beneath this site, and what that would prompt you to investigate.',
     sector: 'Property & development',
     factors: ['subsidence_risk', 'shrink_swell_score', 'coal_mining_pct',
               'historic_landfill_pct', 'radon_potential', 'earthworks_volume'],
@@ -238,8 +256,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'retrofit',
-    name: 'Retrofit and EPC',
-    blurb: 'How poor is the stock, and what would fixing it take?',
+    name: 'Retrofit and EPC evidence',
+    blurb: 'What the recorded energy performance of the local stock is.',
     sector: 'Property & development',
     factors: ['epc_mean_sap', 'epc_below_c_share', 'epc_potential_uplift',
               'retrofit_cost_index', 'heat_demand_density', 'heat_pump_share'],
@@ -249,8 +267,8 @@ export const TEMPLATES: Template[] = [
   // --- Infrastructure & energy ------------------------------------------
   {
     id: 'grid-connection',
-    name: 'Grid connection',
-    blurb: 'Can this site get power, and what would it cost?',
+    name: 'Grid connection evidence',
+    blurb: 'What is recorded about capacity, distance and connection constraints here.',
     sector: 'Infrastructure & energy',
     factors: ['grid_headroom', 'distance_substation', 'grid_connection_cost',
               'curtailment_risk', 'slope_mean', 'distance_a_road'],
@@ -258,8 +276,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'solar-farm',
-    name: 'Solar farm',
-    blurb: 'Would an array work here, and would it connect?',
+    name: 'Solar site evidence',
+    blurb: 'Recorded irradiance, slope, shading and land classification.',
     sector: 'Infrastructure & energy',
     factors: ['solar_ghi', 'solar_farm_suitability', 'slope_mean',
               'shading_horizon_loss', 'grid_headroom', 'bmv_land_pct'],
@@ -268,7 +286,7 @@ export const TEMPLATES: Template[] = [
   {
     id: 'wind-site',
     name: 'Wind resource',
-    blurb: 'Is there enough wind, and is the ground exposed enough?',
+    blurb: 'Recorded wind speed, capacity factor and ground exposure.',
     sector: 'Infrastructure & energy',
     factors: ['wind_speed_100m', 'wind_capacity_factor', 'wind_power_density',
               'elevation_mean', 'distance_substation', 'aonb_pct'],
@@ -276,8 +294,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'battery-storage',
-    name: 'Battery storage',
-    blurb: 'Flat ground, spare capacity, and a road a lorry can use.',
+    name: 'Grid & storage evidence',
+    blurb: 'Recorded gradient, grid headroom, flood exposure and access.',
     sector: 'Infrastructure & energy',
     factors: ['battery_site_suitability', 'grid_headroom', 'slope_mean',
               'flood_zone3_pct', 'distance_substation', 'hgv_access_class'],
@@ -285,8 +303,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'digital-infra',
-    name: 'Digital infrastructure',
-    blurb: 'What connectivity does this area already have?',
+    name: 'Digital infrastructure evidence',
+    blurb: 'What connectivity is recorded in this area.',
     sector: 'Infrastructure & energy',
     factors: ['broadband_gigabit_pct', 'broadband_median_speed', 'mobile_5g_coverage',
               'broadband_notspot_pct', 'population_density', 'households'],
@@ -296,8 +314,8 @@ export const TEMPLATES: Template[] = [
   // --- Land & rural ------------------------------------------------------
   {
     id: 'farm-appraisal',
-    name: 'Farm appraisal',
-    blurb: 'What will this land grow, and how many days can you work it?',
+    name: 'Farm land evidence',
+    blurb: 'What is recorded about growing conditions and workable days.',
     sector: 'Land & rural',
     factors: ['alc_grade', 'bmv_land_pct', 'yield_potential_wheat',
               'workable_days', 'soil_organic_carbon', 'field_size_mean'],
@@ -306,7 +324,7 @@ export const TEMPLATES: Template[] = [
   {
     id: 'crop-season',
     name: 'Crop performance',
-    blurb: 'How has this field performed season by season?',
+    blurb: 'How this field has measured, season by season.',
     sector: 'Land & rural',
     factors: ['ndvi', 'soil_moisture', 'growing_degree_days',
               'crop_stress_days', 'irrigation_demand', 'precip_total'],
@@ -314,8 +332,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'bng',
-    name: 'Biodiversity net gain',
-    blurb: 'What is here now, and what could the habitat be worth?',
+    name: 'Biodiversity baseline evidence',
+    blurb: 'What habitat and cover are recorded here now.',
     sector: 'Land & rural',
     factors: ['bng_units_available', 'bng_uplift_potential', 'lc_dominant',
               'priority_habitat_pct', 'ancient_woodland_pct', 'lc_diversity'],
@@ -323,8 +341,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'woodland-creation',
-    name: 'Woodland creation',
-    blurb: 'Could this be planted, and what would it sequester?',
+    name: 'Woodland creation evidence',
+    blurb: 'What is recorded about this ground, and what to establish before planting.',
     sector: 'Land & rural',
     factors: ['woodland_creation_suitability', 'canopy_cover_pct', 'sequestration_rate',
               'bmv_land_pct', 'soil_ph', 'windthrow_risk'],
@@ -333,7 +351,7 @@ export const TEMPLATES: Template[] = [
   {
     id: 'vegetation',
     name: 'Vegetation change',
-    blurb: 'Is this land getting greener or browner over 15 years?',
+    blurb: 'How green cover has measured across fifteen years.',
     sector: 'Land & rural',
     factors: ['ndvi', 'lc_tree_pct', 'lc_grass_pct', 'precip_total'],
     tool: 'freehand',
@@ -342,16 +360,16 @@ export const TEMPLATES: Template[] = [
   // --- Risk & insurance --------------------------------------------------
   {
     id: 'flood',
-    name: 'Flood exposure',
-    blurb: 'How exposed is this site to water, and is that changing?',
+    name: 'Flood exposure evidence',
+    blurb: 'What flood designations and water observations are recorded, and how they have changed.',
     sector: 'Risk & insurance',
     factors: ['flood_zone3_pct', 'hand', 'water_occurrence', 'max_daily_precip'],
     tool: 'rect',
   },
   {
     id: 'peril-screen',
-    name: 'Multi-peril screen',
-    blurb: 'Flood, subsidence and wind in one pass, for underwriting.',
+    name: 'Multi-peril evidence',
+    blurb: 'Flood, subsidence and wind evidence in one pass.',
     sector: 'Risk & insurance',
     factors: ['insurance_peril_score', 'flood_zone3_pct', 'shrink_swell_score',
               'storm_gust_50yr', 'ground_risk_score', 'coal_mining_pct'],
@@ -359,8 +377,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'contamination',
-    name: 'Contamination screen',
-    blurb: 'What was here before, and does it need investigating?',
+    name: 'Contamination evidence',
+    blurb: 'What was recorded here before, and what that would prompt you to investigate.',
     sector: 'Risk & insurance',
     factors: ['historic_landfill_pct', 'landfill_distance', 'contamination_flag',
               'built_change_rate', 'lc_change_rate', 'sar_coherence'],
@@ -370,8 +388,8 @@ export const TEMPLATES: Template[] = [
   // --- Siting & operations -----------------------------------------------
   {
     id: 'logistics',
-    name: 'Logistics siting',
-    blurb: 'Can lorries reach it, and who lives within a shift of it?',
+    name: 'Logistics access evidence',
+    blurb: 'Recorded road access, and who lives within reach.',
     sector: 'Siting & operations',
     factors: ['warehouse_suitability', 'distance_motorway_junction', 'hgv_access_class',
               'drive_time_pop_30', 'labour_pool_30', 'aadt_nearest'],
@@ -379,8 +397,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'retail-siting',
-    name: 'Retail catchment',
-    blurb: 'Who is nearby, what do they earn, and can they get here?',
+    name: 'Retail catchment evidence',
+    blurb: 'Recorded population, earnings and access nearby.',
     sector: 'Siting & operations',
     factors: ['drive_time_pop_30', 'retail_catchment_spend', 'earnings_median',
               'transit_access_score', 'aadt_nearest', 'walk_score'],
@@ -388,8 +406,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'data-centre',
-    name: 'Data centre screen',
-    blurb: 'Power, water, fibre and flood risk, in that order.',
+    name: 'Data centre evidence',
+    blurb: 'Recorded power, water, fibre and flood exposure.',
     sector: 'Siting & operations',
     factors: ['data_centre_suitability', 'grid_headroom', 'water_stress_class',
               'broadband_gigabit_pct', 'flood_zone3_pct', 'slope_mean'],
@@ -397,8 +415,8 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: 'residential-quality',
-    name: 'Neighbourhood quality',
-    blurb: 'What is it like to live here — schools, crime, green space?',
+    name: 'Neighbourhood evidence',
+    blurb: 'What is recorded locally: schools, crime, green space and access.',
     sector: 'Siting & operations',
     factors: ['school_good_pct', 'crime_rate', 'greenspace_access',
               'transit_access_score', 'imd_score', 'gp_within_2km'],
@@ -409,7 +427,7 @@ export const TEMPLATES: Template[] = [
   {
     id: 'urban',
     name: 'Urban growth',
-    blurb: 'How fast is this area being built on?',
+    blurb: 'How much built surface has been recorded here over time.',
     sector: 'Environment & climate',
     factors: ['lc_built_pct', 'built_volume', 'population_density', 'nightlight_radiance'],
     tool: 'rect',

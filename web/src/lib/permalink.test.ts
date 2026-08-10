@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  URL_STATE_KEYS, decodeState, encodeState, shareUrl, type UrlState,
+  TEMPLATES, URL_STATE_KEYS, decodeState, encodeState, shareUrl, type UrlState,
 } from './permalink'
 
 /**
@@ -204,5 +204,61 @@ describe('partial and hostile input', () => {
     // `if (s.compare)` rather than `!== null` would drop this, and the bug
     // would only show on the very first month of the record.
     expect(decodeState('#' + encodeState({ ...FULL, compare: 0 })).compare).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Templates state a body of evidence, never a decision
+// ---------------------------------------------------------------------------
+describe('template framing', () => {
+  /**
+   * This list is the first thing a new user reads, so it is the product's
+   * positioning whether or not anyone intended it that way. It used to open
+   * with "Development appraisal — is this site worth pursuing?", which is a
+   * suitability question and the one question Contour exists not to answer.
+   *
+   * The scan is deliberately crude. It cannot tell a good template from a bad
+   * one; it can only catch the vocabulary that shows someone has started
+   * promising a verdict again, which is the failure that actually happens.
+   */
+  const VERDICT_WORDS = [
+    'appraisal', 'suitable', 'suitability', 'best', 'worth pursuing',
+    'quality', 'opportunity', 'viable', 'ranking', 'score',
+  ]
+
+  /**
+   * Compounds where a banned word is a measured property rather than a
+   * judgement. "Air quality" is a property of air; "neighbourhood quality" was
+   * a verdict on a place, and that one is gone. Listed explicitly rather than
+   * softening the scan, because the scan's value is that it is blunt — the
+   * same reasoning that keeps the comparison module's fixed disclaimers on an
+   * exception list instead of relaxing its forbidden-word check.
+   */
+  const MEASURED_COMPOUNDS = ['air quality', 'water quality']
+
+  it('never names a decision in a template name or blurb', () => {
+    for (const t of TEMPLATES) {
+      let text = `${t.name} ${t.blurb}`.toLowerCase()
+      for (const ok of MEASURED_COMPOUNDS) text = text.replaceAll(ok, '')
+      for (const word of VERDICT_WORDS) {
+        expect(text, `${t.id} promises a verdict: "${word}"`).not.toContain(word)
+      }
+    }
+  })
+
+  it('never asks whether the user should do something', () => {
+    // "Would an array work here?", "Could this be planted?", "Can lorries
+    // reach it?" — each asks Contour for the decision rather than the
+    // evidence behind it.
+    for (const t of TEMPLATES) {
+      expect(t.blurb, `${t.id} asks Contour to decide`)
+        .not.toMatch(/^(would|could|should|can|is this|are these)\b/i)
+    }
+  })
+
+  it('still carries the factors — this was a reframing, not a removal', () => {
+    for (const t of TEMPLATES) {
+      expect(t.factors.length, `${t.id} lost its factors`).toBeGreaterThan(0)
+    }
   })
 })
