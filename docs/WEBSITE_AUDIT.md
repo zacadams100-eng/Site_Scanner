@@ -1,4 +1,12 @@
-# Website, SEO and trust pass — what was done, and what is blocked
+# Website, SEO and trust pass
+
+> **Update: the marketing site now exists.** The blocked items below were
+> blocked on routes, and there are ten. What remains blocked is blocked on
+> *business facts* — real customers, a real address, a real legal entity — and
+> that is a different kind of blocker that no amount of building resolves. See
+> §"After the site was built".
+
+## Original audit — what was done, and what was blocked
 
 A 20-item website quality pass was requested. **Fourteen of the twenty require
 a public marketing website, and there isn't one.**
@@ -119,3 +127,76 @@ The order that follows from this audit:
 5. Consent mechanism, then analytics
 6. Trust components — FAQ first, since it needs no external input; case
    studies, reviews and team only when there is something real to put in them
+
+
+---
+
+## After the site was built
+
+### Routes
+
+| Route | Title | Indexable | Breadcrumbs |
+| --- | --- | --- | --- |
+| `/` | Site Scanner \| Environmental site evidence | yes | none (homepage) |
+| `/scanners` | Scanners \| Site Scanner | yes | 2 |
+| `/scanners/land` | Land Scanner \| Site Scanner | yes | 3 |
+| `/scanners/habitat` | Habitat Scanner \| Site Scanner | yes | 3 |
+| `/about` | About \| Site Scanner | yes | 2 |
+| `/case-studies` | Case studies \| Site Scanner | yes | 2 |
+| `/contact` | Contact \| Site Scanner | yes | 2 |
+| `/request-a-site-scan` | Request a site scan \| Site Scanner | yes | 2 |
+| `/thank-you` | Enquiry received \| Site Scanner | **noindex** | 2 |
+| `/privacy` | Privacy policy \| Site Scanner | yes | 2 |
+| `*` → 404 | Page not found \| Site Scanner | **noindex** | 2 |
+| `/app` | (application) | disallowed in robots.txt | — |
+
+Verified in a browser: every title unique, every description present, one `h1`
+per route, Open Graph on all, no horizontal overflow at 1440×900 or 390×844,
+no console errors.
+
+### Canonical URLs and the sitemap are configuration
+
+`VITE_SITE_ORIGIN` supplies the production origin. **Unset, no canonical tag,
+no `og:url` and no sitemap are emitted at all** — a wrong canonical tells a
+search engine the real page is elsewhere, and a wrong `og:url` is cached by
+every platform that reads it. The sitemap is generated at build time from the
+route table, so it cannot drift.
+
+    VITE_SITE_ORIGIN=https://the-real-domain.example
+
+### Structured data
+
+`BreadcrumbList` only, and only when an origin is configured. `Organization`
+and `LocalBusiness` were **not** added: both require a legal entity, an address
+and contact details nobody has supplied, and fabricated structured data is a
+machine-readable claim rather than a cosmetic one.
+
+---
+
+## Still requires real business information
+
+Each has a built, working component and an empty state that reads as a
+decision rather than a gap.
+
+| What | Where | Needed |
+| --- | --- | --- |
+| **Contact details** | `/contact` | A monitored email address. A registered address and map only if one exists. |
+| **Team** | `/about` | Names, roles, bios, photography. No placeholder people. |
+| **Case studies** | `/case-studies` | Real projects. The page says so plainly. |
+| **Reviews** | not rendered | No component is shown, because showing an empty testimonials section advertises the absence. |
+| **Response time** | `/thank-you` | An SLA. Until then the copy is neutral: *"We will review it and get back to you."* |
+| **Legal entity** | `/privacy` | Company name, registered address, data-protection contact, retention period, legal review. |
+| **Form endpoint** | `/request-a-site-scan` | **Nothing receives a submission.** The form validates and routes to the thank-you page; there is no backend to store or forward it. |
+| **Canonical domain** | build | `VITE_SITE_ORIGIN` |
+| **Analytics** | build | `VITE_GA_MEASUREMENT_ID`, plus a consent mechanism and the decision to track at all |
+
+**The form endpoint is the most urgent.** A contact form that goes nowhere is
+worse than no form, and this one should not go live until something receives
+the submission.
+
+## Deliberately not fabricated
+
+No reviews, case studies, statistics, response times, team members, addresses,
+phone numbers, client names, project outcomes, company registration details or
+aggregate ratings. No `Organization` or `LocalBusiness` schema. No placeholder
+`og:url` or canonical. No measurement ID.

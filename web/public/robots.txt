@@ -1,17 +1,21 @@
 # Site Scanner
-#
-# This deployment is an application, not a marketing website: there is one
-# route, and everything below it is client-side state (a drawn area, a chosen
-# scanner, an open investigation). There is nothing crawlable beyond the entry
-# point, and no sitemap, because there is no second page to list.
-#
-# Nothing is disallowed. Blanket-disallowing an app that has no private routes
-# would hide the one page worth finding, and the application's own state is
-# unreachable to a crawler anyway — it lives in a URL fragment, which is never
-# sent to the server.
-#
-# When public marketing routes exist, this file needs revisiting alongside a
-# sitemap. See docs/WEBSITE_AUDIT.md.
 
+# The application. Everything below /app is client-side state — a drawn area,
+# a chosen scanner, an open investigation — held in a URL fragment that never
+# reaches the server. There is nothing here for a crawler to index, and an
+# assessment URL in search results would be someone else's site.
 User-agent: *
+Disallow: /app
+
+# The thank-you page is reachable only after submitting the form. In search
+# results it is a page people arrive at without having done the thing it
+# thanks them for.
+Disallow: /thank-you
+
+# Everything else is public and should be found.
 Allow: /
+
+# Sitemap: written by scripts/build-sitemap.mjs, and only when
+# VITE_SITE_ORIGIN is configured. Uncomment with the real origin once the
+# production domain exists.
+# Sitemap: https://the-real-domain.example/sitemap.xml

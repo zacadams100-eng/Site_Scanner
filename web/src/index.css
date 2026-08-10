@@ -2833,3 +2833,230 @@ button.lib-card-face:focus-visible {
   .lib-name { margin-top: 16px; font-size: 23px; }
   .lib-head { margin-bottom: 30px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Public website
+
+   The brand's public expression, and deliberately not the application's
+   chrome. Field equipment and technical catalogue: rules rather than shadows,
+   mono for the small technical labels, one accent, and type doing the work.
+
+   Absent on purpose: hero gradients, glass, stock photography, rounded pills,
+   animation, and the three-column icon grid every SaaS homepage has.
+   --------------------------------------------------------------------------- */
+.mk { background: var(--paper-000); color: var(--text); min-height: 100vh; }
+.mk-wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+.mk-prose { max-width: 42em; }
+
+.mk-skip {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  padding: 10px 14px; background: var(--surface); border: 1px solid var(--line);
+}
+.mk-skip:focus { left: 8px; top: 8px; }
+
+/* --- top bar --- */
+.mk-top { border-bottom: 1px solid var(--line); background: var(--surface); }
+.mk-top-inner {
+  max-width: 1080px; margin: 0 auto; padding: 0 32px; height: 62px;
+  display: flex; align-items: center; gap: 24px;
+}
+.mk-brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: inherit; }
+.mk-brand-mark { width: 24px; height: 24px; }
+.mk-brand-name { font-size: 15px; letter-spacing: .01em; }
+.mk-brand-name b { font-weight: 600; }
+
+.mk-nav { display: flex; gap: 22px; margin-left: 8px; }
+.mk-nav a {
+  font-size: 13px; color: var(--text-dim); text-decoration: none;
+  padding: 4px 0; border-bottom: 1px solid transparent;
+}
+.mk-nav a:hover, .mk-nav a.active {
+  color: var(--text); border-bottom-color: var(--structure);
+}
+.mk-top-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* One CTA style, used everywhere, so there is visibly one primary action. */
+.mk-cta {
+  display: inline-block; padding: 9px 15px; border: 1px solid var(--text);
+  background: var(--text); color: var(--paper-000);
+  font-size: 12.5px; font-weight: 500; letter-spacing: .01em;
+  text-decoration: none; border-radius: 2px; cursor: pointer;
+  font-family: var(--font-ui);
+}
+.mk-cta:hover { background: var(--structure); border-color: var(--structure); }
+.mk-cta:disabled { opacity: .6; cursor: default; }
+.mk-cta-lg { padding: 13px 22px; font-size: 14px; }
+.mk-cta-block { display: block; text-align: center; }
+.mk-ghost {
+  font-size: 13px; color: var(--accent); text-decoration: none;
+}
+.mk-ghost:hover { text-decoration: underline; }
+
+.mk-nav-toggle {
+  display: none; background: none; border: 1px solid var(--line);
+  border-radius: 2px; padding: 5px 9px; cursor: pointer; font-size: 13px;
+  color: var(--text);
+}
+
+/* --- breadcrumbs --- */
+.mk-crumbs { border-bottom: 1px solid var(--line); background: var(--paper-050); }
+.mk-crumbs-inner { max-width: 1080px; margin: 0 auto; padding: 9px 32px; }
+.mk-crumbs ol {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap;
+  gap: 7px; font-size: 11.5px; color: var(--text-faint);
+}
+.mk-crumbs li + li::before { content: '/'; margin-right: 7px; color: var(--paper-200); }
+.mk-crumbs a { color: var(--text-dim); text-decoration: none; }
+.mk-crumbs a:hover { color: var(--accent); text-decoration: underline; }
+
+/* --- hero --- */
+.mk-hero { padding: 76px 0 60px; border-bottom: 1px solid var(--line); }
+.mk-kicker {
+  margin: 0 0 16px; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--text-faint);
+}
+.mk-h1 {
+  margin: 0 0 20px; font-size: clamp(32px, 5vw, 52px); line-height: 1.06;
+  font-weight: 600; letter-spacing: -0.025em;
+}
+.mk-h1-sm { font-size: clamp(28px, 4vw, 40px); }
+.mk-lede {
+  margin: 0 0 16px; max-width: 44em; font-size: 16.5px; line-height: 1.65;
+  color: var(--text-dim);
+}
+.mk-lede-sm { font-size: 15px; }
+.mk-who { margin: 0 0 28px; max-width: 42em; font-size: 13.5px; color: var(--text-faint); }
+.mk-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+
+/* --- bands --- */
+.mk-band { padding: 56px 0; border-bottom: 1px solid var(--line); }
+.mk-band-alt { background: var(--paper-050); }
+.mk-band-cta { background: var(--paper-050); text-align: left; }
+.mk-h2 {
+  margin: 0 0 22px; font-size: 22px; font-weight: 600; letter-spacing: -0.012em;
+}
+.mk-h2-sp { margin-top: 44px; }
+.mk-prose h2 {
+  margin: 30px 0 9px; font-size: 15px; font-weight: 600; letter-spacing: .01em;
+}
+.mk-prose p { margin: 0 0 13px; font-size: 14.5px; line-height: 1.7; color: var(--text-dim); }
+.mk-prose p b { color: var(--text); }
+.mk-note { margin: 18px 0 0; font-size: 12.5px; color: var(--text-faint); }
+.mk-note a, .mk-prose a { color: var(--accent); }
+
+/* The chain: numbered, ruled, no icons. */
+.mk-chain {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 22px; grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.mk-chain li { border-top: 2px solid var(--text); padding-top: 12px; }
+.mk-step { display: block; font-size: 10.5px; color: var(--text-faint); letter-spacing: .1em; }
+.mk-chain h3 { margin: 7px 0 6px; font-size: 15px; font-weight: 600; }
+.mk-chain p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+
+.mk-cards { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mk-card {
+  display: block; padding: 20px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface);
+  text-decoration: none; color: inherit; transition: border-color .14s ease;
+}
+.mk-card:hover { border-color: var(--structure); }
+.mk-card-idx { font-size: 10.5px; color: var(--text-faint); letter-spacing: .1em; }
+.mk-card h3 { margin: 12px 0 7px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.mk-card p { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.mk-card-go { font-size: 12.5px; color: var(--accent); }
+
+.mk-roadmap { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
+              background: var(--line); border: 1px solid var(--line); }
+.mk-roadmap li {
+  display: flex; gap: 14px; padding: 11px 14px; background: var(--paper-050);
+  font-size: 13.5px; color: var(--text-faint);
+}
+.mk-roadmap b { min-width: 92px; color: var(--text-dim); font-weight: 500; }
+
+/* An empty state that reads as a decision, not a gap. */
+.mk-empty {
+  margin: 18px 0; padding: 16px 18px; border: 1px dashed var(--paper-200);
+  border-radius: var(--radius-sm); background: var(--paper-050);
+}
+.mk-empty p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.65; color: var(--text-dim); }
+.mk-empty p:last-child { margin-bottom: 0; }
+
+/* --- form --- */
+.mk-form { margin-top: 26px; max-width: 34em; }
+.mk-field { display: block; margin-bottom: 18px; border: 0; padding: 0; }
+.mk-field-label {
+  display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 500;
+  color: var(--text);
+}
+.mk-field-label em { color: var(--warn); font-style: normal; }
+.mk-field input[type=text], .mk-field input[type=email], .mk-field textarea {
+  width: 100%; padding: 9px 11px; font: inherit; font-size: 14px;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 2px;
+}
+.mk-field input:focus, .mk-field textarea:focus {
+  outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent);
+}
+.mk-field-hint { display: block; margin-top: 6px; font-size: 11.5px; color: var(--text-faint); }
+.mk-check { display: block; margin: 5px 0; font-size: 13.5px; color: var(--text-dim); }
+
+.mk-404 { padding: 90px 0; }
+.mk-404-code {
+  margin: 0 0 12px; font-size: 56px; font-weight: 500; letter-spacing: .04em;
+  color: var(--paper-200);
+}
+
+/* --- footer --- */
+.mk-foot { padding: 44px 0 60px; background: var(--paper-050); }
+.mk-foot-inner {
+  max-width: 1080px; margin: 0 auto; padding: 0 32px;
+  display: grid; gap: 34px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
+}
+.mk-foot-line { margin: 12px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); max-width: 26em; }
+.mk-foot-nav { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mk-foot-nav h2 {
+  margin: 0 0 10px; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--text-faint);
+}
+.mk-foot-nav a {
+  display: block; margin-bottom: 7px; font-size: 13px; color: var(--text-dim);
+  text-decoration: none;
+}
+.mk-foot-nav a:hover { color: var(--accent); }
+
+/* Sticky CTA: mobile only, clearing the home indicator. */
+.mk-sticky { display: none; }
+
+@media (max-width: 860px) {
+  .mk-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mk-foot-inner { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .mk-wrap, .mk-top-inner, .mk-crumbs-inner, .mk-foot-inner { padding-left: 18px; padding-right: 18px; }
+  .mk-hero { padding: 44px 0 38px; }
+  .mk-band { padding: 38px 0; }
+  .mk-chain, .mk-cards { grid-template-columns: 1fr; }
+  .mk-foot-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* The nav collapses; the CTA does not. The one thing a visitor might want to
+     do is never two taps behind an icon. */
+  .mk-nav {
+    display: none; position: absolute; left: 0; right: 0; top: 62px; z-index: 30;
+    flex-direction: column; gap: 0; padding: 6px 18px 12px;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .mk-nav.is-open { display: flex; }
+  .mk-nav a { padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+  .mk-nav-toggle { display: block; }
+  .mk-top-inner { position: relative; }
+  .mk-cta { padding: 8px 12px; font-size: 12px; }
+
+  .mk-sticky {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    padding: 10px 18px calc(10px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--line);
+  }
+  /* Room for the sticky bar, so it never covers the last line of a page. */
+  .mk-foot { padding-bottom: 96px; }
+}
