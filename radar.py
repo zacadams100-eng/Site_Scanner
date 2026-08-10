@@ -807,7 +807,10 @@ def _provenance_for(needs: Sequence[str], series: Dict[str, Any]) -> List[Dict[s
 
 
 def assess(report: Dict[str, Any],
-           real_capable: Optional[set] = None) -> Dict[str, Any]:
+           real_capable: Optional[set] = None,
+           *,
+           topic_names: Optional[Dict[str, str]] = None,
+           rules: Optional[Sequence["Rule"]] = None) -> Dict[str, Any]:
     """Run every rule over a report and assemble the radar.
 
     `real_capable` is the set of factor ids the server has a real
@@ -822,17 +825,24 @@ def assess(report: Dict[str, Any],
     series = (report or {}).get("series") or {}
     at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
 
+    # The scanner's vocabulary and checks. Defaulted to this module's own so
+    # every existing caller is unaffected, and injectable so a second scanner
+    # is a configuration rather than a fork. The engine below reads only these
+    # two names; it has never known what a topic means.
+    topic_names = TOPICS if topic_names is None else topic_names
+    rules = RULES if rules is None else rules
+
     flags: List[Dict[str, Any]] = []
     info: List[Dict[str, Any]] = []
     # topic -> the states its rules reached
-    topic_states: Dict[str, List[str]] = {t: [] for t in TOPICS}
-    checked: Dict[str, List[str]] = {t: [] for t in TOPICS}
+    topic_states: Dict[str, List[str]] = {t: [] for t in topic_names}
+    checked: Dict[str, List[str]] = {t: [] for t in topic_names}
     unavailable: List[Dict[str, Any]] = []
     # Per-topic ledger of every risk check and what became of it. "Flood:
     # flagged" hides whether one indicator was read or three; a professional
     # needs to know that Zone 3 was assessed and Zone 2 was not, because those
     # are different statements about the same site.
-    topic_checks: Dict[str, List[Dict[str, Any]]] = {t: [] for t in TOPICS}
+    topic_checks: Dict[str, List[Dict[str, Any]]] = {t: [] for t in topic_names}
     # The audit trail: one row per factor any rule wanted, and what became of
     # it. Written here rather than reconstructed by the UI, because "why did
     # the report say that in August" is a question with one correct answer and
@@ -857,7 +867,7 @@ def assess(report: Dict[str, Any],
             "at": at,
         }
 
-    for rule in RULES:
+    for rule in rules:
         state, reason, blocking = _state_of(rule, series, real_capable)
         names = [(series.get(f) or {}).get("meta", {}).get("name")
                  or _catalog_name(f) for f in rule.needs]
@@ -883,7 +893,7 @@ def assess(report: Dict[str, Any],
             unavailable.append({
                 "rule": rule.id,
                 "topic": rule.topic,
-                "topic_name": TOPICS.get(rule.topic, rule.topic),
+                "topic_name": topic_names.get(rule.topic, rule.topic),
                 "asks": rule.asks,
                 # Which investigations this check would have contributed to had
                 # it run. Without this a workspace can show the evidence behind
@@ -938,7 +948,7 @@ def assess(report: Dict[str, Any],
             unavailable.append({
                 "rule": rule.id,
                 "topic": rule.topic,
-                "topic_name": TOPICS.get(rule.topic, rule.topic),
+                "topic_name": topic_names.get(rule.topic, rule.topic),
                 "asks": rule.asks,
                 "reason": "no_data",
                 "factors": list(rule.needs),
@@ -966,7 +976,7 @@ def assess(report: Dict[str, Any],
             info.append({
                 "id": rule.id,
                 "topic": rule.topic,
-                "topic_name": TOPICS.get(rule.topic, rule.topic),
+                "topic_name": topic_names.get(rule.topic, rule.topic),
                 "text": found["text"],
                 "evidence": found.get("evidence", {}),
                 "factors": list(rule.needs),
@@ -978,7 +988,7 @@ def assess(report: Dict[str, Any],
         flags.append({
             "id": rule.id,
             "topic": rule.topic,
-            "topic_name": TOPICS.get(rule.topic, rule.topic),
+            "topic_name": topic_names.get(rule.topic, rule.topic),
             "severity": found["severity"],
             "text": found["text"],
             "evidence": found.get("evidence", {}),
@@ -993,7 +1003,7 @@ def assess(report: Dict[str, Any],
     flags.sort(key=lambda f: (_rank(f["severity"]), f["topic"]))
 
     topics = []
-    for tid, name in TOPICS.items():
+    for tid, name in topic_names.items():
         states = topic_states.get(tid, [])
         gaps = "not_assessed" in states
         if "flagged" in states:
