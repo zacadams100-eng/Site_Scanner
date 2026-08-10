@@ -205,7 +205,17 @@ def _real_values(series: Dict[str, Any]) -> List[Tuple[str, float]]:
     figure held flat across 144 months is not 144 observations.
     """
     out: List[Tuple[str, float]] = []
-    for p in series.get("points") or []:
+    points = series.get("points")
+    # A malformed series must not raise here. This is called from `_state_of`,
+    # which runs *outside* the try/except that guards rule execution — so a
+    # `points` that is a string rather than a list would take down the whole
+    # radar rather than one rule, and the radar is a nicety over a report the
+    # user has already paid for.
+    if not isinstance(points, list):
+        return out
+    for p in points:
+        if not isinstance(p, dict):
+            continue
         if p.get("value") is None or p.get("interpolated"):
             continue
         try:
@@ -690,6 +700,13 @@ def _state_of(rule: Rule, series: Dict[str, Any],
             if (series[f] or {}).get("source") not in REAL_SOURCES]
     if demo:
         return "not_assessed", "demo_data", demo
+    # A real source that answered with nothing is not a clean result. Letting
+    # the rule run would produce no finding, which reads as "checked, clear" —
+    # the same false zero as reporting 0% for an unreadable geometry, one level
+    # up. The service was asked and did not answer; say that.
+    silent = [f for f in rule.needs if not _real_values(series[f] or {})]
+    if silent:
+        return "not_assessed", "no_data", silent
     return "ready", None, []
 
 
@@ -749,6 +766,11 @@ def assess(report: Dict[str, Any],
     topic_states: Dict[str, List[str]] = {t: [] for t in TOPICS}
     checked: Dict[str, List[str]] = {t: [] for t in TOPICS}
     unavailable: List[Dict[str, Any]] = []
+    # Per-topic ledger of every risk check and what became of it. "Flood:
+    # flagged" hides whether one indicator was read or three; a professional
+    # needs to know that Zone 3 was assessed and Zone 2 was not, because those
+    # are different statements about the same site.
+    topic_checks: Dict[str, List[Dict[str, Any]]] = {t: [] for t in TOPICS}
     # The audit trail: one row per factor any rule wanted, and what became of
     # it. Written here rather than reconstructed by the UI, because "why did
     # the report say that in August" is a question with one correct answer and
@@ -775,8 +797,24 @@ def assess(report: Dict[str, Any],
 
     for rule in RULES:
         state, reason, blocking = _state_of(rule, series, real_capable)
+        names = [(series.get(f) or {}).get("meta", {}).get("name")
+                 or _catalog_name(f) for f in rule.needs]
+        if rule.kind == "flag":
+            topic_checks.setdefault(rule.topic, []).append({
+                "rule": rule.id,
+                "asks": rule.asks,
+                "indicators": names,
+                "assessed": state != "not_assessed",
+                "reason": reason,
+            })
         if state == "not_assessed":
-            topic_states.setdefault(rule.topic, []).append("not_assessed")
+            # Only a *risk* check can leave a topic incompletely screened. An
+            # unmeasured informational fact — tree cover, mean elevation — is
+            # not a gap in the screening, and letting it set `partial` made a
+            # topic read "1/1, partly checked", which is a contradiction the
+            # user has to resolve rather than a finding.
+            topic_states.setdefault(rule.topic, []).append(
+                "not_assessed" if rule.kind == "flag" else "info_missing")
             for f in rule.needs:
                 record(f, "generated" if (reason == "demo_data" and f in blocking)
                        else "not_selected" if f in blocking else "assessed")
@@ -795,7 +833,10 @@ def assess(report: Dict[str, Any],
                 "text": (
                     f"Not assessed — {rule.asks}. "
                     + ("Add " + ", ".join(blocking) + " to this report and run "
-                       "it again." if reason == "not_selected" else
+                       "it again." if reason == "not_selected"
+                       else "The source returned no usable observation for this "
+                       "area, so nothing was concluded from it."
+                       if reason == "no_data" else
                        "The data behind it is generated demo data, so no flag "
                        "can honestly be raised from it.")),
             })
@@ -862,15 +903,27 @@ def assess(report: Dict[str, Any],
             # overstatement as calling a generated zero clear, one level up.
             state = "partial" if gaps else "clear"
         elif "info" in states and not gaps:
-            state = "clear"
+            # Measured something, screened nothing that could flag. Only
+            # `clear` when the topic has no risk checks outstanding.
+            state = "clear" if any(c["assessed"] for c in topic_checks.get(tid, [])) \
+                    or not topic_checks.get(tid) else "not_assessed"
         else:
             state = "not_assessed"
+        checks = topic_checks.get(tid, [])
+        done = [c for c in checks if c["assessed"]]
+        missed = [c for c in checks if not c["assessed"]]
         topics.append({
             "id": tid,
             "name": name,
             "state": state,
             "flags": sum(1 for f in flags if f["topic"] == tid),
             "checked": sorted(set(checked.get(tid, []))),
+            # "2 / 3 indicators assessed" is what makes `flagged` and `clear`
+            # mean something. Without it both are bare adjectives.
+            "coverage": {"assessed": len(done), "total": len(checks)},
+            "checks": checks,
+            "detail": _topic_detail(done, missed),
+            "informational": sum(1 for i in info if i["topic"] == tid),
         })
 
     rows = sorted(log.values(), key=lambda r: (r["state"] != "assessed", r["name"]))
@@ -911,6 +964,47 @@ COVERAGE_NOTE = (
     "the site is. A site at 90% is not better than one at 50%; we simply know "
     "more about it."
 )
+
+
+def _topic_detail(done: Sequence[Dict[str, Any]],
+                  missed: Sequence[Dict[str, Any]]) -> str:
+    """One sentence naming what was read and what was not.
+
+    This is what stops `clear` being a bare adjective. "Protected sites —
+    clear, 3 of 3 assessed" is a finding; "Protected sites — clear" is a mood.
+    Missed checks are separated by cause, because "not loaded" and "no live
+    source" are different problems with different owners.
+    """
+    parts: List[str] = []
+    if done:
+        names = sorted({n for c in done for n in c["indicators"]})
+        parts.append(_join(names) + (" was" if len(names) == 1 else " were")
+                     + " assessed.")
+    not_loaded = sorted({n for c in missed if c["reason"] == "not_selected"
+                         for n in c["indicators"]})
+    generated = sorted({n for c in missed if c["reason"] == "demo_data"
+                        for n in c["indicators"]})
+    if not_loaded:
+        parts.append(_join(not_loaded) + (" was" if len(not_loaded) == 1
+                                          else " were") + " not loaded.")
+    silent = sorted({n for c in missed if c["reason"] == "no_data"
+                     for n in c["indicators"]})
+    if silent:
+        parts.append(_join(silent) + (" returned" if len(silent) == 1
+                                      else " returned")
+                     + " no usable observation for this area.")
+    if generated:
+        one = len(generated) == 1
+        parts.append(_join(generated) + (" has" if one else " have")
+                     + " no live source, so nothing was claimed from "
+                     + ("it." if one else "them."))
+    return " ".join(parts)
+
+
+def _join(items: Sequence[str]) -> str:
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return ", ".join(items[:-1]) + " and " + items[-1]
 
 
 def _coverage(rows: Sequence[Dict[str, Any]], assessed: Sequence[Dict[str, Any]],

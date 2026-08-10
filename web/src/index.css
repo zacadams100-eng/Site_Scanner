@@ -1972,3 +1972,43 @@ td.cov-severe { color: var(--text-dim); }
   text-wrap: balance;
 }
 .radar-limits { border-top: 0; margin-top: 10px; padding-top: 0; }
+
+/* --- Topic rows, with their coverage ---------------------------------------
+   The fraction beside a topic is what stops `clear` being a mood. "Flood —
+   clear" is an adjective; "Flood — clear, 2/2 assessed" is a finding, and
+   "Flood — flagged, 1/2" tells you the other indicator was never read. */
+.radar-topic { display: block; padding: 0; }
+.radar-topic-row {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center; gap: 9px; width: 100%;
+  padding: 5px 0; background: none; border: 0; text-align: left;
+  font-family: var(--font-ui); font-size: 12px; color: var(--text);
+  cursor: pointer;
+}
+.radar-topic-row:hover .radar-topic-name { color: var(--accent); }
+.radar-topic-cov { font-size: 10px; color: var(--text-faint); }
+.radar-topic-detail {
+  margin: 0 0 8px 19px; padding: 7px 9px;
+  background: var(--paper-050); border-radius: var(--radius-sm);
+  font-size: 11px; line-height: 1.55; color: var(--text-dim);
+}
+
+/* --- Log filters -----------------------------------------------------------
+   At 24 rows the log is a list; at 200 it is a haystack. Counts sit on the
+   buttons so the shape of the evidence is readable without clicking. */
+.log-filters { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.log-filter {
+  padding: 3px 8px; border-radius: 3px;
+  border: 1px solid var(--line); background: var(--paper-000);
+  font-family: var(--font-ui); font-size: 10.5px; color: var(--text-dim);
+  cursor: pointer;
+}
+.log-filter .mono { font-size: 9.5px; color: var(--text-faint); }
+.log-filter:hover:not(:disabled) { border-color: var(--line-strong); }
+.log-filter.is-active {
+  background: var(--structure); border-color: var(--structure); color: #fff;
+}
+.log-filter.is-active .mono { color: rgba(255, 255, 255, .75); }
+/* Disabled rather than hidden: "Not loaded 0" is itself a useful reading, and
+   a filter row that changes shape between sites is hard to scan. */
+.log-filter:disabled { opacity: .45; cursor: default; }

@@ -221,6 +221,14 @@ export interface RadarTopic {
   state: 'flagged' | 'clear' | 'partial' | 'not_assessed'
   flags: number
   checked: string[]
+  /** "2 of 3 indicators assessed". What makes `flagged` and `clear` mean
+   *  something — without it both are bare adjectives. */
+  coverage: { assessed: number; total: number }
+  checks: { rule: string; asks: string; indicators: string[]
+            assessed: boolean; reason?: string | null }[]
+  /** One sentence naming what was read and what was not. */
+  detail: string
+  informational: number
 }
 
 export interface Unassessed {
@@ -229,7 +237,9 @@ export interface Unassessed {
   topic_name: string
   asks: string
   /** `not_selected` is one click to fix; `demo_data` is a wall. */
-  reason: 'not_selected' | 'demo_data'
+  /** `no_data` — a real source was asked and returned nothing usable.
+   *  Distinct from both: the service answered, with silence. */
+  reason: 'not_selected' | 'demo_data' | 'no_data'
   factors: string[]
   /** Display names for `factors`. "Add flood_zone2_pct" is a column, not a
    *  sentence. Optional so an older backend still renders. */

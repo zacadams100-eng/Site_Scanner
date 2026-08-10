@@ -5,6 +5,47 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Freezing the evidence model — 2026-08-10
+
+Consolidation rather than features. The nine invariants that define what
+Contour is permitted to claim are now written down in `EVIDENCE_MODEL.md` as a
+domain specification, and `tests/test_evidence_model.py` enforces every one of
+them by number (EM1–EM9). Several were written after the behaviour they
+describe had already been violated in real code, and none of the violations
+looked like a lie while being written.
+
+Writing them found two more:
+
+- **A real source that answered with nothing was reported as `clear`.** EM6
+  caught it. The service was asked, returned only gaps, and the rule produced
+  no finding — which reads as "checked, nothing found". That is the same false
+  zero as reporting 0% for an unreadable geometry, one level up. There is now
+  a third cause, `no_data`: *the source returned no usable observation for this
+  area*, distinct from both "you did not load it" and "it is demo data".
+- **A topic could read "1/1 assessed, partly checked".** Unmeasured
+  *informational* facts were setting `partial` on topics whose risk indicators
+  had all been read. Not measuring tree cover is not a gap in risk screening.
+  Only a risk check can leave a topic incompletely screened, and a test now
+  asserts state and coverage can never contradict each other.
+
+**Topic coverage is visible.** Every topic carries `2 / 3 indicators assessed`
+and expands to a sentence naming what was read and what was not — "Flood Zone 3
+coverage was assessed. Flood Zone 2 coverage was not loaded." Without the
+fraction, `clear` is a bare adjective; with it, it is a finding.
+
+**The assessment log has filters** — All / Assessed / Not loaded / No live
+source, with counts on the buttons so the shape of the evidence is readable
+without clicking. Disabled rather than hidden when a count is zero: "Not loaded
+0" is itself a useful reading.
+
+`/api/capabilities` is documented as the hard contract between backend and
+frontend. The frontend must not ask whether a factor exists; it must ask what
+Contour can honestly claim about it right now.
+
+688 Python tests (+25), 165 frontend.
+
+---
+
 ## Radar, second pass — coverage, informational findings, the log — 2026-08-10
 
 Four changes from a product review, one of which was a real bug in my own

@@ -50,6 +50,8 @@ export default function Radar() {
   const [openFlag, setOpenFlag] = useState<string | null>(null)
   const [openInv, setOpenInv] = useState<string | null>(null)
   const [logOpen, setLogOpen] = useState(false)
+  const [openTopic, setOpenTopic] = useState<string | null>(null)
+  const [logFilter, setLogFilter] = useState<'all' | 'assessed' | 'not_selected' | 'generated'>('all')
 
   const radar = data?.radar
 
@@ -101,17 +103,30 @@ export default function Radar() {
         <ul className="radar-topics">
           {topics.map((t) => (
             <li key={t.id} className={`radar-topic is-${t.state}`}>
-              <Dot state={t.state} />
-              <span className="radar-topic-name">{t.name}</span>
-              <span className="radar-topic-state">
-                {t.state === 'flagged'
-                  ? `${t.flags} flag${t.flags === 1 ? '' : 's'}`
-                  : t.state === 'clear' ? 'checked · clear'
-                  /* Some checks ran, others could not. Calling that clear
-                     would be the same overstatement as a generated zero. */
-                  : t.state === 'partial' ? 'partly checked'
-                  : 'not assessed'}
-              </span>
+              <button className="radar-topic-row"
+                      aria-expanded={openTopic === t.id}
+                      onClick={() => setOpenTopic(openTopic === t.id ? null : t.id)}>
+                <Dot state={t.state} />
+                <span className="radar-topic-name">{t.name}</span>
+                {/* The fraction is what stops `clear` being a mood. */}
+                {t.coverage.total > 0 && (
+                  <span className="radar-topic-cov mono">
+                    {t.coverage.assessed}/{t.coverage.total}
+                  </span>
+                )}
+                <span className="radar-topic-state">
+                  {t.state === 'flagged'
+                    ? `${t.flags} flag${t.flags === 1 ? '' : 's'}`
+                    : t.state === 'clear' ? 'checked · clear'
+                    /* Some checks ran, others could not. Calling that clear
+                       would be the same overstatement as a generated zero. */
+                    : t.state === 'partial' ? 'partly checked'
+                    : 'not assessed'}
+                </span>
+              </button>
+              {openTopic === t.id && t.detail && (
+                <p className="radar-topic-detail">{t.detail}</p>
+              )}
             </li>
           ))}
         </ul>
@@ -284,9 +299,31 @@ export default function Radar() {
               <p className="log-when mono">
                 Assessed {new Date(radar.assessed_at).toLocaleString('en-GB')}
               </p>
+              {/* Filters, because at 24 rows this is a list and at 200 it is a
+                  haystack. The counts are on the buttons so the shape of the
+                  evidence is readable without clicking anything. */}
+              <div className="log-filters" role="group" aria-label="Filter the log">
+                {([['all', 'All'], ['assessed', 'Assessed'],
+                   ['not_selected', 'Not loaded'],
+                   ['generated', 'No live source']] as const).map(([id, label]) => {
+                  const n = id === 'all' ? log.length
+                    : log.filter((r) => r.state === id).length
+                  return (
+                    <button key={id}
+                            className={`log-filter${logFilter === id ? ' is-active' : ''}`}
+                            aria-pressed={logFilter === id}
+                            disabled={n === 0}
+                            onClick={() => setLogFilter(id)}>
+                      {label} <span className="mono">{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
               <table className="log-table">
                 <tbody>
-                  {log.map((row) => (
+                  {log
+                    .filter((r) => logFilter === 'all' || r.state === logFilter)
+                    .map((row) => (
                     <tr key={row.factor} className={`log-${row.state}`}>
                       <td>{row.name}</td>
                       <td className="log-state">
