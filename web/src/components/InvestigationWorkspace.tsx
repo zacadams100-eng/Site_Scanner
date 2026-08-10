@@ -4,9 +4,7 @@ import {
   allVerified, assessedOn, findEntry, gapLabel, gapSummary, humanKey,
   methodsUsed, priorityClass, priorityLabel, raisedSummary,
 } from '../lib/investigation'
-import type {
-  EvidenceChain, EvidencePack, InvestigationWorkspaceEntry, RaisedBy,
-} from '../types'
+import type { EvidenceChain, EvidencePack, RaisedBy } from '../types'
 
 /**
  * The investigation workspace.

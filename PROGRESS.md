@@ -5,6 +5,69 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Scanner library, and a website pass that was mostly blocked — 2026-08-10
+
+**Site Scanner now opens on a scanner library**, not a map. Six verticals: two
+available, four in development, all from `/api/catalog` so there is no frontend
+roadmap array to drift from the registry. Choosing a scanner enters the
+existing workspace; the wordmark is the way back and names the active scanner
+("Site Scanner / Habitat").
+
+Two compositions rather than one grid — the available scanners are large
+plates because they are the decision, the declared ones a compact index because
+they are the roadmap. A single uniform grid produced six equal cards and a dead
+gutter, which is exactly the generic-card look the brief warned against.
+
+Forestry, Water and Terrain joined Coastal as **registered, empty** scanner
+configs. Registering is not implementing: no topics, no rules, no factors, no
+coverage, and the API refuses a request naming them. Putting them in the
+registry rather than a frontend list means the roadmap has one source of truth.
+
+**Switching scanners clears the drawn shape and the report.** A site assessed
+by land is not the same document as the same shape assessed by habitat, and
+carrying the report across would show one scanner's findings under another's
+name.
+
+### The website pass: 6 of 20 done, 14 blocked, and the reason matters
+
+`docs/WEBSITE_AUDIT.md`. The brief assumed a public marketing website. There
+isn't one: no router, no pages, no public routes, and `<title>` was `web` — the
+Vite default — since the project started.
+
+Done: the title, a meta description, Open Graph and Twitter metadata,
+`robots.txt`, an alt-text audit, and `lib/analytics.ts` (env-configured,
+consent-gated, inert in every environment because no consent mechanism exists).
+
+`og:url` and `og:image` were deliberately **omitted**: there is no canonical
+public URL and no branded social asset, and a placeholder `og:url` is cached by
+every platform that reads it. No structured data was added — `Organization` and
+`LocalBusiness` both require facts about a business this repository does not
+contain, and fabricated structured data is a machine-readable claim.
+
+The other fourteen need pages that do not exist, and building them means
+inventing the site's primary conversion action — which the brief itself says to
+identify rather than invent. That decision is now written down.
+
+### The production build caught four defects nothing else did
+
+`npm run build` runs `tsc -b` over a wider set than `npx tsc --noEmit`, which
+is the check this session has been running. It surfaced:
+
+- **The share button dropped the open investigation.** `Toolbar`'s `shareUrl`
+  call predated the `investigation` field added two sessions ago, so "Share"
+  sent the site but not the question. A real functional bug, now with a
+  regression test.
+- Three stale fixtures and unused imports left by earlier refactors.
+
+Worth recording as process rather than as bugs: **`tsc --noEmit` is not the
+build**, and running it all session gave false confidence.
+
+863 Python tests, 254 frontend. Chromium at 1440×900 and 390×844: six cards,
+two openable, land ↔ habitat ↔ library navigation, badge follows the scanner,
+no horizontal overflow, no console errors.
+
+---
+
 ## Habitat Scanner — R7, scanner #2 — 2026-08-10
 
 The first real second product. **One flagged check and five informational

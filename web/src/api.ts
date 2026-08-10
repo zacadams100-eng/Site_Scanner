@@ -34,8 +34,8 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
   return res.json()
 }
 
-export async function fetchCatalog(): Promise<Catalog> {
-  const res = await fetch('/api/catalog')
+export async function fetchCatalog(scanner?: string): Promise<Catalog> {
+  const res = await fetch(`/api/catalog${scanner ? `?scanner=${encodeURIComponent(scanner)}` : ''}`)
   if (!res.ok) throw new ApiError(`Catalogue unavailable (${res.status})`, res.status)
   return res.json()
 }

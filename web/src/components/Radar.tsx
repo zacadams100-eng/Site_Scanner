@@ -411,7 +411,6 @@ function FlagRow({ flag, open, onToggle }:
                  { flag: Flag; open: boolean; onToggle: () => void }) {
   const evidence = Object.entries(flag.evidence)
   const openEvidence = useStore((s) => s.openEvidence)
-  const openInvestigation = useStore((s) => s.openInvestigation)
   return (
     <li className={`flag is-${flag.severity}`}>
       <button className="flag-main" onClick={onToggle} aria-expanded={open}>

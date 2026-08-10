@@ -25,7 +25,7 @@ function entry(over: Partial<EvidenceEntry> = {}): EvidenceEntry {
     investigations: [{ id: 'ecology_survey', name: 'Preliminary ecological appraisal',
                        priority: 'high', why: ['historical_vegetation_decline'] }],
     assessed_at: '2026-08-10T13:00:00+00:00',
-    claims: { established: 'Declined 23%.', not_established: 'Not a cause.' },
+    claims: { established: ['Declined 23%.'], not_established: ['Not a cause.'] },
     ...over,
   }
 }

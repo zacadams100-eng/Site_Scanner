@@ -32,6 +32,7 @@ export default function Toolbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const [briefPending, setBriefPending] = useState(false)
+  const investigationId = useStore((s) => s.investigationId)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   const cols = useMemo(
@@ -82,9 +83,12 @@ export default function Toolbar() {
   }
 
   const onShare = async () => {
+    // The open investigation travels with the link. Without it, "share this"
+    // from the toolbar sent the site but not the question — the recipient got
+    // the report and had to be told which finding to look at.
     const url = shareUrl({
       aoi, factors: selected, t: timeIndex, compare: compareIndex,
-      markers, name: projectName,
+      markers, name: projectName, investigation: investigationId,
     })
     try {
       await navigator.clipboard.writeText(url)

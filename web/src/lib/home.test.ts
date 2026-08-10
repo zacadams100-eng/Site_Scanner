@@ -8,7 +8,8 @@ const SQUARE: GeoJSON.Polygon = {
 }
 
 const shared = '#' + encodeState({
-  aoi: SQUARE, factors: ['ndvi'], t: 3, compare: null, markers: [], name: 'Manor Farm',
+  aoi: SQUARE, factors: ['ndvi'], t: 3, compare: null, markers: [],
+  name: 'Manor Farm', investigation: null,
 })
 
 describe('openOnGallery', () => {

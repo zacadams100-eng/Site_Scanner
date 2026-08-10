@@ -29,8 +29,12 @@ GEOMETRY = {
 # ---------------------------------------------------------------------------
 # R1 — the registry
 # ---------------------------------------------------------------------------
-def test_three_scanners_are_registered():
-    assert set(scanners.ids()) == {"land", "habitat", "coastal"}
+def test_six_verticals_are_registered():
+    """Six, because the shape of the product is part of what the library says:
+    two live and four declared reads as "platform, early", where two cards
+    reads as "two tools"."""
+    assert set(scanners.ids()) == {"land", "habitat", "coastal", "forestry",
+                                   "water", "terrain"}
 
 
 def test_land_is_built_from_the_existing_configuration_not_copied():
@@ -189,3 +193,32 @@ def test_switching_scanners_needs_no_monkeypatching(mock_client):
     r = _series(mock_client, "land")
     assert r.status_code == 200
     assert radar.INVESTIGATIONS is scanners.resolve("land").investigations
+
+
+# ---------------------------------------------------------------------------
+# The scanner library's contract with the frontend
+# ---------------------------------------------------------------------------
+def test_the_catalogue_lists_every_scanner_with_its_availability(mock_client):
+    """One source of truth. The library renders this list; a frontend roadmap
+    array would drift, and the first symptom would be a card offering a
+    scanner the API refuses."""
+    body = mock_client.get("/api/catalog").json()
+    listed = {s["id"]: s for s in body["scanners"]}
+
+    assert set(listed) == set(scanners.ids())
+    assert len(listed) == 6, "six verticals, so the shape of the product shows"
+    assert {i for i, s in listed.items() if s["implemented"]} == {"land", "habitat"}
+
+    for s in listed.values():
+        assert s["name"] and s["subject"], "a card without a subject is a logo"
+
+
+def test_a_declared_scanner_is_registered_but_carries_no_content():
+    """Registering is not implementing. The four future verticals exist so the
+    roadmap has one source of truth, and carry nothing that could be mistaken
+    for functionality."""
+    for sid in ("coastal", "forestry", "water", "terrain"):
+        s = scanners.resolve(sid)
+        assert s.implemented is False
+        assert (s.topics, s.rules, s.investigations, s.factors) == ({}, (), {}, ())
+        assert s.coverage is None

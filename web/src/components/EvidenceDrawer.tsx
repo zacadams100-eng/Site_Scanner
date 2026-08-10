@@ -4,7 +4,7 @@ import {
   evidenceRows, findEntry, humanKey, sections, sourceRows, stateClass,
   stateLabel,
 } from '../lib/evidence'
-import type { EvidenceEntry, EvidenceFinding } from '../types'
+import type { EvidenceFinding } from '../types'
 
 /**
  * The evidence explorer.

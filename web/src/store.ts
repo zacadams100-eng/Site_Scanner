@@ -86,6 +86,19 @@ interface State {
   activeTab: 'overview' | 'radar' | 'findings' | 'table' | 'charts' | 'sources'
   browserOpen: boolean
 
+  /**
+   * The active scanner's id, and whether the library is showing.
+   *
+   * The scanner is the product vertical; the site is the thing being analysed.
+   * `scannerId` is the only scanner state the frontend holds — everything else
+   * about a scanner (its name, subject, availability, factors) comes from
+   * `/api/catalog`, so there is no second source of truth to drift.
+   */
+  scannerId: string
+  library: boolean
+  setLibrary: (o: boolean) => void
+  chooseScanner: (id: string) => void
+
   /** Which factor the evidence explorer is open on, or null. A factor id
    *  rather than a copy of the entry: the payload is the source of truth and a
    *  snapshot would go stale the moment the report refreshes. */
@@ -281,6 +294,9 @@ export const useStore = create<State>((set, get) => ({
   activeTab: 'overview',
   browserOpen: false,
   evidenceFactor: null,
+  scannerId: 'land',
+  // Opens on the library: the first decision is which scanner, not which site.
+  library: true,
   investigationId: null,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn
@@ -320,6 +336,26 @@ export const useStore = create<State>((set, get) => ({
     })
     get().hydrateFromUrl()
   },
+  setLibrary: (o) => set({ library: o }),
+
+  /**
+   * Enter a scanner.
+   *
+   * Clears the drawn shape and the report: a site assessed by the land scanner
+   * is not the same document as the same shape assessed by habitat, and
+   * carrying the old report across would show one scanner's findings under
+   * another's name. The map keeps its position, so the user does not lose
+   * where they were looking.
+   */
+  chooseScanner: (id) => {
+    if (id === get().scannerId) { set({ library: false }); return }
+    set({
+      scannerId: id, library: false, aoi: null, data: null, cells: [],
+      error: null, evidenceFactor: null, investigationId: null,
+      projectName: null, past: [], future: [],
+    })
+  },
+
   setCatalogError: (e) => set({ catalogError: e }),
   setMock: (m) => set({ isMock: m }),
   setDrawMode: (m) => {

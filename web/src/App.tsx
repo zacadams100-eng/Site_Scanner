@@ -14,6 +14,7 @@ import Provenance from './components/Provenance'
 import Radar from './components/Radar'
 import SiteOverview from './components/SiteOverview'
 import EvidenceDrawer from './components/EvidenceDrawer'
+import ScannerLibrary from './components/ScannerLibrary'
 import InvestigationWorkspace from './components/InvestigationWorkspace'
 import CompareSites from './components/CompareSites'
 import PlaceSearch from './components/PlaceSearch'
@@ -54,6 +55,9 @@ export default function App() {
   const compareOpen = useStore((s) => s.comparing && s.compareIds.length >= 2)
   const setHome = useStore((s) => s.setHome)
   const catalogError = useStore((s) => s.catalogError)
+  const scannerId = useStore((s) => s.scannerId)
+  const library = useStore((s) => s.library)
+  const setLibrary = useStore((s) => s.setLibrary)
   const setCatalog = useStore((s) => s.setCatalog)
   const setCatalogError = useStore((s) => s.setCatalogError)
   const setMock = useStore((s) => s.setMock)
@@ -83,7 +87,7 @@ export default function App() {
   // again instead of making the user reload the page.
   const loadCatalog = useCallback(() => {
     setCatalogError(null)
-    fetch('/api/catalog')
+    fetch(`/api/catalog?scanner=${encodeURIComponent(scannerId)}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`Catalogue unavailable (${r.status})`)
         // The backend stamps every response; surfacing it means nobody ever
@@ -93,11 +97,11 @@ export default function App() {
       })
       .catch(() => {
         // Retry once through the typed client for a cleaner message.
-        fetchCatalog()
+        fetchCatalog(scannerId)
           .then(setCatalog)
           .catch((e) => setCatalogError(e?.message ?? 'Could not reach the API'))
       })
-  }, [setCatalog, setCatalogError, setMock])
+  }, [setCatalog, setCatalogError, setMock, scannerId])
 
   useEffect(() => { loadCatalog() }, [loadCatalog])
 
@@ -146,21 +150,33 @@ export default function App() {
       ? 'Drag the shape to move it, or a corner to resize'
       : 'Pick a tool, then drag on the map'
 
+  // The library is the first screen and replaces the workspace: choosing a
+  // scanner is a different activity from analysing a site, and overlaying the
+  // two would leave a map running behind a decision that has not been made.
+  if (library) return <ScannerLibrary />
+
   return (
     <div className={`app${sidebarOpen ? '' : ' rail-collapsed'}${panelOpen ? '' : ' panel-closed'}`}>
       <header className="topbar">
-        <div className="brand">
+        {/* The wordmark is the way back. A user must always know which
+            scanner they are in and how to leave it, and burying that in a
+            sidebar is how a platform reads as a single app. */}
+        <button className="brand brand-home" onClick={() => setLibrary(true)}
+                title="All scanners" aria-label="Back to all scanners">
           <BrandMark className="brand-mark" />
           <span className="brand-name"><b>Site</b> Scanner</span>
           {/* The active scanner, named. Site Scanner is the platform; Land is
               the scanner running — and until this was shown, which scanner
               produced a report was backend state a user could not see. */}
           {catalog?.scanner && (
-            <span className="brand-scanner" title={catalog.scanner.subject}>
-              {catalog.scanner.name}
-            </span>
+            <>
+              <span className="brand-sep" aria-hidden>/</span>
+              <span className="brand-scanner" title={catalog.scanner.subject}>
+                {catalog.scanner.name}
+              </span>
+            </>
           )}
-        </div>
+        </button>
 
         <div className="topbar-doc">
           <span className="doc-name">{projectName ?? (aoi ? 'Untitled site' : 'No site open')}</span>

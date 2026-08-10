@@ -1,0 +1,17 @@
+# Site Scanner
+#
+# This deployment is an application, not a marketing website: there is one
+# route, and everything below it is client-side state (a drawn area, a chosen
+# scanner, an open investigation). There is nothing crawlable beyond the entry
+# point, and no sitemap, because there is no second page to list.
+#
+# Nothing is disallowed. Blanket-disallowing an app that has no private routes
+# would hide the one page worth finding, and the application's own state is
+# unreachable to a crawler anyway — it lives in a URL fragment, which is never
+# sent to the server.
+#
+# When public marketing routes exist, this file needs revisiting alongside a
+# sitemap. See docs/WEBSITE_AUDIT.md.
+
+User-agent: *
+Allow: /

@@ -101,7 +101,7 @@ class Scanner:
 LAND = Scanner(
     id="land",
     name="Land",
-    subject="A site, parcel or landholding",
+    subject="Site constraints and land assessment",
     topics=radar.TOPICS,
     rules=tuple(radar.RULES),
     investigations=radar.INVESTIGATIONS,
@@ -126,7 +126,7 @@ LAND = Scanner(
 HABITAT = Scanner(
     id="habitat",
     name="Habitat",
-    subject="A habitat parcel, reserve or landscape unit",
+    subject="Ecological condition and habitat investigation",
     topics=habitat_rules.TOPICS,
     rules=radar.rules_from("habitat.rules"),
     investigations=habitat_rules.INVESTIGATIONS,
@@ -135,19 +135,48 @@ HABITAT = Scanner(
     coverage_name="England",
 )
 
+#: Declared verticals, in the order the library shows them. Each has a name, a
+#: subject and no content — registered so the product roadmap has one source of
+#: truth rather than a backend registry and a frontend list that drift.
+#:
+#: Registering is not implementing. `implemented` is False for every one of
+#: these, the API refuses a request naming them, and the library shows them as
+#: unavailable. What they are *not* is functionality: no topics, no rules, no
+#: thresholds, no factors, no coverage.
 COASTAL = Scanner(
     id="coastal",
     name="Coastal",
-    subject="A frontage or coastal cell",
-    topics={},
-    rules=(),
-    investigations={},
-    factors=(),
-    coverage=None,
+    subject="Coastal conditions and change",
+    topics={}, rules=(), investigations={}, factors=(), coverage=None,
+)
+
+FORESTRY = Scanner(
+    id="forestry",
+    name="Forestry",
+    subject="Forest condition and management",
+    topics={}, rules=(), investigations={}, factors=(), coverage=None,
+)
+
+WATER = Scanner(
+    id="water",
+    name="Water",
+    subject="Water and catchment assessment",
+    topics={}, rules=(), investigations={}, factors=(), coverage=None,
+)
+
+TERRAIN = Scanner(
+    id="terrain",
+    name="Terrain",
+    subject="Terrain and physical site conditions",
+    topics={}, rules=(), investigations={}, factors=(), coverage=None,
 )
 
 
-SCANNERS: Dict[str, Scanner] = {s.id: s for s in (LAND, HABITAT, COASTAL)}
+#: Order matters: this is the order the scanner library renders, so the two
+#: built scanners come first.
+SCANNERS: Dict[str, Scanner] = {
+    s.id: s for s in (LAND, HABITAT, COASTAL, FORESTRY, WATER, TERRAIN)
+}
 
 #: What a request gets when it does not say. Every existing caller predates
 #: scanner identity, and the land scanner is what they have always meant.

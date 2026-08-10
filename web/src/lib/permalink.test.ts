@@ -91,6 +91,7 @@ function emptyFor(key: keyof UrlState): UrlState[keyof UrlState] {
     case 'factors': return []
     case 't': return 0
     case 'compare': return null
+    case 'investigation': return null
     case 'markers': return []
     case 'name': return null
   }
@@ -193,6 +194,7 @@ describe('partial and hostile input', () => {
   it('omits absent optional fields rather than inventing empties', () => {
     const bare = encodeState({
       aoi: null, factors: [], t: 0, compare: null, markers: [], name: null,
+      investigation: null,
     })
     expect(bare).toBe('t=0')
     const out = decodeState('#' + bare)
@@ -287,5 +289,14 @@ describe('shared investigation', () => {
   it('survives an id that needs escaping', () => {
     expect(roundTrip({ ...FULL, investigation: 'a b&c=d' }).investigation)
       .toBe('a b&c=d')
+  })
+
+  it('a shared link carries the open investigation from the toolbar too', () => {
+    // The production build caught this: Toolbar's shareUrl call predated the
+    // `investigation` field, so "Share" sent the site but not the question and
+    // the recipient had to be told which finding to look at. `npx tsc --noEmit`
+    // did not surface it; `npm run build` did.
+    expect(encodeState({ ...FULL, investigation: 'ecology_survey' }))
+      .toContain('i=ecology_survey')
   })
 })
