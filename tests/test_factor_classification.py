@@ -45,6 +45,70 @@ JUDGEMENT_FACTORS = frozenset({
 })
 
 
+#: Composites that were considered and **rejected**, with the reasoning kept
+#: rather than the factor. Both combined several different hazards into one
+#: number, which is the abstraction Contour refuses everywhere else:
+#:
+#:     several hazards → weighting → one number → a reading of site condition
+#:
+#: The problem was never the word "score". It was that the weighting is an
+#: unstated judgement, and the output invites exactly the interpretation the
+#: evidence model exists to prevent — "ground risk = 73" is a conclusion about
+#: a site wearing a decimal point.
+#:
+#: Their inputs remain in the catalogue individually, each with its own
+#: evidence state and provenance, which is the honest form of the same
+#: information. The investigation layer can still say "multiple perils warrant
+#: assessment" without anyone inventing a combined numerical judgement.
+#:
+#: Recorded here rather than silently deleted so nobody re-adds them believing
+#: the idea was simply never considered. See docs/FACTOR_CLASSIFICATION.md.
+REJECTED_COMPOSITES = frozenset({
+    "insurance_peril_score",   # flood + subsidence + wind, combined
+    "ground_risk_score",       # GeoSure bands, combined
+})
+
+
+def test_rejected_composites_are_not_in_the_catalogue():
+    """They were removed, not renamed.
+
+    A rename would have kept the aggregate and hidden it behind a better word,
+    which is worse than either keeping it or dropping it: the number would
+    still be a weighted judgement and would no longer look like one.
+    """
+    declared = {f["id"] for f in catalog.FACTORS}
+    back = REJECTED_COMPOSITES & declared
+    assert not back, (
+        f"a rejected composite is back in the catalogue: {sorted(back)}. "
+        "See docs/FACTOR_CLASSIFICATION.md for why it was refused."
+    )
+
+
+def test_no_replacement_aggregate_took_their_place():
+    """The failure mode this guards is subtler than re-adding the same id.
+
+    "Composite ground risk" could return as `ground_condition_index` or
+    `peril_composite` and pass the test above while being the same object.
+
+    Scoped to the hazard groups, and deliberately not to the whole catalogue.
+    The objection was never to combining anything — `transit_access_score`
+    combines stop density and service frequency, which are two views of one
+    thing. It was to combining *different hazards*, where the weighting decides
+    which kind of harm matters more and nobody has stated it. So the check is
+    "no aggregate lives where the hazards are", which is where both rejected
+    factors did.
+    """
+    HAZARD_GROUPS = {"Ground risk", "Flood", "Climate risk"}
+    for f in catalog.FACTORS:
+        if f.get("group") not in HAZARD_GROUPS:
+            continue
+        note = (f.get("note") or "").lower()
+        assert "combined" not in note and "composite" not in note, (
+            f"{f['id']} aggregates hazards: {note!r} — see "
+            "docs/FACTOR_CLASSIFICATION.md on rejected composites"
+        )
+
+
 def test_the_judgement_set_still_matches_the_catalogue():
     """A guard on the guard.
 

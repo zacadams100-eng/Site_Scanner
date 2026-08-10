@@ -16,6 +16,7 @@ the three flavours of `not_assessed`.
 
 import pytest
 
+import claims as claims_mod
 import evidence
 import radar
 
@@ -126,14 +127,14 @@ def test_clear_does_not_claim_the_topic_is_safe():
     factor that no rule flags, and constructing that through the mock backend
     would be an elaborate way to reach a function this module owns.
     """
-    claims = evidence._claims("clear", None, findings=[],
-                              measurement_text="Slope was assessed.")
+    claims = claims_mod.compose("clear", None, findings=[],
+                                measurement_text="Slope was assessed.")
     assert "does not establish that the site is free of risk" in " ".join(claims["not_established"])
     assert "other checks in the same topic may not have run" in " ".join(claims["not_established"]).lower()
 
 
 def test_clear_still_carries_the_regulatory_limit():
-    claims = evidence._claims("clear", None, findings=[], measurement_text="")
+    claims = claims_mod.compose("clear", None, findings=[], measurement_text="")
     assert "not a regulatory determination" in " ".join(claims["not_established"])
 
 

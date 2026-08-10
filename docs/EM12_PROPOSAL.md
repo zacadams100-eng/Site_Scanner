@@ -1,9 +1,13 @@
 # EM12 (proposed) — every finding exposes its limitation
 
-**Status: proposed, not adopted.** `EVIDENCE_MODEL.md` is unchanged. This
-document states the candidate invariant and records whether the architecture
-can actually satisfy it, which is the question that decides whether it is worth
-adopting.
+**Status: ADOPTED, in the satisfiable form.** EM12 is now in
+`EVIDENCE_MODEL.md` and enforced by `test_em12_*`. `claims.py` is the canonical
+source; `evidence.py` and `brief.py` consume it and compose nothing.
+
+This document is kept as the record of *why the scope is what it is* — the
+measurement below (1 of 25 rules) is the reason EM12 does not require every
+rule author to write limitation prose, and that reasoning would otherwise be
+invisible in the invariant itself.
 
 ---
 

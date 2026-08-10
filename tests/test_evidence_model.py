@@ -379,3 +379,76 @@ def test_em4_topic_state_and_topic_coverage_never_contradict_each_other():
             assert t["state"] == "not_assessed", t["id"]
         if t["state"] == "partial":
             assert 0 < cov["assessed"] < cov["total"], t["id"]
+
+
+# ---------------------------------------------------------------------------
+# EM12 — every finding exposes a state-generic claim boundary
+# ---------------------------------------------------------------------------
+def test_em12_every_state_produces_a_limitation():
+    """Exhaustive over `claims.STATES`, so a new finding state cannot ship
+    without one. The list is the contract; walking it is the enforcement."""
+    import claims
+
+    for state, reason in claims.STATES:
+        out = claims.compose(state, reason, findings=[], measurement_text="X.")
+        assert out["not_established"], f"{state}/{reason} states no limitation"
+        assert all(c.strip() for c in out["not_established"])
+        assert out["established"], f"{state}/{reason} establishes nothing"
+
+
+def test_em12_no_rule_is_required_to_write_its_own_limitation():
+    """The scope decision, made executable.
+
+    A state-generic boundary must be complete on its own — a rule with no
+    `not_evidence_of` still gets a full limitation. Were that not true, EM12
+    would silently become "every rule author writes prose", which is the
+    version this project rejected.
+    """
+    import claims
+
+    bare = claims.compose("flagged", None,
+                          findings=[{"text": "X fell 30%.", "rule_meta": {}}],
+                          measurement_text="")
+    assert len(bare["not_established"]) >= 2
+    assert any("not establish why" in c for c in bare["not_established"])
+
+
+def test_em12_a_rule_negative_adds_and_never_replaces():
+    """A rule's own negative is an addition. Replacing the generic clauses
+    would let a rule quietly narrow its own limitation."""
+    import claims
+
+    with_rule = claims.compose(
+        "flagged", None,
+        findings=[{"text": "X fell 30%.",
+                   "rule_meta": {"not_evidence_of": "It is not evidence of Y."}}],
+        measurement_text="")
+    assert "It is not evidence of Y." in with_rule["not_established"]
+    assert any("not a regulatory determination" in c
+               for c in with_rule["not_established"])
+
+
+def test_em12_the_boundary_has_exactly_one_source():
+    """No surface composes limitation prose of its own.
+
+    The clause constants live in `claims.py` and nowhere else. This is a
+    structural check rather than a behavioural one, because the failure it
+    guards — a second wording of the same boundary — passes every behavioural
+    test that exists.
+    """
+    import pathlib
+    import claims
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    sentinels = [claims.CAUSAL_LIMIT[:40], claims.ABSENCE_LIMIT[:40],
+                 claims.CLEAR_LIMIT[:40]]
+
+    for path in root.glob("*.py"):
+        if path.name == "claims.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for sentinel in sentinels:
+            assert sentinel not in text, (
+                f"{path.name} carries its own copy of a claim clause; EM12 "
+                "requires one canonical source (claims.py)"
+            )

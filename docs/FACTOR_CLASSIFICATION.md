@@ -9,9 +9,12 @@ They are **not all the same problem**, and a mass rename would have destroyed
 real information. This document classifies each one and says what should happen
 to it.
 
-**None of the 26 is currently a live factor.** All are generated demo data
-(28 of 273 factors are real). Nothing here is being claimed about any site
-today; every risk below is latent.
+**None of the 26 was a live factor.** All were generated demo data (28 of 273
+factors are real), so nothing was being claimed about any site — every risk
+below was latent, which is why it could be settled deliberately rather than
+under pressure.
+
+**Two have since been removed outright.** See `REJECTED` below.
 
 ---
 
@@ -59,15 +62,49 @@ read by a rule. See "The EM7 collision" below.
 
 ---
 
-## DERIVED_METRIC — 10 factors
+## REJECTED — 2 factors, removed from the catalogue
+
+`insurance_peril_score` and `ground_risk_score` were considered and **refused**.
+They are not renamed, not reclassified and not parked: they are gone from
+`catalog.py`, and this section exists so nobody re-adds them believing the idea
+was never examined.
+
+**The objection was never the word "score".** It was the shape:
+
+    several different hazards → weighting → one number → a reading of site condition
+
+- `insurance_peril_score` — "flood, subsidence and wind combined for screening"
+- `ground_risk_score` — "the GeoSure bands combined into one screening number"
+
+The weighting decides which kind of harm matters more, and nobody has stated
+it. `Ground risk: 73` is a conclusion about a site wearing a decimal point, and
+it is the same abstraction the product refuses everywhere else — a site score
+scoped to one topic is still a site score.
+
+**A rename would have been worse than either keeping or dropping them.** The
+number would still be a weighted judgement and would no longer look like one.
+
+**What replaces them: nothing, and that is the point.** Their inputs remain in
+the catalogue individually — flood zone, shrink-swell, storm gust, coal mining,
+landslide, historic landfill — each with its own evidence state, provenance and
+claim boundary. The `multi-peril` template now names those six directly. The
+investigation layer can still reach *"multiple environmental perils warrant
+further assessment"* by counting flags across topics, which is a statement
+about evidence rather than an invented composite.
+
+Guarded by `tests/test_factor_classification.py`, which checks both that the
+ids are absent and that no replacement aggregate has appeared in a hazard
+group under a different name.
+
+---
+
+## DERIVED_METRIC — 8 factors
 
 Legitimate to publish, but only with the methodology attached. Each combines
 inputs under weights, and the weights are the claim.
 
 | Factor | Unit | Who chose the weights |
 | --- | --- | --- |
-| `ground_risk_score` | 0–100 | **Contour** — "GeoSure bands combined into one screening number" |
-| `insurance_peril_score` | 0–100 | **Contour** — "flood, subsidence and wind combined" |
 | `solar_aspect_score` | 0–1 | **Contour** — aspect and shade into "favourability" |
 | `transit_access_score` | 0–100 | **Contour** — stop density and service frequency |
 | `timber_access_score` | 0–1 | **Contour** |
@@ -77,17 +114,17 @@ inputs under weights, and the weights are the claim.
 | `rooftop_solar_potential` | MWh/yr | Contour — requires deciding which roof planes are "suitable" |
 | `bng_uplift_potential` | units/ha | Defra metric defines the units; "creatable" assumes an intervention |
 
-**`insurance_peril_score` is the most serious.** It combines *different perils*
-into one number for a site. That is a site score with a narrower noun, and it
-is the closest thing in the catalogue to the thing §14 forbids outright.
-`ground_risk_score` is the same shape within one hazard family.
-
 **Recommendation:** these need a published methodology and a `method_version`
 before they could ever go live, exactly as `hist-1` does for historical
 metrics — a composite without a stated formula is an opinion with a decimal
-point. Until then they stay generated. `insurance_peril_score` and
-`ground_risk_score` should be reconsidered on principle rather than fixed:
-a cross-peril composite may simply not belong in this product.
+point. Until then they stay generated.
+
+The two cross-hazard composites that were in this section have since been
+**rejected outright** rather than documented; see above. The distinction that
+decided it: `transit_access_score` combines stop density and service frequency,
+which are two views of one thing, and that is a methodology problem.
+`insurance_peril_score` combined flood, subsidence and wind, which are
+different kinds of harm, and that is a judgement problem no methodology fixes.
 
 `solar_aspect_score`'s note says "favourability", which is a judgement word
 inside a `DERIVED_METRIC`; it sits on the boundary and should be re-read when
@@ -158,10 +195,11 @@ by renaming the *factor* to say what it is (`_band`), never by editing EM7.
 
 | Class | Count | Action |
 | --- | --- | --- |
+| `REJECTED` | 2 | **Removed from the catalogue.** Cross-hazard composites. |
 | `JUDGEMENT` | 5 | Do not implement. Guarded by test. |
-| `DERIVED_METRIC` | 10 | Need published methodology + version before going live. Two need reconsidering on principle. |
+| `DERIVED_METRIC` | 8 | Need published methodology + version before going live. |
 | `MEASUREMENT` | 11 | Retain. Two renames for clarity; two keep external names deliberately. |
 
-No factor has been renamed or removed by this document. It records the
-classification and the reasoning so the decision can be made once rather than
-re-derived.
+Two factors have been removed. Nothing has been renamed — the remaining naming
+changes are recorded above as recommendations, so the decision can be made once
+rather than re-derived.

@@ -371,8 +371,14 @@ export const TEMPLATES: Template[] = [
     name: 'Multi-peril evidence',
     blurb: 'Flood, subsidence and wind evidence in one pass.',
     sector: 'Risk & insurance',
-    factors: ['insurance_peril_score', 'flood_zone3_pct', 'shrink_swell_score',
-              'storm_gust_50yr', 'ground_risk_score', 'coal_mining_pct'],
+    // Each peril separately, with its own evidence state and provenance.
+    // This template used to lead with two composites — `insurance_peril_score`
+    // and `ground_risk_score` — which combined different hazards into one
+    // number. Those are rejected; see docs/FACTOR_CLASSIFICATION.md. The
+    // investigation layer can still say "multiple perils warrant assessment"
+    // without anyone inventing a combined numerical judgement.
+    factors: ['flood_zone3_pct', 'shrink_swell_score', 'storm_gust_50yr',
+              'coal_mining_pct', 'landslide_score', 'historic_landfill_pct'],
     tool: 'rect',
   },
   {

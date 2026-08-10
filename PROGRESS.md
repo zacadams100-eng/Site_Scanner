@@ -5,6 +5,69 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Two rejected composites, and EM12 adopted — 2026-08-10
+
+Three architectural decisions settled before the Investigation Workspace,
+because all three decide what that workspace is allowed to display.
+
+**`insurance_peril_score` and `ground_risk_score` are removed, not renamed.**
+The objection was never the word "score" — it was the shape:
+
+    several different hazards → weighting → one number → a reading of site condition
+
+The weighting decides which kind of harm matters more and nobody has stated it.
+"Ground risk: 73" is a conclusion about a site wearing a decimal point, and a
+site score scoped to one topic is still a site score. A rename would have been
+worse than either keeping or dropping them: the number would still be a
+weighted judgement and would no longer look like one.
+
+Their inputs stay in the catalogue individually — flood zone, shrink-swell,
+storm gust, coal mining, landslide, historic landfill — each with its own
+evidence state, provenance and claim boundary, and the `multi-peril` template
+now names those six directly. The investigation layer can still reach "multiple
+perils warrant assessment" by counting flags across topics, which is a
+statement about evidence rather than an invented composite.
+
+271 factors, down from 273. `docs/FACTOR_CLASSIFICATION.md` gains a `REJECTED`
+section so nobody re-adds them believing the idea was never examined, and
+`tests/test_factor_classification.py` checks both that the ids are absent and
+that no replacement aggregate has appeared under a different name.
+
+**The replacement-aggregate check needed narrowing, and the narrowing is the
+interesting part.** The first version failed on `transit_access_score`, which
+combines stop density and service frequency. That is two views of *one* thing —
+a methodology problem. `insurance_peril_score` combined flood, subsidence and
+wind, which are different kinds of harm — a judgement problem no methodology
+fixes. The check is now scoped to hazard groups, which is where the distinction
+actually lives.
+
+**EM12 adopted, in the satisfiable form.** Every finding exposes a
+state-generic claim boundary; rule-specific negatives are optional. The measured
+reason for that scope: **1 of 25 rules** declares a per-finding negative, so
+requiring all of them would mean inventing 24 — limitation prose written for
+domains nobody has thought hard about, which is the failure this whole model
+exists to prevent.
+
+`claims.py` is now the canonical source, lifted out of `evidence.py`, and
+`test_em12_the_boundary_has_exactly_one_source` scans every module for a second
+copy of a clause. That check is structural rather than behavioural on purpose:
+the failure it guards — two wordings of one boundary — passes every behavioural
+test there is, because each reads correctly on its own screen. Only someone
+holding a printed brief next to the app would notice the document was more
+confident than the product.
+
+`docs/EM12_PROPOSAL.md` is kept rather than deleted, because the invariant does
+not carry its own reasoning: without it, "rule-specific negatives are optional"
+looks like laziness instead of the honest limit of what the architecture can
+promise.
+
+The Docker context test caught `claims.py` on startup — its third catch in
+three sessions.
+
+810 Python tests (+6), 228 frontend.
+
+---
+
 ## Site Investigation Brief — 2026-08-10
 
 The artefact that leaves the product. A differentiation audit found the gap:

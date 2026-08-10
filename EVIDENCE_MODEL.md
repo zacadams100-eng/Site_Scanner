@@ -149,6 +149,35 @@ realistic mistake; the guarantee itself is architectural, and reviewers should
 treat any new threshold constant in `web/src/` as a defect until proven
 otherwise.
 
+### EM12 — Every finding exposes a state-generic claim boundary
+
+Every finding states **what it establishes** and **what it does not establish**,
+and both come from `claims.py`. No surface composes its own limitation.
+
+The failure this prevents is prose duplication rather than absence. The
+explorer, the Brief and the investigation workspace all present the same
+findings, and the moment one of them writes its own limitation there are two
+sentences describing one boundary. They drift, and the drift is invisible: each
+reads correctly on its own screen, and only someone holding a printed brief
+next to the app would notice that the document is more confident than the
+product.
+
+**Scope, deliberately narrower than it first appears.** The boundary is keyed
+by *state* — flagged, clear, informational, and the three causes of
+not-assessed — never by rule. A rule **may** add its own negative through
+`rule_meta.not_evidence_of`, and most will not.
+
+That limit is not laziness, it is the honest reading of what the architecture
+can satisfy. When EM12 was written, **1 of 25 rules** declared a per-finding
+negative. Requiring all of them would have meant inventing 24 — asking rule
+authors to write limitation prose for domains they have not thought hard about,
+which produces confident-sounding text nobody checked. That is the failure this
+whole model exists to prevent, so the invariant stops where the architecture
+can keep the promise.
+
+`claims.STATES` is exhaustive and `test_em12_*` walks it, so a new finding state
+cannot ship without a limitation.
+
 ### EM9 — Every claim is traceable
 
 Factor, source, publisher, timestamp and assessment state, for every flag,

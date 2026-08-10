@@ -698,9 +698,7 @@ _F = [
     ("historic_landfill_pct", "Historic landfill", "ea_landfill", "Ground risk", "%", "continuous", "periodic", 0.0, 60.0, False, "Share over a recorded historic landfill."),
     ("landfill_distance", "Distance to landfill", "ea_landfill", "Ground risk", "m", "continuous", "periodic", 0.0, 20000.0, True, "Nearest historic or operational landfill."),
     ("contamination_flag", "Contamination status", "ea_landfill", "Ground risk", "class", "categorical", "periodic", None, None, True, "Whether past use suggests investigation. Never averaged."),
-    ("ground_risk_score", "Composite ground risk", "bgs_geosure", "Ground risk", "0–100", "continuous", "static", 0.0, 100.0, True, "The GeoSure bands combined into one screening number."),
     ("storm_gust_50yr", "50-year gust", "era5_land", "Ground risk", "m/s", "continuous", "static", 22.0, 45.0, True, "Wind speed with a 2% annual exceedance — design load."),
-    ("insurance_peril_score", "Composite peril score", "ea_flood_zones", "Ground risk", "0–100", "continuous", "annual", 0.0, 100.0, True, "Flood, subsidence and wind combined for screening."),
 
     # --- Energy & renewables ------------------------------------------------
     ("wind_speed_50m", "Wind speed at 50 m", "wind_atlas", "Energy", "m/s", "continuous", "static", 3.5, 11.0, False, "Mean wind speed at small-turbine hub height."),
