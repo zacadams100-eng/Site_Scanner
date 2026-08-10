@@ -1679,3 +1679,175 @@ td.cov-severe { color: var(--text-dim); }
      has asked for no movement. */
   .site-delete { opacity: 1; }
 }
+
+/* ---------------------------------------------------------------------------
+   Investigation radar
+
+   The hard part of this screen is not the flags, it is the empty space. A
+   reader takes a short list of warnings as "we checked everything and this is
+   what is wrong", so silence has to be made visible: the coverage strip runs
+   before any flag, and a topic that was checked and found clear is drawn as
+   confidently as one that was flagged.
+
+   Colour stays rationed. Severity is carried by a bar and a word, not by three
+   sizes of red disc — a wall of alarm discs is the wrong register for "worth a
+   look", and it makes the one genuinely serious flag indistinguishable from
+   five routine ones.
+   --------------------------------------------------------------------------- */
+.radar { padding: 14px 16px 22px; }
+
+.radar-head {
+  margin: 22px 0 9px; font-size: 12px; font-weight: 600;
+  letter-spacing: .02em; text-transform: uppercase; color: var(--text-dim);
+}
+.radar-head:first-child { margin-top: 0; }
+
+/* --- Coverage strip -------------------------------------------------------- */
+.radar-coverage {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper-000); padding: 10px 12px;
+}
+.radar-topics { list-style: none; margin: 0; padding: 0; }
+.radar-topic {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center; gap: 9px; padding: 4px 0; font-size: 12px;
+}
+.radar-topic-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.radar-topic-state {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+}
+.radar-topic.is-flagged .radar-topic-state { color: var(--warn); }
+/* A checked-and-clear topic is a result, not an absence. It gets the same
+   weight as a flag, in the structural green rather than the alert colour. */
+.radar-topic.is-clear .radar-topic-name { color: var(--text); }
+.radar-topic.is-not_assessed .radar-topic-name { color: var(--text-faint); }
+
+.radar-dot { width: 9px; height: 9px; border-radius: 2px; display: block; }
+.radar-dot.is-flagged { background: var(--warn); }
+.radar-dot.is-clear { background: var(--structure); }
+/* Hollow, not grey-filled: "we did not look" must not read as a quiet pass. */
+.radar-dot.is-not_assessed {
+  background: none; border: 1px dashed var(--line-strong);
+}
+
+.radar-coverage-sum {
+  margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line);
+  font-size: 10px; color: var(--text-faint);
+}
+
+/* --- Flags ----------------------------------------------------------------- */
+.flag-list { list-style: none; margin: 0; padding: 0; }
+.flag {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-raised); margin-bottom: 8px; overflow: hidden;
+}
+.flag-main {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px; width: 100%; text-align: left;
+  padding: 10px 11px; background: none; border: 0; cursor: pointer;
+}
+.flag-main:hover { background: var(--paper-050); }
+
+.flag-sev {
+  align-self: start; padding: 2px 6px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.flag-sev.is-high { background: var(--bad); color: #fff; }
+.flag-sev.is-medium { background: var(--warn); color: #fff; }
+.flag-sev.is-low {
+  background: var(--paper-100); color: var(--text-dim);
+  border: 1px solid var(--line);
+}
+
+.flag-body { display: block; min-width: 0; }
+.flag-topic {
+  display: block; font-size: 10px; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 2px;
+}
+.flag-text { display: block; font-size: 12.5px; line-height: 1.55; }
+
+.flag-detail {
+  padding: 10px 11px 11px; border-top: 1px solid var(--line);
+  background: var(--paper-050);
+}
+.flag-evidence { width: 100%; border-collapse: collapse; }
+.flag-evidence th, .flag-evidence td {
+  padding: 3px 0; font-size: 11px; text-align: left; font-weight: 400;
+  vertical-align: top;
+}
+.flag-evidence th { color: var(--text-faint); width: 48%; }
+.flag-prov {
+  list-style: none; margin: 9px 0 0; padding: 9px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px; color: var(--text-faint);
+}
+.flag-prov li { margin-bottom: 4px; }
+.prov-status { display: block; }
+/* `verified` and `written` are different claims. Making them look alike is the
+   quiet way this feature would start overstating itself. */
+.prov-status.is-verified { color: var(--structure); }
+.prov-status.is-written { font-style: italic; }
+
+.radar-none {
+  margin: 14px 0 0; padding: 12px; font-size: 12px; line-height: 1.6;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper-000); color: var(--text-dim);
+}
+
+/* --- Investigations -------------------------------------------------------- */
+.inv-group { margin-bottom: 14px; }
+.inv-priority {
+  margin: 0 0 7px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.inv-priority.is-high { color: var(--bad); }
+.inv-priority.is-medium { color: var(--warn); }
+.inv-priority.is-low { color: var(--text-faint); }
+
+.inv-list { list-style: none; margin: 0; padding: 0; }
+.inv {
+  padding: 9px 0 10px; border-top: 1px solid var(--line);
+}
+.inv-name { margin: 0; font-size: 12.5px; font-weight: 600; }
+.inv-blurb {
+  margin: 3px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--text-dim);
+}
+/* The trace back to the numbers. Indented under the recommendation because it
+   is the reason for it, not a footnote to it. */
+.inv-why {
+  margin: 6px 0 0; padding: 0 0 0 12px;
+  border-left: 2px solid var(--line-strong);
+  list-style: none; font-size: 10.5px; line-height: 1.5;
+  color: var(--text-faint);
+}
+.inv-why li { margin-bottom: 3px; }
+
+/* --- Gaps ------------------------------------------------------------------ */
+.radar-gaps { margin-top: 4px; }
+.gap-block { margin-bottom: 12px; }
+.gap-lead { margin: 0 0 8px; font-size: 11.5px; line-height: 1.55; color: var(--text-dim); }
+.gap-add { list-style: none; margin: 0; padding: 0; }
+/* One row per check, not one button per column. The check is the unit a user
+   thinks in; the layer it needs is an implementation detail of it. */
+.gap-add li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px; align-items: center;
+  padding: 7px 0; border-top: 1px solid var(--line);
+}
+.gap-add-text { font-size: 11.5px; line-height: 1.5; color: var(--text-dim); }
+.gap-add .btn { white-space: nowrap; }
+.gap-list {
+  list-style: none; margin: 0; padding: 0;
+  font-size: 11.5px; line-height: 1.6; color: var(--text-faint);
+}
+.gap-list li { padding: 3px 0; }
+.gap-topic { color: var(--text-dim); font-weight: 600; }
+
+.radar-limits {
+  margin: 20px 0 0; padding-top: 12px; border-top: 1px solid var(--line);
+  font-size: 10.5px; line-height: 1.6; color: var(--text-faint);
+}
+
+/* A flagged tab count is the one place an alert colour earns the top bar. */
+.tab-count.is-alert { background: var(--bad); color: #fff; }

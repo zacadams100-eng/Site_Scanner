@@ -5,6 +5,51 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Investigation radar — 2026-08-10
+
+The move from "here is the data" to "here is what deserves a closer look".
+`radar.py` runs 19 threshold rules over a report and produces flags, then the
+standard investigations those flags would prompt, ranked.
+
+**The design question was never the flags, it was the empty space.** A flag is
+judgement-shaped, and a reader takes a short list of warnings as "we checked
+everything and this is what is wrong" — so silence reads as safety. Here
+silence usually means *we could not look*: every slope factor in the catalogue
+is generated, so a naive version of this screen shows a site with no terrain
+warning and no hint that terrain was never assessed.
+
+So the radar reports **three states, never two** — flagged, checked-and-clear,
+not-assessed — and the coverage strip runs before any flag. `not_assessed`
+separates "you did not load that layer" (one click) from "the data is
+generated" (a wall).
+
+Four rules hold it up, all tested:
+
+- **A flag may only come from real data.** Never with a "demo data" caveat
+  attached: a caveat protects a measurement far better than it protects a
+  recommendation, because the second has done its damage by the time anyone
+  reads the parenthesis. This directly answers `LEGAL_RISK_REGISTER.md` L4.
+- **Every flag carries its value, its threshold and its provenance**, including
+  whether the factor was ever run against the live service.
+- **Every investigation names the flags that raised it.** No free-floating
+  advice; converging evidence promotes medium to high, and nothing else does.
+- **It prompts, it does not conclude.** Thresholds are Contour's own reporting
+  thresholds, not regulatory tests, and `limits` says so in the payload.
+
+Of the six topics in the brief, five are assessable from real data. **Terrain
+is not, and neither is nearby planning activity** — both rules are written and
+report "not assessed" until the data behind them becomes real, which is more
+honest than a missing heading and starts working with no code change.
+
+One bug found by driving it in a browser: the radar offered "add this layer"
+for factors that have no real implementation, so the button led straight to
+"not assessed — demo data". The server now passes its real-data registry in,
+and the suggestion is only made when it can be kept.
+
+Radar is now the first tab. 647 Python tests (+29), 165 frontend.
+
+---
+
 ## The home screen takes the window — 2026-08-09
 
 The gallery was shipped inside the 440px report panel, with the question of

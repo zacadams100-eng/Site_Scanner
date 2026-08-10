@@ -11,6 +11,7 @@ import Findings from './components/Findings'
 import Gallery from './components/Gallery'
 import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
+import Radar from './components/Radar'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
@@ -258,14 +259,23 @@ export default function App() {
             </button>
           </div>
           <div className="tabs" role="tablist">
-            {(['findings', 'table', 'charts', 'sources'] as const).map((t) => (
+            {(['radar', 'findings', 'table', 'charts', 'sources'] as const).map((t) => (
               <button key={t} role="tab" aria-selected={tab === t}
                       className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'findings' ? 'Findings'
+                {t === 'radar' ? 'Radar'
+                  : t === 'findings' ? 'Findings'
                   : t === 'table' ? 'Table'
                   : t === 'charts' ? 'Charts' : 'Sources'}
                 {t === 'findings' && !!data?.insights?.length && (
                   <span className="tab-count">{data.insights.length}</span>
+                )}
+                {/* Only flags get a count. Badging the number of topics
+                    assessed would put a reassuring number on a tab whose
+                    job is to say what was missed. */}
+                {t === 'radar' && !!data?.radar?.counts?.flags && (
+                  <span className={`tab-count${data.radar.counts.high ? ' is-alert' : ''}`}>
+                    {data.radar.counts.flags}
+                  </span>
                 )}
               </button>
             ))}
@@ -318,6 +328,7 @@ export default function App() {
 
           {!error && data && (
             <>
+              {tab === 'radar' && <Radar />}
               {tab === 'findings' && <Findings />}
               {tab === 'table' && <AttributeTable />}
               {tab === 'charts' && <><Compare /><ChartStack /></>}

@@ -175,6 +175,89 @@ export interface SeriesResponse {
     from_real_data: number
     from_generated_data: number
   }
+  /** What deserves investigation. Absent on an older backend. See radar.py. */
+  radar?: Radar
+}
+
+/** Where a flag's numbers came from, and how well that has been proven.
+ *  `written` means implemented against the documented API and never yet run
+ *  against the live service — not the same claim as `verified`. */
+export interface FlagProvenance {
+  factor: string
+  name: string
+  source?: 'earth-engine' | 'open-data' | 'generated'
+  publisher?: string
+  endpoint?: string
+  status: 'verified' | 'written' | 'unknown'
+}
+
+export interface Flag {
+  id: string
+  topic: string
+  topic_name: string
+  severity: 'high' | 'medium' | 'low'
+  text: string
+  /** The observed value and the threshold it crossed, so a flag is checkable
+   *  rather than merely assertive. */
+  evidence: Record<string, string | number>
+  factors: string[]
+  provenance: FlagProvenance[]
+  investigations: string[]
+}
+
+/**
+ * Three states, never two.
+ *
+ * `clear` means it was checked and nothing crossed a threshold; `not_assessed`
+ * means it was not checked. Collapsing those two into one silence is what
+ * turns this feature from a help into a hazard, so the type will not let a
+ * component treat "absent" as "fine".
+ */
+export interface RadarTopic {
+  id: string
+  name: string
+  state: 'flagged' | 'clear' | 'not_assessed'
+  flags: number
+  checked: string[]
+}
+
+export interface Unassessed {
+  rule: string
+  topic: string
+  topic_name: string
+  asks: string
+  /** `not_selected` is one click to fix; `demo_data` is a wall. */
+  reason: 'not_selected' | 'demo_data'
+  factors: string[]
+  /** Display names for `factors`. "Add flood_zone2_pct" is a column, not a
+   *  sentence. Optional so an older backend still renders. */
+  factor_names?: string[]
+  text: string
+}
+
+export interface Investigation {
+  id: string
+  name: string
+  blurb: string
+  priority: 'high' | 'medium' | 'low'
+  /** Flag ids. Never empty — no recommendation exists without a flag. */
+  why: string[]
+  why_text: string[]
+}
+
+export interface Radar {
+  flags: Flag[]
+  topics: RadarTopic[]
+  investigations: Investigation[]
+  not_assessed: Unassessed[]
+  counts: {
+    flags: number
+    high: number
+    topics_flagged: number
+    topics_clear: number
+    topics_not_assessed: number
+  }
+  limits: string
 }
 
 export interface Cell {

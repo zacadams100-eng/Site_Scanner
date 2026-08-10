@@ -78,7 +78,7 @@ interface State {
   // in temporal GIS, and in ArcGIS it is a multi-step raster-calculator chore.
   compareIndex: number | null
 
-  activeTab: 'findings' | 'table' | 'charts' | 'sources'
+  activeTab: 'radar' | 'findings' | 'table' | 'charts' | 'sources'
   browserOpen: boolean
 
   sidebarOpen: boolean
@@ -142,7 +142,7 @@ interface State {
   setTimeIndex: (i: number) => void
   setCompareIndex: (i: number | null) => void
   setPlaying: (p: boolean) => void
-  setTab: (t: 'findings' | 'table' | 'charts' | 'sources') => void
+  setTab: (t: 'radar' | 'findings' | 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
   setSidebarOpen: (o: boolean) => void
   setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
@@ -237,9 +237,10 @@ export const useStore = create<State>((set, get) => ({
   timeIndex: 0,
   playing: false,
   compareIndex: null,
-  // Findings first: it is the answer to the question people actually
-  // arrive with, and the table is one click away.
-  activeTab: 'findings',
+  // Radar first: "is there anything here I should worry about" is the
+  // question people actually arrive with, and Findings — which says what the
+  // numbers did — is the follow-up to it rather than the opener.
+  activeTab: 'radar',
   browserOpen: false,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn

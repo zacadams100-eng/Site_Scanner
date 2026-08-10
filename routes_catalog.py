@@ -26,6 +26,7 @@ import catalog
 import licensing
 import insights
 import nlq
+import radar
 import series as series_mod
 import telemetry
 from cache import build_cache, cache_key
@@ -463,6 +464,16 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # generated data, no trends through carried-forward values — belong
         # next to the labelling they depend on. See insights.py.
         **insights.summarise({"series": out}),
+        # What deserves a closer look, and what could not be looked at. Sits
+        # beside insights rather than inside it because the two answer
+        # different questions — insights says what the numbers did, the radar
+        # says what that would prompt a professional to check. See radar.py,
+        # and note that it raises flags only from real data: a recommendation
+        # carrying a "demo data" caveat has already done its damage by the
+        # time anyone reads the parenthesis.
+        # `REAL_SERIES` is passed so the radar never suggests adding a layer
+        # that would come back generated — see radar._state_of.
+        "radar": radar.assess({"series": out}, real_capable=set(REAL_SERIES)),
     }
 
 
