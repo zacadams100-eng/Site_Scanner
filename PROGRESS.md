@@ -5,6 +5,56 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Historical metrics — step 3 — 2026-08-10
+
+A deliberately boring transcription of the frozen methodology. `historical/`
+contains metrics and nothing else: no rules, no radar changes, no UI, and
+nothing in the output that resembles a finding.
+
+    NDVI decreased 20.4% between the defined historical baseline
+    (2011–2013) and the recent period (2024–2026).
+    16 of 16 years adequately observed · method hist-1
+
+That is what step 4 will hand to a rule. The metric says what happened; the
+rule says whether it crosses a threshold; the existing engine turns that into
+`flagged` / `clear` / `informational` / `not assessed`. Nothing in
+`historical/` knows what those words mean, and a test asserts `metrics.py`
+imports neither `radar` nor `insights` — structural rather than stylistic,
+because the moment it does, the two layers can start agreeing with each other
+by accident rather than by construction.
+
+The tests are adversarial by design, since "NDVI produces the expected number"
+would pass against a subtly wrong baseline. The ones worth keeping are the ones
+that catch a future *simplification*:
+
+- **Seasonal windows are per metric and actually differ.** The same
+  winter-heavy series is unusable to vegetation, unusable to LST, and perfectly
+  usable to surface. Fails the day someone shares one window because it is
+  tidier.
+- **Baseline is the first three *usable* years.** With data in 2011–13, 2015,
+  2018 and 2021, the baseline is 2011–2013 and the recent period is 2015–2021.
+  Fails the day someone reaches for `years[:3]` on the calendar range.
+- **Two usable years produce no change statistic** — incomplete evidence must
+  not quietly become a confident number. Five produce none either, because the
+  two three-year periods would overlap and the metric would be comparing a
+  period with itself.
+- **A zero baseline gives an absolute difference and no percentage.** A
+  percentage change from zero is an infinity dressed as a statistic. A negative
+  baseline divides by magnitude, or NDVI over water reports a fall as a rise.
+- **Interpolated years never become usable years**, guarding the exclusion
+  `insights.py` already applies for the same reason.
+- **Generated input produces no derived values at all**, not a labelled trend.
+
+Coverage is reported as two figures that are not interchangeable: observation
+coverage and year coverage. A series excellent at the ends and poor in the
+middle has high observation coverage and mediocre year coverage, and it is the
+second that decides whether a fifteen-year statement is defensible.
+
+738 Python tests (+21), 165 frontend. Step 4 — rules registered into
+`radar.RULES` — is now close to mechanical.
+
+---
+
 ## Locking the historical architecture — 2026-08-10
 
 Contract before code, as with comparison. `HISTORICAL_EVIDENCE_MODEL.md` states
