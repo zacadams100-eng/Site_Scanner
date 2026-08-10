@@ -177,6 +177,9 @@ export interface SeriesResponse {
   }
   /** What deserves investigation. Absent on an older backend. See radar.py. */
   radar?: Radar
+  /** Temporal metrics paired with the finding the engine reached for each. */
+  historical?: HistoricalEntry[]
+  methodology?: Methodology
 }
 
 /** Where a flag's numbers came from, and how well that has been proven.
@@ -485,4 +488,63 @@ export interface Comparison {
   coverage_warning: string
   principle: string
   limits: string
+}
+
+// --- Historical evidence ----------------------------------------------------
+// See HISTORICAL_EVIDENCE_MODEL.md. A metric says what happened; the finding
+// beside it was decided by the engine. The UI renders both and derives neither
+// — EVIDENCE_MODEL.md EM11.
+
+export interface HistoricalMetric {
+  baseline: number | null
+  recent: number | null
+  change: number | null
+  /** Null where the baseline was zero and a percentage would be undefined. */
+  change_pct: number | null
+  change_type: 'relative' | 'absolute' | null
+  baseline_years: number[]
+  recent_years: number[]
+  years_usable: number
+  years_total: number
+  year_coverage: number
+  observation_coverage: number
+  /** Whether a rule was permitted to evaluate this. A statement about the
+   *  evidence, not about the site. */
+  meets_minimum_evidence: boolean
+  /** Plain words naming what was missing, when something was. */
+  shortfall: string
+  method_version: string
+  source?: string
+  real: boolean
+  season: number[]
+}
+
+export interface HistoricalFinding {
+  state: 'flagged' | 'clear' | 'informational' | 'not_assessed'
+  reason: string | null
+  text?: string
+  flag?: Flag | null
+}
+
+export interface HistoricalEntry {
+  id: string
+  name: string
+  factor: string
+  rule: string
+  /** The threshold, what kind of threshold it is, and what it is for. Part of
+   *  the evidence, not a tooltip: Contour does not present its own reporting
+   *  threshold as an external fact. */
+  rule_meta: Record<string, string | number>
+  available: boolean
+  metric: HistoricalMetric | null
+  finding: HistoricalFinding | null
+}
+
+export interface Methodology {
+  version: string
+  seasons: Record<string, number[]>
+  min_observations_per_year: number
+  period_years: number
+  min_year_coverage: number
+  rules: string[]
 }

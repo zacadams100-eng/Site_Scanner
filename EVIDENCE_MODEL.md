@@ -134,8 +134,17 @@ rules drift, and the product ends up holding three opinions about one site:
 radar says flagged, history says stable, the report says concerning. There must
 be **one interpretation, viewed several ways.**
 
+A rule's result is a three-state, not an overloaded `None`: a finding, nothing,
+or `radar.Insufficient`. "I evaluated and found nothing" and "I could not
+evaluate" have opposite consequences — `clear` and `not_assessed` — and
+collapsing them into one falsy return is how a live series with two usable
+years produced a clean bill of health.
+
 `tests/test_em11_ui_never_decides.py` scans the frontend for a value comparison
-in the same expression as a finding-state literal. That test catches the
+in the same expression as a finding-state literal, and
+`web/src/lib/historical.test.ts` proves it positively for the historical panel
+by feeding it a −45% change with a `clear` state and asserting it renders
+"checked · clear". That test catches the
 realistic mistake; the guarantee itself is architectural, and reviewers should
 treat any new threshold constant in `web/src/` as a defect until proven
 otherwise.

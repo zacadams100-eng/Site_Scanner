@@ -612,3 +612,18 @@ def test_both_ndvi_rules_can_fire_without_inflating_each_other():
     # two flags pointed at the same survey.
     assert survey["priority"] == min((f["severity"] for f in raised),
                                      key=radar._rank)
+
+
+def test_an_informational_reading_states_when_it_was_observed():
+    """A reading without its date reads as a summary of the record.
+
+    For a seasonal factor the most recent observation is one month, and
+    "Mean vegetation vigour: 0.21" beside a historical baseline of 0.61 looks
+    like a contradiction rather than two different measurements.
+    """
+    result = radar.assess(report(
+        ndvi=series([0.6, 0.55, 0.21], unit="index", source="earth-engine",
+                    start=(2026, 1))))
+    info = next(i for i in result["informational"] if i["id"] == "info_ndvi")
+    assert "2026-03" in info["text"]
+    assert info["evidence"]["basis"] == "most recent observation"

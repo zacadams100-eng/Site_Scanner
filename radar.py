@@ -247,6 +247,27 @@ def _mean(xs: Sequence[float]) -> float:
 # ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
+class Insufficient:
+    """A rule ran and could not evaluate.
+
+    `None` cannot carry two meanings. "I evaluated and found nothing" and "I
+    could not evaluate" are different epistemic states with opposite
+    consequences — the first is a `clear` and the second is a `not_assessed` —
+    and collapsing them into one falsy return is how a live series with two
+    usable years produced a clean bill of health.
+
+    A class rather than a dict key, so the distinction is visible at the call
+    site and cannot be created by a typo in a string.
+    """
+
+    __slots__ = ("reason",)
+
+    def __init__(self, reason: str) -> None:
+        #: A sentence a user reads. What was missing, not merely that
+        #: something was.
+        self.reason = reason
+
+
 class Rule:
     """One thing worth noticing, and what it would prompt.
 
@@ -564,9 +585,17 @@ def _info(field: str, topic: str, rule_id: str, label: str, asks: str,
         if level is None:
             return None
         period, value = level
+        # The period is part of the statement, not a footnote to it.
+        #
+        # An informational reading is the most recent observation, and for a
+        # seasonal factor that is one month rather than a summary of the
+        # record. Without the date, "Mean vegetation vigour: 0.21" sits beside
+        # a historical baseline of 0.61 and reads as a contradiction — the two
+        # are measuring different things and only one of them says so.
         return {
-            "text": f"{label}: {fmt(value)}",
-            "evidence": {field: value, "as_of": period},
+            "text": f"{label}: {fmt(value)} ({period})",
+            "evidence": {field: value, "as_of": period,
+                         "basis": "most recent observation"},
         }
 
     return Rule(rule_id, topic, [field], test, (), asks, kind="info")
@@ -681,7 +710,7 @@ def _rules_from(module_name: str) -> Tuple[Rule, ...]:
     """
     try:
         module = __import__(module_name, fromlist=["build"])
-        return tuple(module.build(Rule))
+        return tuple(module.build(Rule, Insufficient))
     except Exception:                                       # noqa: BLE001
         return ()
 
@@ -891,7 +920,7 @@ def assess(report: Dict[str, Any],
         # "checked, nothing found" — the same false zero as EM6, arriving one
         # layer higher. General on purpose: any rule may declare insufficient
         # evidence, and the engine does not know or care which one did.
-        if isinstance(found, dict) and found.get("insufficient"):
+        if isinstance(found, Insufficient):
             topic_states.setdefault(rule.topic, []).append("not_assessed")
             for check in topic_checks.get(rule.topic, []):
                 if check["rule"] == rule.id:
@@ -909,7 +938,7 @@ def assess(report: Dict[str, Any],
                 "factor_names": [
                     (series.get(f) or {}).get("meta", {}).get("name")
                     or _catalog_name(f) for f in rule.needs],
-                "text": f"Not assessed — {rule.asks}. {found['insufficient']}",
+                "text": f"Not assessed — {rule.asks}. {found.reason}",
             })
             continue
 
@@ -1107,6 +1136,29 @@ def _coverage(rows: Sequence[Dict[str, Any]], assessed: Sequence[Dict[str, Any]]
         "verified": sum(1 for r in assessed if r.get("status") == "verified"),
         "note": COVERAGE_NOTE,
     }
+
+
+def outcome_for(payload: Dict[str, Any], rule_id: str) -> Dict[str, Any]:
+    """What the engine decided for one rule, for a caller that needs to join.
+
+    Read-only over an assembled payload. Exists so that a composition layer —
+    a route, an export, a report — can pair a rule's numbers with its finding
+    **without recomputing the finding**, which is EM11 applied one layer below
+    the UI. Returns the state, the reason where there is one, and the flag
+    itself where one was raised.
+    """
+    for flag in payload.get("flags") or []:
+        if flag.get("id") == rule_id:
+            return {"state": "flagged", "reason": None, "flag": flag}
+    for entry in payload.get("not_assessed") or []:
+        if entry.get("rule") == rule_id:
+            return {"state": "not_assessed", "reason": entry.get("reason"),
+                    "flag": None, "text": entry.get("text")}
+    for item in payload.get("informational") or []:
+        if item.get("id") == rule_id:
+            return {"state": "informational", "reason": None, "flag": item}
+    # A rule that is neither flagged nor unavailable ran and found nothing.
+    return {"state": "clear", "reason": None, "flag": None}
 
 
 def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:

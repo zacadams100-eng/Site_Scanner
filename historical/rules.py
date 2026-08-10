@@ -71,7 +71,8 @@ VEGETATION_RULE_META: Dict[str, Any] = {
 }
 
 
-def _vegetation_decline(series_by_factor: Dict[str, Dict[str, Any]]) -> Any:
+def _vegetation_decline(series_by_factor: Dict[str, Dict[str, Any]],
+                        insufficient: Callable[[str], Any]) -> Any:
     """Flag a vegetation decline at or beyond the reporting threshold.
 
     Almost no intelligence, on purpose. It reads the metric, trusts
@@ -91,8 +92,9 @@ def _vegetation_decline(series_by_factor: Dict[str, Dict[str, Any]]) -> Any:
         # Not a clear result. `radar.assess` routes this to `not_assessed`
         # with reason `no_data` — a live series with too few usable years must
         # never read as "checked, nothing found".
-        return {"insufficient": metric["shortfall"] or
-                "There were not enough usable observations to measure change."}
+        return insufficient(
+            metric["shortfall"]
+            or "There were not enough usable observations to measure change.")
 
     change = metric["change_pct"]
     if change is None or change > VEGETATION_CHANGE_INVESTIGATION_THRESHOLD:
@@ -130,16 +132,18 @@ def _span(years: Sequence[int]) -> str:
     return f"{years[0]}" if len(years) == 1 else f"{years[0]}–{years[-1]}"
 
 
-def build(rule_class: Callable[..., Any]) -> Tuple[Any, ...]:
+def build(rule_class: Callable[..., Any],
+          insufficient: Callable[[str], Any]) -> Tuple[Any, ...]:
     """The historical rules, as engine rules.
 
-    Takes the class rather than importing it, so this module never depends on
-    the finding engine. See the module docstring.
+    Takes the rule class and the insufficient-evidence marker as arguments
+    rather than importing them, so this module never depends on the finding
+    engine. See the module docstring.
     """
     return (
         rule_class(
             "historical_vegetation_decline", "vegetation", ["ndvi"],
-            _vegetation_decline,
+            lambda s: _vegetation_decline(s, insufficient),
             ["ecology_survey"],
             "whether vegetation vigour has declined against its historical "
             "baseline",

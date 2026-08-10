@@ -28,6 +28,7 @@ import insights
 import nlq
 import comparison
 import radar
+from historical import view as historical_view
 import series as series_mod
 import telemetry
 from cache import build_cache, cache_key
@@ -528,6 +529,15 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
     telemetry.observe("series.real_factors", len(real_ids))
     telemetry.observe("series.area_ha", area_ha)
 
+    radar_payload = radar.assess({"series": out}, real_capable=set(REAL_SERIES))
+
+    # Pair each historical metric with the state the engine decided for its
+    # rule. `outcome_for` is a read over an assembled payload — nothing is
+    # recomputed, which is EM11 one layer below the UI.
+    historical = historical_view.report(out)
+    for entry in historical:
+        entry["finding"] = radar.outcome_for(radar_payload, entry["rule"])
+
     return {
         "area_ha": round(area_ha, 2),
         "centroid": {"lng": round(centroid[0], 5), "lat": round(centroid[1], 5)},
@@ -557,7 +567,15 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # time anyone reads the parenthesis.
         # `REAL_SERIES` is passed so the radar never suggests adding a layer
         # that would come back generated — see radar._state_of.
-        "radar": radar.assess({"series": out}, real_capable=set(REAL_SERIES)),
+        "radar": radar_payload,
+        # The historical block: metrics for every declared historical metric,
+        # paired with the finding the engine already reached. Assembled here
+        # rather than inside `historical/` because the join needs to read
+        # radar's output, and letting the historical package do that would give
+        # it knowledge of what `flagged` means. This is the composition layer;
+        # composing is its job.
+        "historical": historical,
+        "methodology": historical_view.methodology(),
     }
 
 

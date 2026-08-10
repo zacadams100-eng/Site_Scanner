@@ -5,6 +5,53 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Historical UI — step 5 — 2026-08-10
+
+Evidence first, visual record second. The obvious version of this panel is a
+big timeline with numbers underneath and it is the wrong way round: a
+professional needs to know what changed and whether it was established well
+enough to act on, before deciding whether to explore fifteen years of imagery.
+
+**The panel decides nothing, and that is proven rather than claimed.** All of
+its decision-making lives in `web/src/lib/historical.ts`, whose functions read
+`finding.state` and ignore the numbers — so the test can feed them a **−45%
+change with a `clear` state** and assert they render "checked · clear". Noticing
+that −45% is *obviously* a flag is exactly what a UI must not do: the threshold
+may have changed, the evidence may have been insufficient, the rule may not
+apply. Only the server knows. The mirror case is tested too, and so is a full
+metric carrying a `not_assessed` state.
+
+`None` no longer carries two meanings. A rule returns a finding, nothing, or
+`radar.Insufficient` — a class rather than a dict key, so the distinction is
+visible at the call site and cannot be created by a typo.
+
+The backend gained `historical/view.py`, because a `clear` result raises no
+flag and a UI reading only `radar.flags` would have nothing to draw for the
+most reassuring outcome the product can produce. Metrics are computed for every
+declared historical metric; `routes_catalog` pairs each with the state the
+engine already reached via `radar.outcome_for` — a read over an assembled
+payload, nothing recomputed.
+
+The threshold block sits in the open beside the finding rather than behind a
+tooltip: *Contour reporting threshold · product-defined; not a regulatory or
+scientific standard · identifies changes large enough to warrant professional
+investigation, not evidence of ecological degradation.* It is part of the
+evidence, and hiding it would present Contour's own interpretation as an
+external fact.
+
+Driving it found a defect in a neighbouring rule: "Mean vegetation vigour
+(NDVI): 0.21" sat directly above a historical baseline of 0.61 and read as a
+contradiction. It was not — the informational reading is the most recent
+observation, which for a seasonal factor is one December. Informational
+findings now state their observation date.
+
+758 Python tests (+1), 181 frontend (+16). The chain is complete: verified
+15-year series → defined baseline → quantified change → evidence sufficiency →
+explicitly product-defined threshold → transparent investigation → methodology
+on screen, all through the same evidence model as everything else.
+
+---
+
 ## Historical rules — step 4 — 2026-08-10
 
 One rule, and the whole chain proven: Sentinel-2 → metric → rule → radar →

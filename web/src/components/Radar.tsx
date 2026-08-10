@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
 import type { Coverage, Flag, InfoFinding, RadarTopic, Unassessed } from '../types'
+import HistoricalEvidence from './HistoricalEvidence'
 
 /**
  * The investigation radar.
@@ -174,6 +175,11 @@ export default function Radar() {
           </ul>
         </section>
       )}
+
+      {/* Temporal evidence, beside the rest of it rather than on a separate
+          page: a historical flag is a flag, and separating it would teach the
+          user that satellite evidence is a different kind of thing. */}
+      <HistoricalEvidence />
 
       {/* Investigations */}
       {investigations.length > 0 && (

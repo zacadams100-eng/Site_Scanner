@@ -2149,3 +2149,81 @@ td.cov-severe { color: var(--text-dim); }
   font-size: 9.5px; letter-spacing: .03em; text-transform: uppercase;
   color: var(--text-faint);
 }
+
+/* ---------------------------------------------------------------------------
+   Historical evidence
+
+   Evidence first, visual record second. The obvious version of this panel is a
+   big timeline with numbers underneath, and it is the wrong way round: a
+   professional needs to know what changed and whether it was established well
+   enough to act on, before deciding whether to explore fifteen years of
+   imagery.
+
+   The threshold block sits in the open rather than behind a tooltip. It is
+   part of the evidence — Contour does not present its own reporting threshold
+   as an external fact.
+   --------------------------------------------------------------------------- */
+.hist { margin-top: 6px; }
+.hist-head { display: flex; align-items: baseline; justify-content: space-between; }
+.hist-count { font-size: 10px; color: var(--text-faint); }
+
+.hist-list { list-style: none; margin: 0; padding: 0; }
+.hist-row {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-raised); margin-bottom: 7px; overflow: hidden;
+}
+.hist-main {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline; gap: 10px; width: 100%;
+  padding: 9px 11px; background: none; border: 0; text-align: left;
+  font-family: var(--font-ui); font-size: 12.5px; color: var(--text);
+  cursor: pointer;
+}
+.hist-main:hover { background: var(--paper-050); }
+.hist-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-change { font-size: 12px; }
+.hist-state { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+/* Same colouring as every other finding in the product. A user should not have
+   to learn a second vocabulary for satellite evidence. */
+.hist-row.is-flagged .hist-state { color: var(--warn); }
+.hist-row.is-clear .hist-state { color: var(--structure); }
+.hist-row.is-not_assessed .hist-name { color: var(--text-faint); }
+
+.hist-detail {
+  padding: 10px 11px 11px; border-top: 1px solid var(--line);
+  background: var(--paper-050);
+}
+.hist-reason {
+  margin: 0 0 9px; font-size: 11.5px; line-height: 1.55; color: var(--text-dim);
+}
+.hist-periods {
+  display: grid; gap: 10px; margin-bottom: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+}
+.hist-label {
+  display: block; font-size: 9.5px; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.hist-value { display: block; font-size: 15px; margin: 1px 0; }
+.hist-when { display: block; font-size: 9.5px; color: var(--text-faint); }
+
+.hist-threshold {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px; margin: 0; padding-top: 9px;
+  border-top: 1px solid var(--line); font-size: 10.5px;
+}
+.hist-threshold dt { color: var(--text-faint); }
+.hist-threshold dd { margin: 0; color: var(--text-dim); }
+
+.hist-finding {
+  margin: 9px 0 0; padding-top: 9px; border-top: 1px solid var(--line);
+  font-size: 11.5px; line-height: 1.55;
+}
+.hist-method { margin-top: 10px; }
+.hist-method-body { padding-bottom: 4px; }
+.hist-seasons { margin: 0 0 6px; font-size: 10px; color: var(--text-faint); }
+.hist-method-rules {
+  margin: 0; padding-left: 14px;
+  font-size: 10.5px; line-height: 1.55; color: var(--text-faint);
+}
+.hist-method-rules li { margin-bottom: 3px; }
