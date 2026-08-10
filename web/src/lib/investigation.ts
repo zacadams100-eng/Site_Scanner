@@ -81,3 +81,42 @@ export function findEntry(
   if (!workspace || !id) return null
   return workspace.find((w) => w.id === id) ?? null
 }
+
+/**
+ * Why a check could not run, in words.
+ *
+ * The four causes stay separate because they have four different fixes and
+ * four different owners. Collapsing them into "unavailable" is the specific
+ * loss this product works hardest to prevent.
+ */
+const GAP_LABEL: Record<string, string> = {
+  not_selected: 'not loaded into this report',
+  demo_data: 'no live source — demo data cannot support a finding',
+  no_data: 'source queried; no usable observation returned',
+  insufficient: 'insufficient evidence to evaluate',
+}
+
+export function gapLabel(reason: string): string {
+  return GAP_LABEL[reason] ?? 'not assessed'
+}
+
+/**
+ * "4 checks could not run" — or nothing, when every check ran.
+ *
+ * The empty case returns a positive statement rather than an empty string,
+ * because a section that vanishes when there is nothing to report is
+ * indistinguishable from a section nobody implemented.
+ */
+export function gapSummary(entry: InvestigationWorkspaceEntry): string {
+  const n = entry.gaps.length
+  if (n === 0) return 'Every check behind this investigation ran.'
+  return `${n} check${n === 1 ? '' : 's'} that would have informed this could not run`
+}
+
+/** The date the assessment ran, formatted. Empty rather than "Invalid Date". */
+export function assessedOn(entry: InvestigationWorkspaceEntry): string {
+  if (!entry.assessed_at) return ''
+  const d = new Date(entry.assessed_at)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'short', year: 'numeric' })
+}

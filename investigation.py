@@ -96,6 +96,88 @@ def _evidence_for(factors: Sequence[str],
     return out
 
 
+#: The steps of an evidence chain, in the order a professional reads them.
+#: Names the *shape* of provenance, never a domain: "what answered" is the same
+#: question for a satellite, a borehole register and a tide gauge.
+CHAIN_STEPS = ("source", "observation", "method", "coverage", "comparison",
+               "threshold", "finding")
+
+
+def _chain(pack: Dict[str, Any], measurement: Dict[str, Any],
+           raised: Sequence[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """The evidence chain for **one rule**, as readable steps.
+
+    Sentinel-2 → NDVI → hist-1 → 9 of 15 years → 0.61 to 0.47 → 20% threshold
+    → flagged.
+
+    One chain per rule, not one per factor. A factor read by two rules
+    produced a single flattened sequence with two methods and two thresholds
+    interleaved, which is a debugging screen rather than a chain — the reader
+    could not tell which threshold belonged to which method.
+
+    Built from what the rule recorded rather than from a per-domain template:
+    the `evidence` keys carry whatever comparison the rule made, so a shoreline
+    retreat rule assembles the same way as a vegetation one.
+    """
+    ev = measurement.get("evidence") or {}
+    steps: List[Dict[str, str]] = []
+
+    if pack.get("dataset") or pack.get("publisher"):
+        steps.append({"step": "source", "label": "Source",
+                      "value": pack.get("dataset") or pack.get("publisher", "")})
+    steps.append({"step": "observation", "label": "Observation",
+                  "value": pack.get("name", pack.get("factor", ""))})
+
+    method = str(ev.get("method_version") or "")
+    if method:
+        steps.append({"step": "method", "label": "Method", "value": method})
+
+    for key in ("years_observed", "n", "observations"):
+        if key in ev:
+            steps.append({"step": "coverage", "label": "Evidence observed",
+                          "value": str(ev[key])})
+            break
+
+    if "baseline_period" in ev and "recent_period" in ev:
+        steps.append({
+            "step": "comparison", "label": "Compared",
+            "value": f"{ev.get('baseline')} in {ev['baseline_period']} "
+                     f"to {ev.get('recent')} in {ev['recent_period']}"})
+
+    if measurement.get("threshold"):
+        steps.append({"step": "threshold", "label": "Threshold",
+                      "value": str(measurement["threshold"])})
+
+    by_rule = {r["id"]: r for r in raised}
+    hit = by_rule.get(measurement.get("rule", ""))
+    if hit:
+        steps.append({"step": "finding", "label": "Finding",
+                      "value": hit.get("severity") or "flagged"})
+    return steps
+
+
+def _gaps(investigation_id: str,
+          unassessed: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Checks that would have informed this investigation and could not run.
+
+    The reason this section exists: a workspace showing only the evidence
+    *behind* an investigation reads as a complete pack, and the reader has no
+    way to know what was missing from it. That is the same false completeness
+    the coverage strip prevents one level up.
+
+    The four causes stay separate — they have four different fixes.
+    """
+    return [
+        {"rule": u.get("rule", ""),
+         "asks": u.get("asks", ""),
+         "reason": u.get("reason", ""),
+         "factors": u.get("factor_names") or u.get("factors") or [],
+         "text": u.get("text", "")}
+        for u in unassessed
+        if investigation_id in (u.get("investigations") or [])
+    ]
+
+
 def report(radar_payload: Dict[str, Any],
            evidence_entries: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """One workspace entry per investigation the evidence raised.
@@ -106,6 +188,7 @@ def report(radar_payload: Dict[str, Any],
     what lets the same function serve a domain this code has never seen.
     """
     investigations = radar_payload.get("investigations") or []
+    unassessed = radar_payload.get("not_assessed") or []
     flags_by_id = {f["id"]: f for f in (radar_payload.get("flags") or [])}
     entries_by_factor = {e["factor"]: e for e in evidence_entries}
 
@@ -160,6 +243,7 @@ def report(radar_payload: Dict[str, Any],
                 if c not in not_established:
                     not_established.append(c)
 
+        packs = _evidence_for(seen, evidence_entries)
         out.append({
             "id": inv["id"],
             "name": inv["name"],
@@ -169,7 +253,17 @@ def report(radar_payload: Dict[str, Any],
             "raised_by": raised_by,
             "established": established,
             "not_established": not_established,
-            "evidence": _evidence_for(seen, evidence_entries),
+            "evidence": packs,
+            # One chain per rule, named by the rule that produced it.
+            "chains": [
+                {"factor": p["factor"], "name": p["name"],
+                 "rule": m.get("rule_name") or _readable(m.get("rule", "")),
+                 "steps": _chain(p, m, raised_by)}
+                for p in packs for m in p.get("measurements", [])
+            ],
+            # Never omitted, and empty is a statement rather than an absence.
+            "gaps": _gaps(inv["id"], unassessed),
+            "assessed_at": radar_payload.get("assessed_at", ""),
         })
     return out
 

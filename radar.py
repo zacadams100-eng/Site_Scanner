@@ -885,6 +885,13 @@ def assess(report: Dict[str, Any],
                 "topic": rule.topic,
                 "topic_name": TOPICS.get(rule.topic, rule.topic),
                 "asks": rule.asks,
+                # Which investigations this check would have contributed to had
+                # it run. Without this a workspace can show the evidence behind
+                # an investigation but not the evidence *missing* from it, and
+                # a reader would take the pack as complete — the same false
+                # completeness the coverage strip exists to prevent, one level
+                # in. The rule already knows; it was simply never exposed.
+                "investigations": list(rule.investigations),
                 "reason": reason,
                 "factors": blocking,
                 "factor_names": [

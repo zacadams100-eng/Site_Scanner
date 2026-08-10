@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SECTIONS, allVerified, findEntry, humanKey, methodsUsed, priorityClass,
-  priorityLabel, raisedSummary,
+  SECTIONS, allVerified, assessedOn, findEntry, gapLabel, gapSummary, humanKey,
+  methodsUsed, priorityClass, priorityLabel, raisedSummary,
 } from './investigation'
 import type { InvestigationWorkspaceEntry } from '../types'
 
@@ -33,6 +33,20 @@ function coastal(): InvestigationWorkspaceEntry {
     }],
     established: ['Mean high water has retreated 14 m.'],
     not_established: ['It is not evidence of accelerating erosion.'],
+    assessed_at: '2026-08-10T00:00:00+00:00',
+    chains: [{
+      factor: 'shoreline_position', name: 'Mean high water position',
+      rule: 'Shoreline retreat',
+      steps: [
+        { step: 'source', label: 'Source', value: 'Sentinel-2 Surface Reflectance' },
+        { step: 'observation', label: 'Observation', value: 'Mean high water position' },
+        { step: 'method', label: 'Method', value: 'coast-1' },
+        { step: 'threshold', label: 'Threshold', value: '10 m retreat' },
+        { step: 'finding', label: 'Finding', value: 'high' },
+      ],
+    }],
+    gaps: [{ rule: 'tide_gauge', asks: 'whether the tidal record supports the change',
+             reason: 'not_selected', factors: ['Tide gauge record'], text: '' }],
     evidence: [{
       factor: 'shoreline_position', name: 'Mean high water position',
       state: 'flagged', publisher: 'Copernicus / ESA',
@@ -103,5 +117,49 @@ describe('reading, never deriving', () => {
     expect(findEntry([coastal()], null)).toBeNull()
     expect(findEntry([coastal()], 'coastal_process_study')?.name)
       .toBe('Coastal process study')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Evidence gaps and dates
+// ---------------------------------------------------------------------------
+describe('evidence gaps', () => {
+  it('names each cause distinctly', () => {
+    // Four causes, four fixes, four owners.
+    expect(gapLabel('not_selected')).toContain('not loaded')
+    expect(gapLabel('demo_data')).toContain('demo data')
+    expect(gapLabel('no_data')).toContain('no usable observation')
+    expect(gapLabel('insufficient')).toContain('insufficient')
+    expect(new Set([gapLabel('not_selected'), gapLabel('demo_data'),
+                    gapLabel('no_data'), gapLabel('insufficient')]).size).toBe(4)
+  })
+
+  it('never renders an unknown cause as reassuring', () => {
+    expect(gapLabel('something_new')).toBe('not assessed')
+    expect(gapLabel('')).toBe('not assessed')
+  })
+
+  it('states the empty case rather than vanishing', () => {
+    // A section that disappears when there is nothing to report is
+    // indistinguishable from a section nobody implemented.
+    expect(gapSummary({ ...coastal(), gaps: [] }))
+      .toBe('Every check behind this investigation ran.')
+  })
+
+  it('counts gaps with correct grammar', () => {
+    const one = { ...coastal(), gaps: [{ rule: 'a', asks: '', reason: 'no_data', factors: [], text: '' }] }
+    expect(gapSummary(one)).toContain('1 check that')
+    expect(gapSummary({ ...one, gaps: [...one.gaps, ...one.gaps] })).toContain('2 checks that')
+  })
+})
+
+describe('assessment date', () => {
+  it('formats a real timestamp', () => {
+    expect(assessedOn(coastal())).toBe('10 Aug 2026')
+  })
+
+  it('returns nothing rather than "Invalid Date"', () => {
+    expect(assessedOn({ ...coastal(), assessed_at: '' })).toBe('')
+    expect(assessedOn({ ...coastal(), assessed_at: 'nonsense' })).toBe('')
   })
 })

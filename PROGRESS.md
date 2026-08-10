@@ -5,6 +5,65 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Investigation workspace — production pass — 2026-08-10
+
+The workspace built earlier the same day covered the chain but not the whole
+brief. Three sections were genuinely missing, and one of them mattered.
+
+**Evidence gaps.** The workspace showed the evidence *behind* an investigation
+and nothing about what was missing from it — so the pack read as complete, and
+the reader had no way to know four checks never ran. That is the same false
+completeness the coverage strip prevents one level up, and it is the section
+most aligned with what the product is for. The ecological appraisal now shows
+that standing water could not be assessed (no live source) and that SSSI,
+ancient woodland and TPO were never loaded, with the four causes kept apart.
+
+Making it possible needed one small backend change: `radar` now records which
+investigations each unassessed check *would* have contributed to. The rule
+already knew — `rule.investigations` — it was simply never exposed.
+
+**Evidence chain.** Source → observation → method → coverage → comparison →
+threshold → finding, as a readable ladder. Built from what each rule recorded
+rather than from a per-domain template, so a shoreline rule assembles the same
+way.
+
+**Actions and header.** Back to Radar, the subject's name, and the assessment
+date.
+
+**Permalink now carries the open investigation.** `i=ecology_survey`, and the
+completeness test caught the missing field the moment it was added — which is
+exactly what that test is for. The **id** travels, never the content: the
+recipient's report is re-assessed from their own request, so a link cannot
+smuggle in a finding their evidence does not support. If their assessment does
+not raise it, the workspace does not open, which is the correct answer rather
+than an error. Verified by opening the URL in a clean page: the workspace
+restores with the right investigation.
+
+**Three defects found by driving it:**
+
+- **The chain was one per factor**, so a series read by two rules produced a
+  flattened sequence with two methods and two thresholds interleaved — a
+  debugging screen in which the reader cannot tell which threshold belongs to
+  which method. Now one chain per rule.
+- **The raw measurement tables had the same problem**, running three rules
+  together with two unlabelled "Threshold" rows, which reads as a
+  contradiction. Each table is now captioned with its rule.
+- **Mobile could not be driven at all** — the report panel starts closed on a
+  phone, and a 90px drag did not register as an area. Both are correct app
+  behaviour; the test driver was wrong.
+
+One test needed rewriting for the same reason as two before it:
+`test_the_gap_causes_are_never_collapsed` first demanded that two *different*
+causes appear, which depends on how many real implementations the process
+installed. It passed alone and failed in the full suite. It now asserts
+**preservation** — the workspace's causes match the engine's exactly — which is
+the invariant that was actually meant.
+
+824 Python tests (+6), 244 frontend (+9). Checked at 1440×900 and 390×844: no
+console errors, no horizontal overflow at either width.
+
+---
+
 ## Investigation workspace — built to prove the abstraction — 2026-08-10
 
 Where a finding becomes a professional question, in the order a professional

@@ -729,6 +729,27 @@ export interface EvidencePack {
   }[]
 }
 
+/** One readable provenance chain, for one rule. Not one per factor: a factor
+ *  read by two rules produced a flattened sequence with two methods and two
+ *  thresholds interleaved, which is a debugging screen rather than a chain. */
+export interface EvidenceChain {
+  factor: string
+  name: string
+  rule: string
+  steps: { step: string; label: string; value: string }[]
+}
+
+/** A check that would have informed this investigation and could not run.
+ *  Never omitted: a workspace showing only the evidence *behind* an
+ *  investigation reads as a complete pack. */
+export interface InvestigationGap {
+  rule: string
+  asks: string
+  reason: string
+  factors: string[]
+  text: string
+}
+
 export interface InvestigationWorkspaceEntry {
   id: string
   name: string
@@ -739,4 +760,7 @@ export interface InvestigationWorkspaceEntry {
   established: string[]
   not_established: string[]
   evidence: EvidencePack[]
+  chains: EvidenceChain[]
+  gaps: InvestigationGap[]
+  assessed_at: string
 }

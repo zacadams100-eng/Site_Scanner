@@ -36,6 +36,7 @@ const FULL: UrlState = {
     { id: 'm1', name: 'Ditch', lng: -0.5612, lat: 51.2455 },
   ],
   name: 'Manor Farm, parcel 3',
+  investigation: 'ecology_survey',
 }
 
 function roundTrip(s: UrlState): Partial<UrlState> {
@@ -260,5 +261,31 @@ describe('template framing', () => {
     for (const t of TEMPLATES) {
       expect(t.factors.length, `${t.id} lost its factors`).toBeGreaterThan(0)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The investigation a link points at
+// ---------------------------------------------------------------------------
+describe('shared investigation', () => {
+  it('carries the investigation id, never its content', () => {
+    // What makes a handover a link rather than a description. The id alone
+    // travels: the recipient's report is re-assessed from their own request,
+    // so a link cannot smuggle in a finding their evidence does not support.
+    const url = encodeState(FULL)
+    expect(url).toContain('i=ecology_survey')
+    expect(url).not.toContain('declined')
+    expect(roundTrip(FULL).investigation).toBe('ecology_survey')
+  })
+
+  it('omits the field entirely when no workspace is open', () => {
+    expect(encodeState({ ...FULL, investigation: null })).not.toContain('i=')
+    expect(roundTrip({ ...FULL, investigation: null }).investigation)
+      .toBeUndefined()
+  })
+
+  it('survives an id that needs escaping', () => {
+    expect(roundTrip({ ...FULL, investigation: 'a b&c=d' }).investigation)
+      .toBe('a b&c=d')
   })
 })

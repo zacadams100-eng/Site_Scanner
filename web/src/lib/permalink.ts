@@ -34,12 +34,26 @@ export interface UrlState {
    *  and the difference between opening "Manor Farm, parcel 3" and opening an
    *  unnamed rectangle. */
   name: string | null
+  /**
+   * The investigation the workspace is open on, when one is.
+   *
+   * This is what makes a professional handover a link rather than a
+   * description: "look at this" instead of "open the report, go to radar,
+   * find the ecological appraisal". The id is carried, never the content —
+   * the recipient's report is re-assessed from their own request, so a link
+   * cannot smuggle in a finding that their evidence does not support.
+   *
+   * If their assessment does not raise it, the workspace simply does not
+   * open. That is the correct behaviour rather than an error: the link names
+   * a question, and the answer is whatever their evidence says.
+   */
+  investigation: string | null
 }
 
 /** The field list the completeness test walks. Kept beside the interface so
  *  the two are edited in the same glance. */
 export const URL_STATE_KEYS: (keyof UrlState)[] =
-  ['aoi', 'factors', 't', 'compare', 'markers', 'name']
+  ['aoi', 'factors', 't', 'compare', 'markers', 'name', 'investigation']
 
 /** Polygons are the bulky part, so coordinates are quantised to ~1 m and
  *  delta-encoded before base64. A 60-vertex freehand shape fits in a URL that
@@ -128,6 +142,7 @@ export function encodeState(s: UrlState): string {
   if (s.compare !== null) parts.push('c=' + s.compare)
   if (s.markers.length) parts.push('m=' + encodeMarkers(s.markers))
   if (s.name) parts.push('n=' + encodeURIComponent(s.name))
+  if (s.investigation) parts.push('i=' + encodeURIComponent(s.investigation))
   return parts.join('&')
 }
 
@@ -155,7 +170,13 @@ export function decodeState(hash: string): Partial<UrlState> {
     else if (k === 't') out.t = Number(v)
     else if (k === 'c') out.compare = Number(v)
     else if (k === 'm') out.markers = decodeMarkers(v)
-    else if (k === 'n') {
+    else if (k === 'i') {
+      try {
+        out.investigation = decodeURIComponent(v) || null
+      } catch {
+        out.investigation = v || null
+      }
+    } else if (k === 'n') {
       try {
         out.name = decodeURIComponent(v) || null
       } catch {

@@ -2616,3 +2616,62 @@ td.cov-severe { color: var(--text-dim); }
 .ev-inv-name:hover { text-decoration: underline; }
 
 @media (max-width: 600px) { .iw { width: 100%; border-left: 0; } }
+
+/* The evidence chain: source → observation → method → coverage → comparison →
+   threshold → finding. A numbered ladder rather than a diagram, because a
+   professional reads it once to check the reasoning and never again — and a
+   diagram would be decoration with no analytical purpose. */
+.iw-chain { margin-bottom: 12px; }
+.iw-chain-rule {
+  margin: 0 0 6px; font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.iw-chain-steps {
+  list-style: none; margin: 0; padding: 0 0 0 13px;
+  border-left: 1px solid var(--line);
+}
+.iw-step {
+  display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.6fr);
+  gap: 10px; padding: 5px 0; position: relative;
+}
+.iw-step::before {
+  content: ''; position: absolute; left: -17px; top: 11px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--paper-200); border: 1px solid var(--surface);
+}
+/* The last link is the one that matters, so it is the one that is marked. */
+.iw-step.is-finding::before { background: var(--warn); }
+.iw-step-label { font-size: 10.5px; color: var(--text-faint); }
+.iw-step-value { font-size: 11.5px; color: var(--text); overflow-wrap: anywhere; }
+
+/* Gaps. Present even when empty — a section that vanishes when there is
+   nothing to report is indistinguishable from one nobody implemented. */
+.iw-gap-summary { margin: 0 0 9px; font-size: 12px; color: var(--text); }
+.iw-gap {
+  padding: 8px 10px; margin-bottom: 6px;
+  border: 1px solid var(--line); border-left-width: 3px;
+  border-left-color: var(--paper-200);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+}
+/* One is a click, the other is a wall — and they should not look alike. */
+.iw-gap.is-not_selected { border-left-color: var(--accent); }
+.iw-gap-asks { margin: 0 0 3px; font-size: 12px; color: var(--text); }
+.iw-gap-why { margin: 0; font-size: 10px; color: var(--text-faint); }
+.iw-gap-factors { margin: 3px 0 0; font-size: 10.5px; color: var(--text-dim); }
+
+.iw-actions {
+  margin-top: 20px; padding-top: 13px; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.iw-action {
+  align-self: flex-start; background: none; border: 0; padding: 0;
+  cursor: pointer; font-family: var(--font-ui); font-size: 11.5px;
+  color: var(--accent);
+}
+.iw-action:hover { text-decoration: underline; }
+.iw-action-note { font-size: 10.5px; line-height: 1.6; color: var(--text-faint); }
+.iw-measure-rule {
+  caption-side: top; text-align: left; padding: 8px 0 3px;
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-faint);
+}

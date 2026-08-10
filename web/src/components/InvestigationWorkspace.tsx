@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import {
-  allVerified, findEntry, humanKey, methodsUsed, priorityClass, priorityLabel,
-  raisedSummary,
+  allVerified, assessedOn, findEntry, gapLabel, gapSummary, humanKey,
+  methodsUsed, priorityClass, priorityLabel, raisedSummary,
 } from '../lib/investigation'
-import type { EvidencePack, InvestigationWorkspaceEntry, RaisedBy } from '../types'
+import type {
+  EvidenceChain, EvidencePack, InvestigationWorkspaceEntry, RaisedBy,
+} from '../types'
 
 /**
  * The investigation workspace.
@@ -43,6 +45,10 @@ export default function InvestigationWorkspace() {
   const id = useStore((s) => s.investigationId)
   const close = useStore((s) => s.closeInvestigation)
   const openEvidence = useStore((s) => s.openEvidence)
+  const setTab = useStore((s) => s.setTab)
+  // The subject's own name where it has one. Never "site" — the workspace
+  // does not know what kind of thing it is looking at.
+  const subject = useStore((s) => s.projectName)
   const panel = useRef<HTMLDivElement>(null)
 
   const entry = findEntry(data?.workspace, id)
@@ -74,7 +80,11 @@ export default function InvestigationWorkspace() {
         <header className="iw-head">
           <h2 className="iw-title">{entry.name}</h2>
           {entry.blurb && <p className="iw-blurb">{entry.blurb}</p>}
-          <p className="iw-raised mono">{raisedSummary(entry)}</p>
+          <p className="iw-raised mono">
+            {raisedSummary(entry)}
+            {subject && <> · {subject}</>}
+            {assessedOn(entry) && <> · assessed {assessedOn(entry)}</>}
+          </p>
         </header>
 
         {/* ---- Why this appeared --------------------------------------- */}
@@ -103,6 +113,32 @@ export default function InvestigationWorkspace() {
           </section>
         )}
 
+        {/* ---- Evidence chain ------------------------------------------ */}
+        {entry.chains.length > 0 && (
+          <section className="iw-section">
+            <h3 className="iw-h">Evidence chain</h3>
+            {entry.chains.map((c, i) => <Chain key={i} chain={c} />)}
+          </section>
+        )}
+
+        {/* ---- Evidence gaps ------------------------------------------- */}
+        <section className="iw-section">
+          <h3 className="iw-h">Evidence gaps</h3>
+          {/* Never omitted. A workspace showing only the evidence *behind* an
+              investigation reads as a complete pack, and the reader has no way
+              to know what was missing from it. */}
+          <p className="iw-gap-summary">{gapSummary(entry)}</p>
+          {entry.gaps.map((g) => (
+            <div key={g.rule} className={`iw-gap is-${g.reason}`}>
+              <p className="iw-gap-asks">{g.asks || g.rule}</p>
+              <p className="iw-gap-why mono">{gapLabel(g.reason)}</p>
+              {!!g.factors.length && (
+                <p className="iw-gap-factors">{g.factors.join(' · ')}</p>
+              )}
+            </div>
+          ))}
+        </section>
+
         {/* ---- What to take along -------------------------------------- */}
         <section className="iw-section">
           <h3 className="iw-h">Evidence to take to the professional</h3>
@@ -121,7 +157,35 @@ export default function InvestigationWorkspace() {
             <Pack key={p.factor} pack={p} onOpen={() => openEvidence(p.factor)} />
           ))}
         </section>
+
+        {/* Only actions the app can actually keep. Nothing here needs backend
+            infrastructure that does not exist. */}
+        <footer className="iw-actions">
+          <button className="iw-action" onClick={() => { close(); setTab('radar') }}>
+            ← Back to Radar
+          </button>
+          <span className="iw-action-note">
+            This investigation and its evidence are included in the site
+            investigation brief.
+          </span>
+        </footer>
       </aside>
+    </div>
+  )
+}
+
+function Chain({ chain }: { chain: EvidenceChain }) {
+  return (
+    <div className="iw-chain">
+      <p className="iw-chain-rule">{chain.rule}</p>
+      <ol className="iw-chain-steps">
+        {chain.steps.map((s, i) => (
+          <li key={i} className={`iw-step is-${s.step}`}>
+            <span className="iw-step-label">{s.label}</span>
+            <span className="iw-step-value">{s.value}</span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }
@@ -172,6 +236,12 @@ function Pack({ pack, onOpen }: { pack: EvidencePack; onOpen: () => void }) {
       </dl>
       {pack.measurements.map((m, i) => (
         <table className="iw-measure" key={i}>
+          {/* Labelled by rule. Three rules' measurements ran together as one
+              list with two unlabelled "Threshold" rows, which reads as a
+              contradiction rather than as two tests of one series. */}
+          <caption className="iw-measure-rule">
+            {m.rule_name || humanKey(m.rule)}
+          </caption>
           <tbody>
             {Object.entries(m.evidence).map(([k, v]) => (
               <tr key={k}>

@@ -537,8 +537,14 @@ export const useStore = create<State>((set, get) => ({
   // Opening one closes the other: they are two depths of the same question,
   // and stacking two dialogues leaves no obvious way back.
   openEvidence: (factor) => set({ evidenceFactor: factor, investigationId: null }),
-  openInvestigation: (id) => set({ investigationId: id, evidenceFactor: null }),
-  closeInvestigation: () => set({ investigationId: null }),
+  openInvestigation: (id) => {
+    set({ investigationId: id, evidenceFactor: null })
+    get().syncUrl()
+  },
+  closeInvestigation: () => {
+    set({ investigationId: null })
+    get().syncUrl()
+  },
   closeEvidence: () => set({ evidenceFactor: null }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
   setSidebarOpen: (o) => set({ sidebarOpen: o }),
@@ -559,6 +565,7 @@ export const useStore = create<State>((set, get) => ({
       compare: s.compareIndex,
       markers: s.markers,
       name: s.projectName,
+      investigation: s.investigationId,
     })
   },
 
@@ -568,6 +575,10 @@ export const useStore = create<State>((set, get) => ({
     if (s.compare !== undefined && s.compare !== null) set({ compareIndex: s.compare })
     if (s.markers?.length) set({ markers: s.markers })
     if (s.name) set({ projectName: s.name })
+    // The workspace opens once the report arrives — the id alone means
+    // nothing until the recipient's own assessment has run and either raises
+    // that investigation or does not.
+    if (s.investigation) set({ investigationId: s.investigation })
     // Geometry last: setAoi fires the fetch, and it clears projectName unless
     // told to keep it — so the name has to be in place before it runs, and the
     // restore has to declare itself a restore.

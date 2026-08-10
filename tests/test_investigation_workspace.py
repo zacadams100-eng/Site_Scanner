@@ -226,3 +226,120 @@ def test_the_workspace_states_no_conclusion(mock_client, live_ndvi):
     for forbidden in ("suitable for", "we recommend developing", "safe to",
                       "no risk", "site is sound"):
         assert forbidden not in prose
+
+
+# ---------------------------------------------------------------------------
+# Evidence gaps: what was missing from the pack, not just what was in it
+# ---------------------------------------------------------------------------
+def test_gaps_name_the_checks_that_could_not_run(mock_client, live_ndvi):
+    """A workspace showing only the evidence *behind* an investigation reads as
+    a complete pack, and the reader has no way to know what was missing. That
+    is the same false completeness the coverage strip prevents one level up."""
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    work = investigation.find(body["workspace"], "ecology_survey")
+    assert work["gaps"], "checks that could not run must be named"
+    for gap in work["gaps"]:
+        assert gap["asks"], "a gap without its question is a code in a document"
+        assert gap["reason"] in {"not_selected", "demo_data", "no_data",
+                                 "insufficient"}
+
+
+def test_the_gap_causes_are_never_collapsed(mock_client, live_ndvi):
+    """Four causes, four fixes, four owners. Collapsing them into
+    "unavailable" is the specific loss this product works hardest to prevent.
+
+    Asserted as *preservation* rather than as diversity. Demanding that two
+    different causes appear is environment-dependent — how many factors are
+    merely not-loaded versus permanently generated depends on how many real
+    implementations this process installed — and a first version of this test
+    passed alone and failed in the full suite for exactly that reason.
+    """
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    work = investigation.find(body["workspace"], "ecology_survey")
+    engine = {u["rule"]: u["reason"] for u in body["radar"]["not_assessed"]
+              if "ecology_survey" in (u.get("investigations") or [])}
+    assert {g["rule"]: g["reason"] for g in work["gaps"]} == engine
+
+
+def test_a_gap_never_becomes_a_clear_result(mock_client, live_ndvi):
+    """The invariant behind the whole product, at this layer: an unassessed
+    check must appear as unassessed, never be silently dropped so the pack
+    looks complete."""
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    work = investigation.find(body["workspace"], "ecology_survey")
+    gap_rules = {g["rule"] for g in work["gaps"]}
+    raised_rules = {r["id"] for r in work["raised_by"]}
+    # No rule can be both a finding and a gap.
+    assert not (gap_rules & raised_rules)
+    # And every gap the engine recorded for this investigation is present.
+    engine_gaps = {u["rule"] for u in body["radar"]["not_assessed"]
+                   if "ecology_survey" in (u.get("investigations") or [])}
+    assert gap_rules == engine_gaps
+
+
+# ---------------------------------------------------------------------------
+# The evidence chain
+# ---------------------------------------------------------------------------
+def test_the_chain_is_one_per_rule_not_one_per_factor(mock_client, live_ndvi):
+    """A factor read by two rules produced one flattened sequence with two
+    methods and two thresholds interleaved — a debugging screen rather than a
+    chain, in which the reader cannot tell which threshold belongs to which
+    method."""
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    work = investigation.find(body["workspace"], "ecology_survey")
+    rules = [c["rule"] for c in work["chains"]]
+    assert len(rules) == len(set(rules)), "one chain per rule"
+    assert len(rules) >= 2, "both rules reading this series must have a chain"
+
+    hist = next(c for c in work["chains"] if c["rule"] == "Historical vegetation decline")
+    labels = [s["label"] for s in hist["steps"]]
+    assert labels == ["Source", "Observation", "Method", "Evidence observed",
+                      "Compared", "Threshold", "Finding"]
+
+
+def test_the_chain_carries_no_domain_template(mock_client, live_ndvi):
+    """Chain steps are built from what the rule recorded, not from a per-domain
+    template — which is what lets a shoreline rule assemble the same way."""
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    work = investigation.find(body["workspace"], "ecology_survey")
+    steps = {s["step"] for c in work["chains"] for s in c["steps"]}
+    assert steps <= set(investigation.CHAIN_STEPS)
+
+
+# ---------------------------------------------------------------------------
+# EM7, on the workspace payload
+# ---------------------------------------------------------------------------
+def test_the_workspace_payload_exposes_no_score(mock_client, live_ndvi):
+    """EM7 walked over this payload specifically. The workspace is where a
+    "confidence" or "severity score" field would feel most natural to add."""
+    from tests.test_historical_end_to_end import declining
+    live_ndvi(declining(0.61, 0.47))
+    body = fetch(mock_client)
+
+    def walk(node, path="workspace"):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                for word in ("score", "rating", "grade", "suitability",
+                             "overall", "health"):
+                    assert word not in str(key).lower(), f"{path}.{key}"
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{path}[{i}]")
+
+    walk(body["workspace"])
