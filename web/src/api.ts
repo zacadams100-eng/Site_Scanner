@@ -1,4 +1,4 @@
-import type { AskResponse, Catalog, CellsResponse, Comparison, SeriesResponse } from './types'
+import type { AskResponse, Brief, Catalog, CellsResponse, Comparison, SeriesResponse } from './types'
 
 /**
  * The backend returns a plain-language `detail` for anything a user can fix
@@ -46,6 +46,23 @@ export function fetchSeries(
   signal?: AbortSignal,
 ): Promise<SeriesResponse> {
   return post<SeriesResponse>('/api/series', { geometry, factor_ids: factorIds }, signal)
+}
+
+/**
+ * The Site Investigation Brief.
+ *
+ * Its own request rather than a key on the series response, because the Brief
+ * carries the full assessment log and every attribution — payload that belongs
+ * in a document someone asked for, not behind every map interaction.
+ */
+export function fetchBrief(
+  geometry: GeoJSON.Polygon,
+  factorIds: string[],
+  siteName: string,
+  signal?: AbortSignal,
+): Promise<Brief> {
+  return post<Brief>('/api/brief',
+    { geometry, factor_ids: factorIds, site_name: siteName }, signal)
 }
 
 export function fetchCells(

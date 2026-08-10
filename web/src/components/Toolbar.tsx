@@ -8,6 +8,8 @@ import { shareUrl } from '../lib/permalink'
 import type { Series } from '../types'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { captureMap } from '../lib/mapImage'
+import { fetchBrief } from '../api'
+import { briefHtml, openBriefWindow } from '../lib/brief'
 
 /**
  * What you do *with* a report, as opposed to what you do to build one.
@@ -29,6 +31,7 @@ export default function Toolbar() {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
+  const [briefPending, setBriefPending] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   const cols = useMemo(
@@ -55,6 +58,27 @@ export default function Toolbar() {
   const say = (msg: string) => {
     setFlash(msg)
     setTimeout(() => setFlash(null), 2400)
+  }
+
+  /**
+   * The Site Investigation Brief.
+   *
+   * Fetched rather than assembled from `data`, because the Brief is composed
+   * on the server beside the engine that reached each state — a browser-side
+   * version would be a second wording of the same limitations, and the first
+   * time the two disagreed nobody would see it.
+   */
+  const onBrief = async () => {
+    if (!aoi) return
+    setBriefPending(true)
+    try {
+      const b = await fetchBrief(aoi, selected, projectName || '')
+      openBriefWindow(briefHtml(b), b.site.name)
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : 'Could not build the brief')
+    } finally {
+      setBriefPending(false)
+    }
   }
 
   const onShare = async () => {
@@ -102,6 +126,13 @@ export default function Toolbar() {
             <button disabled={!aoi}
                     onClick={() => { if (aoi) exportGeoJson(aoi, cols, data.area_ha, markers); setMenuOpen(false) }}>
               GeoJSON — shape, data and markers
+            </button>
+            {/* The Brief goes first: it is the artefact this product exists to
+                produce. Everything below it is a data export — useful, and not
+                what makes Contour worth using. */}
+            <button disabled={!aoi || briefPending}
+                    onClick={() => { void onBrief(); setMenuOpen(false) }}>
+              {briefPending ? 'Preparing brief…' : 'Site investigation brief'}
             </button>
             <button onClick={() => {
               // The map is captured here rather than inside printReport,

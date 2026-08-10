@@ -5,6 +5,113 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Site Investigation Brief — 2026-08-10
+
+The artefact that leaves the product. A differentiation audit found the gap:
+Contour had built a sophisticated evidence system, and the thing that actually
+left the building was a spreadsheet of series values — `printReport` carried no
+findings, no coverage, no gaps, no claim boundary. The most differentiated
+product in the category was shipping the least differentiated document.
+
+`Export → Site investigation brief` opens a document: site, evidence coverage,
+key findings with their claim boundary, historical change, evidence gaps by
+cause, the full assessment log, methodology and attribution, and the principle.
+
+**Not a prettier report — a different artefact**, answering: *here is the
+evidence we established about this site, and the professional questions that
+remain.* It contains no opinion about whether the site is suitable, and a test
+walks it for `score`/`rating`/`grade`/`suitability`, because a document is
+quoted, screenshotted and pasted into decks where a number outlives every
+caveat around it.
+
+**The Brief takes `claims` verbatim from `evidence.py`.** Recomposing them for
+the document would produce two wordings of the same limitation, and the first
+time they disagreed the disagreement would be invisible — each would look
+correct on its own screen. A test asserts the two are byte-identical.
+
+The one thing `brief.py` owns is **order**, and it says why: coverage before
+findings, always. In a document there is no tab to click, so the order is the
+argument — a reader who meets "1 flagged" before learning 23 factors could not
+be assessed has already formed a view of the site.
+
+Three decisions the document forced:
+
+- **Gaps are grouped by cause, never collapsed.** "23 not assessed" tells the
+  recipient nothing they can act on; 13 not loaded and 10 with no live source
+  are different problems with different owners.
+- **Attribution ships with the artefact**, not the screen. It is a licence
+  condition, and the recipient never saw the app.
+- **An empty findings list must not read as "no issues found".** With most of
+  the catalogue generated it far more often means nothing could be checked, and
+  it is the section a reader skims first.
+
+**Found by producing it in a browser:** every finding was printed twice — once
+as narrative, then verbatim inside "What this establishes", because the server
+composes `established` from exactly those strings. The duplicate is gone and
+the space now carries each finding's threshold and method, which the narrative
+never stated.
+
+Also: the Docker context test caught `brief.py` the same way it caught
+`evidence.py` last session. That test has now paid for itself twice.
+
+804 Python tests (+17), 228 frontend (+12).
+
+---
+
+## Differentiation decisions — templates, factor classes, EM12 — 2026-08-10
+
+Three decisions settled before building the Brief, because the Brief had to
+speak the product's final language.
+
+**1. Templates name a body of evidence, never a decision.** The template list
+is the first thing a new user reads, so it is the positioning whether or not
+anyone intended it that way — and it opened with *"Development appraisal — is
+this site worth pursuing?"*. That is a suitability question, the one question
+Contour exists not to answer, promised on the first screen. Now "Solar site
+evidence", not "Solar farm"; "Recorded irradiance, slope, shading", not "Would
+an array work here". Gone: *appraisal*, *quality* as a verdict on a place, and
+blurbs predicting cost, yield or value. **The factors are untouched** — the job
+being promised is what changed. A test pins it, with "air quality" on an
+explicit exception list rather than softening the scan.
+
+**2. The 26 judgement-named factors are classified, not mass-renamed.** One
+test: does the factor's own definition require Contour to decide what counts as
+*good*? See `docs/FACTOR_CLASSIFICATION.md`.
+
+- **JUDGEMENT (5)** — `*_suitability` composites answering "is this site good
+  for X". Should not be implemented at all; their inputs already exist
+  separately as real measurements, which is the honest form.
+- **DERIVED_METRIC (10)** — need a published methodology and version before
+  going live, exactly as `hist-1` does. `insurance_peril_score` combines
+  *different perils* into one number for a site: that is a site score with a
+  narrower noun and needs reconsidering on principle, not fixing.
+- **MEASUREMENT (11)** — real quantities whose names come from the published
+  dataset, where renaming would sever the link to the source. `bmv_land_pct`
+  keeps "best" because it is the statutory term. `developable_area` is the
+  exception: it measures unbuilt area, and calling it *developable* asserts a
+  planning judgement.
+
+**EM7 was not weakened.** It bans `suitability` as a payload key and would have
+failed the day one of these went live and a rule read it — on a name that looks
+perfectly reasonable to whoever implemented it, which is exactly how a
+load-bearing invariant gets quietly relaxed. `tests/test_factor_
+classification.py` closes the collision from the other side, and guards itself:
+a sixth suitability factor fails the test rather than silently falling outside
+the set.
+
+**3. EM12 written down and feasibility-tested rather than adopted.** Measured:
+**1 of 25 rules** declares a per-finding negative, so "every rule declares its
+own limitation" would mean inventing 24 — the precise failure this project
+avoids. `docs/EM12_PROPOSAL.md` records the satisfiable form (state-generic
+clause always, rule-specific addition optional — which `evidence.py` already
+implements) and recommends promoting it *after* the Brief, since the Brief is
+the first artefact presenting findings from every surface at once.
+`EVIDENCE_MODEL.md` is unchanged.
+
+787 Python tests (+4), 216 frontend (+3).
+
+---
+
 ## Evidence explorer — step 3 — 2026-08-10
 
 One question, asked of one factor: **where did this number come from, what did

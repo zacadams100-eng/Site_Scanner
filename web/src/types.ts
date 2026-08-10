@@ -606,3 +606,78 @@ export interface EvidenceEntry {
    *  of prose in the place a reader is trying to read carefully. */
   claims: { established: string[]; not_established: string[] }
 }
+
+
+/**
+ * The Site Investigation Brief — the artefact that leaves the product.
+ *
+ * Not a prettier report. A different document, answering: here is the evidence
+ * we established about this site, and the professional questions that remain.
+ * Every field is a projection of a payload that already satisfies EM1–EM11;
+ * nothing here is computed in the browser.
+ */
+export interface BriefFinding {
+  factor: string
+  name: string
+  severity: 'high' | 'medium' | 'low' | null
+  findings: { text: string; threshold: string; rule: string; method: string }[]
+  established: string[]
+  /** Never empty. The candidate EM12, enforced on this surface first. */
+  not_established: string[]
+  investigations: string[]
+  source: EvidenceSource
+}
+
+export interface BriefGap {
+  reason: string
+  /** The cause in words. A code in a document is a code to its reader. */
+  label: string
+  count: number
+  factors: string[]
+}
+
+export interface Brief {
+  sections: string[]
+  site: {
+    name: string
+    area_ha: number | null
+    centroid: { lng: number; lat: number }
+    assessed_at: string
+  }
+  coverage: {
+    assessed: number
+    relevant: number
+    not_assessed: number
+    flagged: number
+    clear: number
+    informational: number
+    not_loaded: number
+    no_live_source: number
+    note: string
+  }
+  findings: BriefFinding[]
+  informational: { factor: string; name: string; text: string; not_established: string[] }[]
+  historical: {
+    name: string
+    state: string
+    change_pct: number | null
+    baseline: number | null
+    recent: number | null
+    baseline_years: number[]
+    recent_years: number[]
+    years_usable: number | null
+    years_total: number | null
+    method: string
+  }[]
+  gaps: BriefGap[]
+  log: {
+    factor: string; name: string; source: string; endpoint: string
+    status: string; verified: boolean; at: string
+  }[]
+  methodology: {
+    historical: Record<string, unknown>
+    attributions: string[]
+    limits: string
+  }
+  principle: string
+}

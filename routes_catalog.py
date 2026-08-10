@@ -28,6 +28,7 @@ import insights
 import nlq
 import comparison
 import radar
+import brief as brief_mod
 import evidence as evidence_mod
 from historical import view as historical_view
 import series as series_mod
@@ -584,6 +585,29 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # waiting to drift. See evidence.py.
         "evidence": evidence_mod.report(radar_payload, out),
     }
+
+
+class BriefRequest(SeriesRequest):
+    """A brief is a series request plus the name that goes on the document."""
+    site_name: str = Field("", max_length=120)
+
+
+@router.post("/api/brief")
+def get_brief(req: BriefRequest) -> Dict[str, Any]:
+    """The Site Investigation Brief for one site.
+
+    A separate endpoint rather than another key on `/api/series`, because the
+    Brief carries the full assessment log and every attribution — payload that
+    belongs in a document someone asked for, not in the response behind every
+    map interaction.
+
+    It runs the same assessment and then projects it. Nothing is recomputed and
+    no rule runs twice: `brief.build` is a read over the payload `get_series`
+    already produced, so a Brief and the screen it was taken from cannot
+    disagree. See brief.py.
+    """
+    payload = get_series(req)
+    return brief_mod.build(payload, site_name=req.site_name)
 
 
 class CompareSite(BaseModel):
