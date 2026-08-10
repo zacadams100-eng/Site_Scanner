@@ -152,6 +152,14 @@ export default function App() {
         <div className="brand">
           <BrandMark className="brand-mark" />
           <span className="brand-name"><b>Site</b> Scanner</span>
+          {/* The active scanner, named. Site Scanner is the platform; Land is
+              the scanner running — and until this was shown, which scanner
+              produced a report was backend state a user could not see. */}
+          {catalog?.scanner && (
+            <span className="brand-scanner" title={catalog.scanner.subject}>
+              {catalog.scanner.name}
+            </span>
+          )}
         </div>
 
         <div className="topbar-doc">

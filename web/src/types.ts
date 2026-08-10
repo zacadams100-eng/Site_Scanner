@@ -61,10 +61,24 @@ export interface Provenance {
   note?: string
 }
 
+/** Which scanner served a catalogue, and which exist. The shell shows the
+ *  active one rather than inferring it — a scanner is a product concept the
+ *  user can see, not hidden backend state. */
+export interface ScannerInfo {
+  id: string
+  name: string
+  subject: string
+  implemented: boolean
+}
+
 export interface Catalog {
   factors: Factor[]
   bases: Base[]
   groups: string[]
+  /** The scanner that served this catalogue. Optional so a backend predating
+   *  scanner identity still parses. */
+  scanner?: ScannerInfo
+  scanners?: ScannerInfo[]
   real_factor_ids?: string[]
   verified_factor_ids?: string[]
   class_values: Record<string, string[]>

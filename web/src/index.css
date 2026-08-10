@@ -2675,3 +2675,13 @@ td.cov-severe { color: var(--text-dim); }
   font-size: 10px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; color: var(--text-faint);
 }
+
+/* The active scanner, beside the wordmark. A label rather than a control:
+   there is one built scanner, and a selector offering two unbuilt ones would
+   promise a capability the product does not have. */
+.brand-scanner {
+  margin-left: 8px; padding: 2px 7px; border-radius: 3px;
+  border: 1px solid var(--line); background: var(--paper-050);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-dim); white-space: nowrap;
+}

@@ -1,5 +1,11 @@
 # Can this platform carry three scanners?
 
+> **Status: R1–R6 implemented.** `scanners.py` holds the registry; land,
+> habitat and coastal are registered; scanner identity is explicit in the API.
+> R7 — the actual rules and thresholds for habitat and coastal — is
+> deliberately not started. What changed is recorded in §10; the measurement
+> below is kept because it is the reason the design is this small.
+
 A measured answer, not an architectural opinion. The method: inject a coastal
 scanner and a habitat scanner into the existing engine and see how far they get
 before something breaks.
@@ -287,3 +293,49 @@ development scanner, honestly named.
 
 Suggested three: **Land (Site Scanner) · Habitat · Coastal** — with coastal
 third, after the geometry question is answered.
+
+
+---
+
+## 10. What was implemented (R1–R6)
+
+| | Change | Where |
+| --- | --- | --- |
+| R1 | Frozen `Scanner` config + registry; land built from the existing globals | `scanners.py` |
+| R2 | `assess(..., investigations=...)`, defaulted to the module dict | `radar.py` |
+| R3 | A scanner sees only its own factors; the catalogue is scoped | `routes_catalog.py` |
+| R4 | `scanner` on every assessment request, resolved once, 400 on unknown | `routes_catalog.py` |
+| R5 | Coverage from the scanner; `None` means none established | `routes_catalog.py` |
+| R6 | The shell shows the active scanner | `App.tsx`, `types.ts`, `index.css` |
+
+**Land is a lens, not a copy.** `LAND.topics is radar.TOPICS` — asserted by
+test. A copied configuration would drift, and the first symptom would be a rule
+that runs in tests and not in production.
+
+**Habitat and coastal are registered and empty.** No topics, no rules, no
+factors, `coverage=None`. An unbuilt scanner is refused with a reason rather
+than returning an empty report, because a report with no findings from a
+scanner that cannot assess anything is indistinguishable from a clean subject.
+
+**Two bugs the implementation surfaced**, both use-before-assignment: the
+scanner-scoped factor check landed above the line that resolves the scanner, in
+two separate routes. Caught by the suite, not by reading.
+
+### What is enforced
+
+- `test_no_shared_module_branches_on_a_scanner_id` — no `== "habitat"` in any
+  of the seven shared modules.
+- `test_the_engine_does_not_import_the_registry` — one-way knowledge; the
+  registry composes the engine, never the reverse.
+- `test_land_is_unchanged_by_a_habitat_request_between_it` — the isolation
+  test. Shared mutable configuration would show up here.
+- `test_switching_scanners_needs_no_monkeypatching` — the measurement that made
+  this work necessary, now impossible to regress.
+
+### Remaining single-scanner assumptions
+
+S3 (`REAL_SERIES` is process-global) and S5 (`comparison.py` reads
+`radar.TOPICS`) are unchanged and still on the nice-to-have list. Neither
+blocks a second scanner: factor ids are unique today, and cross-scanner
+comparison is meaningless. The linear-geometry blocker in §5 is unchanged and
+still the one item that is real work rather than a seam.

@@ -810,7 +810,9 @@ def assess(report: Dict[str, Any],
            real_capable: Optional[set] = None,
            *,
            topic_names: Optional[Dict[str, str]] = None,
-           rules: Optional[Sequence["Rule"]] = None) -> Dict[str, Any]:
+           rules: Optional[Sequence["Rule"]] = None,
+           investigations: Optional[Dict[str, Dict[str, str]]] = None,
+           ) -> Dict[str, Any]:
     """Run every rule over a report and assemble the radar.
 
     `real_capable` is the set of factor ids the server has a real
@@ -831,6 +833,7 @@ def assess(report: Dict[str, Any],
     # two names; it has never known what a topic means.
     topic_names = TOPICS if topic_names is None else topic_names
     rules = RULES if rules is None else rules
+    investigations = INVESTIGATIONS if investigations is None else investigations
 
     flags: List[Dict[str, Any]] = []
     info: List[Dict[str, Any]] = []
@@ -1043,7 +1046,7 @@ def assess(report: Dict[str, Any],
         "flags": flags,
         "informational": info,
         "topics": topics,
-        "investigations": _investigations(flags),
+        "investigations": _investigations(flags, investigations),
         "not_assessed": unavailable,
         # The audit trail. Every factor a rule wanted, what became of it, and
         # who published it — so a report read three months later can be
@@ -1178,7 +1181,9 @@ def outcome_for(payload: Dict[str, Any], rule_id: str) -> Dict[str, Any]:
     return {"state": "clear", "reason": None, "flag": None}
 
 
-def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _investigations(flags: Sequence[Dict[str, Any]],
+                    catalogue: Optional[Dict[str, Dict[str, str]]] = None,
+                    ) -> List[Dict[str, Any]]:
     """The checks the flags prompt, ranked, each naming what raised it.
 
     Priority is the strongest severity among the flags that raised it, with one
@@ -1204,7 +1209,7 @@ def _investigations(flags: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     out = []
     for inv_id, causes in raised.items():
-        meta = INVESTIGATIONS.get(inv_id)
+        meta = (INVESTIGATIONS if catalogue is None else catalogue).get(inv_id)
         if not meta:
             continue
         priority = min((c["severity"] for c in causes), key=_rank)

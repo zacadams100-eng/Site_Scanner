@@ -34,7 +34,8 @@ COPY app.py mock_ee_backend.py routes_catalog.py \
      cache.py geometry.py redaction.py summary.py \
      open_data.py ea_hydrology.py ons_store.py insights.py nlq.py \
      ratelimit.py telemetry.py baselines.py licensing.py radar.py \
-     comparison.py evidence.py brief.py claims.py investigation.py ./
+     comparison.py evidence.py brief.py claims.py investigation.py \
+     scanners.py ./
 
 # The historical package, as a package. It needs its own COPY: a single COPY
 # with several sources sends all of them to one destination, so folding a

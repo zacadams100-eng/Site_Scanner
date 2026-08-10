@@ -29,6 +29,7 @@ import nlq
 import comparison
 import radar
 import brief as brief_mod
+import scanners
 import evidence as evidence_mod
 import investigation as investigation_mod
 from historical import view as historical_view
@@ -59,7 +60,18 @@ _BBOX = catalog.ENGLAND_BBOX
 MAX_AREA_HA = 250_000.0
 
 
-class SeriesRequest(BaseModel):
+class ScannedRequest(BaseModel):
+    """Anything that runs an assessment names the scanner that runs it.
+
+    Optional, defaulting to land, so every existing client keeps working — but
+    the identity is now carried in the contract rather than inferred from
+    process globals, which is what made a second scanner impossible.
+    """
+
+    scanner: str = Field(scanners.DEFAULT_SCANNER, max_length=32)
+
+
+class SeriesRequest(ScannedRequest):
     geometry: dict
     factor_ids: List[str] = Field(..., min_length=1, max_length=24)
     start: Optional[str] = None          # 'YYYY-MM'
@@ -67,7 +79,7 @@ class SeriesRequest(BaseModel):
 
 
 @router.get("/api/catalog")
-def get_catalog() -> Dict[str, Any]:
+def get_catalog(scanner: str = scanners.DEFAULT_SCANNER) -> Dict[str, Any]:
     """Everything the UI needs to render the factor browser, with provenance
     attached. The frontend never hard-codes a factor list.
 
@@ -83,7 +95,17 @@ def get_catalog() -> Dict[str, Any]:
     and covered by fixture tests, not yet run live). "We wrote it" must never
     reach a user as "we ran it".
     """
-    real_ids = [f["id"] for f in catalog.FACTORS if f["id"] in REAL_SERIES]
+    try:
+        scanner = scanners.resolve(scanner)
+    except scanners.UnknownScanner:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown scanner. Valid scanners: {', '.join(scanners.ids())}.")
+    # A scanner sees only its own factors. Land's list is every factor, so the
+    # land catalogue is unchanged; an unbuilt scanner serves an empty one,
+    # which is the honest answer rather than another scanner's.
+    visible = [f for f in catalog.FACTORS if scanner.sees(f["id"])]
+    real_ids = [f["id"] for f in visible if f["id"] in REAL_SERIES]
     # Provenance is attached only to factors that are *currently* registered.
     # The two dicts are filled together but can come apart — a backend that
     # unregisters a source, or a test that clears one — and a generated factor
@@ -93,11 +115,11 @@ def get_catalog() -> Dict[str, Any]:
         {**f, "real": f["id"] in REAL_SERIES,
          **({"provenance": REAL_SOURCES[f["id"]]}
             if f["id"] in REAL_SERIES and f["id"] in REAL_SOURCES else {})}
-        for f in catalog.FACTORS
+        for f in visible
     ]
     verified = [fid for fid in real_ids
                 if REAL_SOURCES.get(fid, {}).get("status") == "verified"]
-    total = len(catalog.FACTORS) or 1
+    total = len(visible) or 1
     return {
         "factors": factors,
         "real_factor_ids": real_ids,
@@ -109,10 +131,23 @@ def get_catalog() -> Dict[str, Any]:
             **catalog.catalogue_summary(),
             "real_factor_count": len(real_ids),
             "verified_factor_count": len(verified),
-            "generated_factor_count": len(catalog.FACTORS) - len(real_ids),
+            "generated_factor_count": len(visible) - len(real_ids),
             "real_share": round(len(real_ids) / total, 4),
         },
-        "coverage": {"name": "England", "bbox": _BBOX},
+        # Which scanner served this, and which exist. The shell shows the
+        # active one rather than inferring it, so the scanner is a product
+        # concept the user can see instead of hidden backend state.
+        "scanner": {
+            "id": scanner.id, "name": scanner.name, "subject": scanner.subject,
+            "implemented": scanner.implemented,
+        },
+        "scanners": [
+            {"id": s.id, "name": s.name, "subject": s.subject,
+             "implemented": s.implemented}
+            for s in (scanners.resolve(i) for i in scanners.ids())
+        ],
+        "coverage": {"name": scanner.coverage_name or "not established",
+                     "bbox": scanner.coverage},
         # Which factors can be compared with England, and on what sample. Sent
         # with the catalogue so the UI can say "no yardstick for this one"
         # without waiting for a query to come back empty.
@@ -125,7 +160,24 @@ def get_catalog() -> Dict[str, Any]:
     }
 
 
-def _validate_geometry(geometry: dict) -> tuple:
+def _scanner_for(req) -> scanners.Scanner:
+    """The scanner a request names, or a 400 listing the valid ids.
+
+    Resolved once per request and passed down. Nothing below reads a scanner
+    from module state, which is what keeps two requests in one process from
+    seeing each other's configuration.
+    """
+    try:
+        return scanners.resolve(getattr(req, "scanner", None))
+    except scanners.UnknownScanner:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Unknown scanner {getattr(req, 'scanner', None)!r}. "
+                    f"Valid scanners: {', '.join(scanners.ids())}."),
+        ) from None
+
+
+def _validate_geometry(geometry: dict, scanner: scanners.Scanner) -> tuple:
     """Returns (centroid, area_ha). Raises ValueError with a message a
     non-technical user can act on."""
     from mock_ee_backend import geometry_area_m2, geometry_centroid
@@ -141,11 +193,22 @@ def _validate_geometry(geometry: dict) -> tuple:
         )
 
     lng, lat = geometry_centroid(geometry)
-    if not (_BBOX["west"] <= lng <= _BBOX["east"]
-            and _BBOX["south"] <= lat <= _BBOX["north"]):
+    # Coverage belongs to the scanner, not to the application. A scanner with
+    # no coverage established is refused with that reason rather than silently
+    # inheriting another scanner's — "no coverage yet" and "outside coverage"
+    # are different answers and the caller can act on only one of them.
+    box = scanner.coverage
+    if box is None:
         raise ValueError(
-            "That area is outside England. Site Scanner only covers England "
-            "at the moment."
+            f"The {scanner.name} scanner has no coverage area established yet, "
+            "so no area can be assessed with it."
+        )
+    if not (box["west"] <= lng <= box["east"]
+            and box["south"] <= lat <= box["north"]):
+        where = scanner.coverage_name or "its coverage area"
+        raise ValueError(
+            f"That area is outside {where}. The {scanner.name} scanner only "
+            f"covers {where} at the moment."
         )
     return (lng, lat), area_ha
 
@@ -353,7 +416,7 @@ def _series_for(factor_id: str, geometry: dict, centroid: tuple, area_ha: float,
     return s
 
 
-class CellsRequest(BaseModel):
+class CellsRequest(ScannedRequest):
     geometry: dict
     resolution: int = Field(12, ge=4, le=28)
 
@@ -375,8 +438,9 @@ def get_cells(req: CellsRequest) -> Dict[str, Any]:
     which is right for terrain and roughly right for land cover, and is why
     the result carries `precision: "approx"` until the exact pass lands.
     """
+    scanner = _scanner_for(req)
     try:
-        centroid, area_ha = _validate_geometry(req.geometry)
+        centroid, area_ha = _validate_geometry(req.geometry, scanner)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -490,12 +554,22 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
     the attribute table wants annual (decision 5), and making the client fetch
     them separately guarantees they eventually disagree.
     """
+    scanner = _scanner_for(req)
     unknown = [f for f in req.factor_ids if f not in catalog.FACTOR_BY_ID]
     if unknown:
         raise HTTPException(status_code=422,
                             detail=f"Unknown factor(s): {', '.join(unknown)}")
+    # A factor can exist in the catalogue and still not belong to this scanner.
+    # The two messages are different because the fixes are: one is a typo, the
+    # other is asking the wrong scanner.
+    outside = [f for f in req.factor_ids if not scanner.sees(f)]
+    if outside:
+        raise HTTPException(
+            status_code=422,
+            detail=(f"The {scanner.name} scanner does not cover: "
+                    f"{', '.join(outside)}."))
     try:
-        centroid, area_ha = _validate_geometry(req.geometry)
+        centroid, area_ha = _validate_geometry(req.geometry, scanner)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -532,7 +606,13 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
     telemetry.observe("series.real_factors", len(real_ids))
     telemetry.observe("series.area_ha", area_ha)
 
-    radar_payload = radar.assess({"series": out}, real_capable=set(REAL_SERIES))
+    # The scanner's own vocabulary, checks and follow-ups. Land's are today's
+    # globals, so land behaviour is byte-identical; a second scanner supplies
+    # its own without the engine gaining a branch.
+    radar_payload = radar.assess(
+        {"series": out}, real_capable=set(REAL_SERIES),
+        topic_names=scanner.topics, rules=scanner.rules,
+        investigations=scanner.investigations)
 
     # Pair each historical metric with the state the engine decided for its
     # rule. `outcome_for` is a read over an assembled payload — nothing is
@@ -624,7 +704,7 @@ class CompareSite(BaseModel):
     geometry: dict
 
 
-class CompareRequest(BaseModel):
+class CompareRequest(ScannedRequest):
     # Two is the minimum that is a comparison; four is where a topic card stops
     # fitting on a laptop and, more importantly, where a reader stops holding
     # the coverage of every column in their head at once. `COMPARISON_CONTRACT`
@@ -649,17 +729,27 @@ def compare_sites(req: CompareRequest) -> Dict[str, Any]:
     and the tests that keep it that way are in
     `tests/test_comparison_contract.py`.
     """
+    scanner = _scanner_for(req)
     unknown = [f for f in req.factor_ids if f not in catalog.FACTOR_BY_ID]
     if unknown:
         raise HTTPException(status_code=422,
                             detail=f"Unknown factor(s): {', '.join(unknown)}")
+    # A factor can exist in the catalogue and still not belong to this scanner.
+    # The two messages are different because the fixes are: one is a typo, the
+    # other is asking the wrong scanner.
+    outside = [f for f in req.factor_ids if not scanner.sees(f)]
+    if outside:
+        raise HTTPException(
+            status_code=422,
+            detail=(f"The {scanner.name} scanner does not cover: "
+                    f"{', '.join(outside)}."))
 
     steps = series_mod.month_steps(req.start or catalog.TIME_START,
                                    req.end or catalog.TIME_END)
     prepared = []
     for site in req.sites:
         try:
-            centroid, area_ha = _validate_geometry(site.geometry)
+            centroid, area_ha = _validate_geometry(site.geometry, scanner)
         except ValueError as e:
             # Name the site. "That area is outside England" against four
             # geometries is a message the user cannot act on.
@@ -678,6 +768,8 @@ def compare_sites(req: CompareRequest) -> Dict[str, Any]:
             built[fid] = s
 
         payload = radar.assess({"series": built},
+                               topic_names=scanner.topics, rules=scanner.rules,
+                               investigations=scanner.investigations,
                                real_capable=set(REAL_SERIES))
         # The engine reads observed values from here. Kept under a private key
         # because it is an implementation channel between two server modules,
@@ -697,7 +789,7 @@ def compare_sites(req: CompareRequest) -> Dict[str, Any]:
     return result
 
 
-class AskRequest(BaseModel):
+class AskRequest(ScannedRequest):
     geometry: dict
     question: str = Field(..., min_length=3, max_length=400)
 
@@ -716,8 +808,9 @@ def ask(req: AskRequest) -> Dict[str, Any]:
     the charts show. It can be wrong about *which* factor you meant; it cannot
     be wrong about what that factor did.
     """
+    scanner = _scanner_for(req)
     try:
-        centroid, area_ha = _validate_geometry(req.geometry)
+        centroid, area_ha = _validate_geometry(req.geometry, scanner)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
