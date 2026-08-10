@@ -5,6 +5,68 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Historical analysis, tested end to end — step 6 — 2026-08-10
+
+No new feature. Step 5 declared the chain complete, and "complete" was the one
+claim in it that nothing tested: `test_historical_rules.py` proves
+`series → metric → rule → radar` by calling `radar.assess()` directly, which
+leaves the last two links — the HTTP composition in `routes_catalog` and the
+panel that renders it — verified by screenshot and by reading.
+
+`tests/test_historical_end_to_end.py` drives `POST /api/series` and asserts the
+payload a browser actually receives. Only the Earth Engine network call is
+substituted, through `REAL_SERIES` — the same seam `api/index.py` installs into
+at startup — so provenance labelling, `source` derivation, licensing, caching,
+the radar and `historical_view.report` joined to `radar.outcome_for` are all
+the real path.
+
+**The fixture is Sentinel-2 shaped, and that changed what the test proves.**
+`ndvi` is `sentinel2_sr`, which begins 2017-03, so the production baseline is
+**2017–2019 against 2023–2025** — not the 2011 window the step-4 unit tests
+use. A fixture that quietly supplied 2011 NDVI would prove a path production
+can never take. It also surfaces the honest coverage reading: **9 usable years
+of 15 calendar years**, because Sentinel-2 cannot see 2011–2016 at all. Two
+figures that are not interchangeable, exactly as HE3 requires, and the gap is
+part of the result rather than a denominator to quietly shrink.
+
+Six cases: the full chain on a real decline, the threshold labelled as
+Contour's own, HE9 on the composed sentence, a stable site rendering `clear`,
+too few usable years rendering `not_assessed`, and generated NDVI producing no
+finding at all over the wire.
+
+**The tests were tested.** Moving the threshold from −20 to −80 fails the chain
+test — without that check "6 passed" says nothing about whether anything is
+actually asserted.
+
+Two things worth recording that are not defects:
+
+- **The ecological appraisal is `high`, raised by two flags both resting on
+  `ndvi`.** That looks exactly like the double-count step 4 removed. It is not:
+  `vegetation_decline` is `high` on its own, so priority is the strongest
+  severity among the causes rather than a promotion. The same-factor guard is
+  intact and covered at `tests/test_radar.py:570`.
+- **My own HE9 scan failed on the disclaimer**, which says "Not evidence of
+  ecological degradation". A forbidden-word scan cannot tell a denial from an
+  assertion, so pointed at the whole entry it fails on the very sentence that
+  exists to prevent the error. Scoped to `flag.text` — prose composed from this
+  site's data — with the fixed disclaimer pinned separately. The comparison
+  scan hit this same trap; it is now hit twice and worth remembering.
+
+Driven in Chromium at 1440×900 against the fixture backend: the flag reaches
+Investigation Flags as MEDIUM/Vegetation, the panel renders baseline, recent,
+change, `9 of 15 years observed`, the threshold block and the methodology
+disclosure, with no console errors.
+
+764 Python tests (+6), 181 frontend.
+
+**Noted, not fixed:** the product name is split. `Contour` appears in 24 files
+including the evidence model and `rule_meta`; `Site Scanner` in 16, including
+the wordmark, `BRAND.md`, and every export filename and report title. A user
+flagged for vegetation decline currently reads "Contour reporting threshold"
+inside a "Site Scanner report". Cosmetic, but it is user-facing in exports.
+
+---
+
 ## Historical UI — step 5 — 2026-08-10
 
 Evidence first, visual record second. The obvious version of this panel is a
