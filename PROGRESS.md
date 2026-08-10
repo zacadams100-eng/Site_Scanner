@@ -5,6 +5,40 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## The comparison UI — 2026-08-10
+
+Built to the contract rather than to a table. `/api/compare` assesses 2–4 sites
+on the *same* factor list — comparing a site screened on twelve factors against
+one screened on four is not a comparison of sites — and `CompareSites.tsx`
+renders it as an evidence briefing.
+
+**Three deliberate absences do most of the work.** No sortable column headers,
+because a table with sortable totals is a leaderboard whether or not anyone
+called it one, and sorting by flag count ranks sites by how little was looked
+at. No winner colour: `clear` is drawn exactly as in the single-site radar. No
+totals row, because the eye reads a bottom row as a score line and there is no
+honest number to put there.
+
+**Coverage sits above the counts, not below them.** A reader who meets "0
+flagged" first has already ranked the sites before reaching any caveat. So each
+card reads *name → 8% assessed → counts → 2 of 24 indicators observed*, and the
+coverage warning fires unprompted between the cards and the topics.
+
+Two bugs found by driving it:
+
+- **Picking the second site navigated away.** "Open" was derived from "two are
+  picked", so checking the second box swapped the gallery for the comparison
+  mid-selection and a third site could never be picked. Selection and
+  navigation are different intents and now have different state.
+- **"Uneven evidence" was claimed where there was none.** Three sites all at
+  0/2 are not unevenly evidenced, they are uniformly unevidenced — and the
+  label asserted a difference that did not exist. `uneven` is now the narrow
+  claim (the sites differ from each other), separate from `comparable`.
+
+712 Python tests (+8), 165 frontend.
+
+---
+
 ## The comparison contract, written before the feature — 2026-08-10
 
 Comparison is the first thing Contour will build that actively tempts a

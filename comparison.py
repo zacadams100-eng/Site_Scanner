@@ -145,16 +145,36 @@ def _topic_rows(sites: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         complete = all(c["coverage"]["total"] and
                        c["coverage"]["assessed"] == c["coverage"]["total"]
                        for c in cells)
-        comparable = complete and len(totals) == 1
+        # Even coverage and *no* coverage are different situations, and the
+        # earlier version called both "uneven evidence". Three sites all at 0/2
+        # are not unevenly evidenced — they are uniformly unevidenced, and
+        # telling a reader the evidence is uneven asserts a difference that is
+        # not there.
+        even = len(totals) == 1
+        any_assessed = any(c["coverage"]["assessed"] for c in cells)
+        comparable = complete and even
+        if comparable:
+            note = ""
+        elif not even:
+            note = ("These sites were not assessed to the same depth for this "
+                    "topic, so their results describe different amounts of "
+                    "evidence rather than different ground.")
+        elif not any_assessed:
+            note = ("This topic was not assessed for any of these sites, so "
+                    "there is nothing to compare.")
+        else:
+            note = ("None of these sites had every indicator for this topic "
+                    "assessed, so each result is partial.")
         rows.append({
             "id": tid,
             "name": name,
             "sites": cells,
             "comparable": comparable,
-            "note": ("" if comparable else
-                     "These sites were not assessed to the same depth for this "
-                     "topic, so their results describe different amounts of "
-                     "evidence rather than different ground."),
+            # `uneven` is the narrower claim the UI labels: the sites differ
+            # from each other. `comparable` is the broader gate.
+            "uneven": not even,
+            "assessed_for_none": not any_assessed,
+            "note": note,
         })
     return rows
 

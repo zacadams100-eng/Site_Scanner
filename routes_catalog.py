@@ -26,6 +26,7 @@ import catalog
 import licensing
 import insights
 import nlq
+import comparison
 import radar
 import series as series_mod
 import telemetry
@@ -558,6 +559,85 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # that would come back generated — see radar._state_of.
         "radar": radar.assess({"series": out}, real_capable=set(REAL_SERIES)),
     }
+
+
+class CompareSite(BaseModel):
+    id: str = Field(..., min_length=1, max_length=64)
+    name: str = Field("", max_length=120)
+    geometry: dict
+
+
+class CompareRequest(BaseModel):
+    # Two is the minimum that is a comparison; four is where a topic card stops
+    # fitting on a laptop and, more importantly, where a reader stops holding
+    # the coverage of every column in their head at once. `COMPARISON_CONTRACT`
+    # sets the same bound.
+    sites: List[CompareSite] = Field(..., min_length=2, max_length=4)
+    factor_ids: List[str] = Field(..., min_length=1, max_length=16)
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+@router.post("/api/compare")
+def compare_sites(req: CompareRequest) -> Dict[str, Any]:
+    """Compare 2–4 sites' evidence profiles.
+
+    Every site is assessed with the *same* factor list, deliberately. Comparing
+    a site screened on twelve factors against one screened on four is not a
+    comparison of sites, and letting the caller vary it per site would make the
+    coverage warning describe the request rather than the ground.
+
+    Returns sites in the order supplied. See `COMPARISON_CONTRACT.md` and
+    `EVIDENCE_MODEL.md` EM10 — this endpoint does not rank, score or recommend,
+    and the tests that keep it that way are in
+    `tests/test_comparison_contract.py`.
+    """
+    unknown = [f for f in req.factor_ids if f not in catalog.FACTOR_BY_ID]
+    if unknown:
+        raise HTTPException(status_code=422,
+                            detail=f"Unknown factor(s): {', '.join(unknown)}")
+
+    steps = series_mod.month_steps(req.start or catalog.TIME_START,
+                                   req.end or catalog.TIME_END)
+    prepared = []
+    for site in req.sites:
+        try:
+            centroid, area_ha = _validate_geometry(site.geometry)
+        except ValueError as e:
+            # Name the site. "That area is outside England" against four
+            # geometries is a message the user cannot act on.
+            raise HTTPException(status_code=400,
+                                detail=f"{site.name or site.id}: {e}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        built: Dict[str, Any] = {}
+        for fid in req.factor_ids:
+            if licensing.is_blocked(fid):
+                built[fid] = _unavailable(fid, licensing.clearance(fid))
+                continue
+            s = _series_for(fid, site.geometry, centroid, area_ha, steps)
+            s["meta"] = catalog.resolve(fid)
+            built[fid] = s
+
+        payload = radar.assess({"series": built},
+                               real_capable=set(REAL_SERIES))
+        # The engine reads observed values from here. Kept under a private key
+        # because it is an implementation channel between two server modules,
+        # not part of the response contract.
+        payload["_series"] = built
+        prepared.append({"id": site.id, "name": site.name or site.id,
+                         "radar": payload, "area_ha": round(area_ha, 2)})
+
+    telemetry.observe("compare.sites", len(req.sites))
+    telemetry.observe("compare.factors", len(req.factor_ids))
+
+    result = comparison.compare(prepared)
+    # Strip the private channel before the payload leaves the process — it is
+    # several megabytes of points that no client needs.
+    for site, source in zip(result["sites"], prepared):
+        site["area_ha"] = source["area_ha"]
+    return result
 
 
 class AskRequest(BaseModel):

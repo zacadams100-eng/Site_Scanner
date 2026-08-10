@@ -288,3 +288,99 @@ def test_comparison_survives_thin_and_malformed_input():
         assert "sites" in result and "topics" in result
         assert result["differences"] == [] or all(
             d.get("text") for d in result["differences"])
+
+
+# ---------------------------------------------------------------------------
+# The API boundary
+# ---------------------------------------------------------------------------
+def _client():
+    from fastapi.testclient import TestClient
+    import mock_ee_backend
+    return TestClient(mock_ee_backend.app)
+
+
+def _square(west):
+    return {"type": "Polygon", "coordinates": [[
+        [west, 51.20], [west + 0.04, 51.20], [west + 0.04, 51.23],
+        [west, 51.23], [west, 51.20]]]}
+
+
+def _body(n=2, factors=("flood_zone3_pct", "ndvi")):
+    return {"sites": [{"id": f"s{i}", "name": f"Site {i}",
+                       "geometry": _square(-0.60 + 0.1 * i)} for i in range(n)],
+            "factor_ids": list(factors)}
+
+
+def test_the_compare_endpoint_returns_the_contract_shape():
+    body = _client().post("/api/compare", json=_body()).json()
+    for key in ("sites", "topics", "differences", "coverage_warning",
+                "principle", "limits"):
+        assert key in body, key
+    assert len(body["topics"]) == len(radar.TOPICS)
+
+
+def test_the_compare_endpoint_never_leaks_the_private_series_channel():
+    """`_series` is several megabytes of points and an implementation channel
+    between two server modules, not part of the response."""
+    import json
+    raw = json.dumps(_client().post("/api/compare", json=_body()).json())
+    assert "_series" not in raw
+
+
+def test_the_compare_endpoint_refuses_fewer_than_two_and_more_than_four():
+    client = _client()
+    assert client.post("/api/compare", json=_body(1)).status_code == 422
+    assert client.post("/api/compare", json=_body(5)).status_code == 422
+    assert client.post("/api/compare", json=_body(4)).status_code == 200
+
+
+def test_the_compare_endpoint_names_the_site_that_failed():
+    """"That area is outside England" against four geometries is a message the
+    user cannot act on."""
+    body = _body()
+    body["sites"][1]["geometry"] = _square(30.0)      # not England
+    body["sites"][1]["name"] = "Somewhere in Poland"
+    response = _client().post("/api/compare", json=body)
+    assert response.status_code == 400
+    assert "Somewhere in Poland" in response.json()["detail"]
+
+
+def test_the_compare_endpoint_rejects_unknown_factors():
+    body = _body()
+    body["factor_ids"] = ["flood_zone3_pct", "not_a_factor"]
+    assert _client().post("/api/compare", json=body).status_code == 422
+
+
+def test_the_compare_endpoint_preserves_the_order_supplied():
+    body = _body(3)
+    body["sites"].reverse()
+    result = _client().post("/api/compare", json=body).json()
+    assert [s["id"] for s in result["sites"]] == [s["id"] for s in body["sites"]]
+
+
+def test_uneven_evidence_is_only_claimed_when_the_sites_actually_differ():
+    """Three sites all at 0/2 are not unevenly evidenced — they are uniformly
+    unevidenced, and labelling that "uneven evidence" asserts a difference that
+    is not there."""
+    result = comparison.compare([site("a", "Site A", FLOOD_HEAVY),
+                                 site("b", "Site B", FLOOD_CLEAR)])
+    # Neither site loaded any surface-water factor: equal, and equally absent.
+    water = next(t for t in result["topics"] if t["id"] == "water")
+    assert water["uneven"] is False
+    assert water["assessed_for_none"] is True
+    assert "nothing to compare" in water["note"]
+
+    # Flood: both assessed both indicators. Even, complete, comparable.
+    flood = next(t for t in result["topics"] if t["id"] == "flood")
+    assert flood["comparable"] is True
+    assert flood["uneven"] is False
+    assert flood["note"] == ""
+
+
+def test_uneven_is_claimed_when_one_site_assessed_more_than_another():
+    result = comparison.compare([site("a", "Site A", FLOOD_HEAVY),
+                                 site("c", "Site C", BARELY_LOOKED)])
+    flood = next(t for t in result["topics"] if t["id"] == "flood")
+    assert flood["uneven"] is True
+    assert flood["comparable"] is False
+    assert "not assessed to the same depth" in flood["note"]

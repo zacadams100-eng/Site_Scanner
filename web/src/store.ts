@@ -16,6 +16,10 @@ import { openOnGallery } from './lib/home'
 
 const DEFAULT_FACTORS = ['ndvi', 'lc_tree_pct', 'precip_total', 'lst_day']
 const MAX_FACTORS = 12
+// Two is the minimum that is a comparison; four is where a reader stops being
+// able to hold every column's coverage in their head at once. The API enforces
+// the same bound. See COMPARISON_CONTRACT.md.
+const MAX_COMPARE = 4
 const SAVED_KEY = 'site-scanner.saved-aois'
 
 /**
@@ -107,6 +111,23 @@ interface State {
    */
   home: boolean
   setHome: (o: boolean) => void
+
+  /** Sites picked for evidence comparison, in the order the user picked them.
+   *
+   *  Order is preserved deliberately and never sorted — any ordering by count
+   *  is a ranking, and ranking is what EM10 forbids. Capped at four by the
+   *  comparison contract. */
+  compareIds: string[]
+  setCompareIds: (ids: string[]) => void
+  toggleCompare: (id: string) => void
+  /** Whether the comparison screen is open.
+   *
+   *  Separate from `compareIds` because picking must never navigate. Deriving
+   *  "open" from "two are picked" meant checking the second box swapped the
+   *  gallery for the comparison mid-selection, so a third site could not be
+   *  picked at all. Selection and navigation are different intents. */
+  comparing: boolean
+  setComparing: (o: boolean) => void
 
   /**
    * A pending map move, consumed by MapCanvas.
@@ -255,6 +276,8 @@ export const useStore = create<State>((set, get) => ({
   flyTo: null,
   home: typeof window !== 'undefined' &&
     openOnGallery(initialSaved.length, window.location.hash),
+  compareIds: [],
+  comparing: false,
 
   // Searching for a place is a request to look at the map, so it leaves the
   // gallery. Without this the search box on the home screen flies a map the
@@ -288,6 +311,20 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setHome: (o) => set({ home: o }),
+
+  setCompareIds: (ids) => set({ compareIds: ids.slice(0, MAX_COMPARE) }),
+  setComparing: (o) => set({ comparing: o }),
+  toggleCompare: (id) => {
+    const current = get().compareIds
+    // Append rather than insert-sorted: the order the user picked is the only
+    // order this app is allowed to have an opinion about.
+    const next = current.includes(id)
+      ? current.filter((x) => x !== id)
+      : [...current, id].slice(-MAX_COMPARE)
+    // Unpicking below two closes an open comparison — it can no longer show
+    // what it claims to show.
+    set({ compareIds: next, comparing: get().comparing && next.length >= 2 })
+  },
 
   setAoi: (g, opts) => {
     const { aoi, past } = get()

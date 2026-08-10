@@ -422,3 +422,67 @@ export interface Baseline {
   basis: string
   phrase: string
 }
+
+
+// --- Evidence comparison ----------------------------------------------------
+// See COMPARISON_CONTRACT.md. The product answers "how do the evidence
+// profiles differ", never "which site wins" — so there is no rank, no score
+// and no ordering field anywhere in these types, and adding one would be an
+// EM10 violation rather than a feature.
+
+export interface CompareSiteSummary {
+  id: string
+  name: string
+  flags: number
+  high: number
+  informational: number
+  /** A real source returned a usable value. Not "we looked at it". */
+  observed: number
+  relevant: number
+  not_assessed: number
+  /** 0–1. Coverage, never quality. */
+  share: number
+  coverage_note: string
+  area_ha?: number
+}
+
+export interface CompareTopicCell {
+  id: string
+  state: 'flagged' | 'clear' | 'partial' | 'not_assessed'
+  coverage: { assessed: number; total: number }
+  flags: number
+  detail: string
+}
+
+export interface CompareTopic {
+  id: string
+  name: string
+  sites: CompareTopicCell[]
+  /** False where the sites were not assessed to the same depth. Their results
+   *  then describe different amounts of evidence rather than different ground. */
+  comparable: boolean
+  /** The sites differ from each other in how much was assessed. Narrower than
+   *  `!comparable`: three sites all at 0/2 are not unevenly evidenced, they
+   *  are uniformly unevidenced. */
+  uneven: boolean
+  assessed_for_none: boolean
+  note: string
+}
+
+export interface CompareDifference {
+  kind: 'value' | 'coverage' | 'flags'
+  factor?: string
+  text: string
+  sites: string[]
+}
+
+export interface Comparison {
+  sites: CompareSiteSummary[]
+  topics: CompareTopic[]
+  differences: CompareDifference[]
+  /** Fires unprompted when the sites were not examined to comparable depth.
+   *  Fewer flags can mean less looked at. */
+  coverage_warning: string
+  principle: string
+  limits: string
+}

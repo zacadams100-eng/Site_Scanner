@@ -1,4 +1,4 @@
-import type { AskResponse, Catalog, CellsResponse, SeriesResponse } from './types'
+import type { AskResponse, Catalog, CellsResponse, Comparison, SeriesResponse } from './types'
 
 /**
  * The backend returns a plain-language `detail` for anything a user can fix
@@ -78,4 +78,18 @@ export function ask(
   signal?: AbortSignal,
 ): Promise<AskResponse> {
   return post<AskResponse>('/api/ask', { geometry, question }, signal)
+}
+
+/** Compare 2–4 saved sites' evidence profiles.
+ *
+ *  Every site is assessed on the same factor list — comparing a site screened
+ *  on twelve factors against one screened on four is not a comparison of
+ *  sites. See COMPARISON_CONTRACT.md. */
+export function compareSites(
+  sites: { id: string; name: string; geometry: GeoJSON.Polygon }[],
+  factorIds: string[],
+  signal?: AbortSignal,
+): Promise<Comparison> {
+  return post<Comparison>('/api/compare',
+                          { sites, factor_ids: factorIds }, signal)
 }

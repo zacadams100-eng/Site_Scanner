@@ -52,6 +52,9 @@ export default function Gallery({ screen = false }: { screen?: boolean }) {
   // and leaving it must not require drawing something.
   const aoi = useStore((s) => s.aoi)
   const setHome = useStore((s) => s.setHome)
+  const compareIds = useStore((s) => s.compareIds)
+  const toggleCompare = useStore((s) => s.toggleCompare)
+  const setComparing = useStore((s) => s.setComparing)
 
   const [renaming, setRenaming] = useState<string | null>(null)
 
@@ -92,6 +95,19 @@ export default function Gallery({ screen = false }: { screen?: boolean }) {
           <span className="gallery-count mono">{sites.length}</span>
         </h1>
         <div className="gallery-actions">
+          {/* Appears only once a comparison is possible. A permanently
+              disabled "Compare" button teaches nobody what it needs. */}
+          {compareIds.length > 0 && (
+            <span className="gallery-picked mono">
+              {compareIds.length} picked
+            </span>
+          )}
+          {compareIds.length >= 2 && (
+            <button className="btn btn-secondary btn-sm"
+                    onClick={() => setComparing(true)}>
+              Compare {compareIds.length}
+            </button>
+          )}
           {/* Only when there is something to go back to. A "back to map"
               button with an empty map behind it promises a place that isn't
               there. */}
@@ -111,7 +127,18 @@ export default function Gallery({ screen = false }: { screen?: boolean }) {
         {sites.map((site) => {
           const d = thumbnailPath(site.geometry, THUMB)
           return (
-            <li key={site.id} className="site-card">
+            <li key={site.id}
+                className={`site-card${compareIds.includes(site.id) ? ' is-picked' : ''}`}>
+              {/* Selection for comparison. A checkbox rather than a click on
+                  the tile, because the tile already means "open this", and
+                  overloading it would make opening a site feel like a
+                  commitment. */}
+              <label className="site-pick" title="Pick for comparison">
+                <input type="checkbox"
+                       checked={compareIds.includes(site.id)}
+                       onChange={() => toggleCompare(site.id)}
+                       aria-label={`Compare ${site.name}`} />
+              </label>
               {/* The thumbnail is the open affordance, as in any gallery —
                   the whole tile, not a small link inside it. */}
               <button className="site-open" onClick={() => loadSaved(site.id)}

@@ -12,6 +12,7 @@ import Gallery from './components/Gallery'
 import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
 import Radar from './components/Radar'
+import CompareSites from './components/CompareSites'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
@@ -47,6 +48,7 @@ export default function App() {
   // The panel title, and whether the top bar offers a way back to the gallery.
   const saved = useStore((s) => s.saved)
   const home = useStore((s) => s.home)
+  const compareOpen = useStore((s) => s.comparing && s.compareIds.length >= 2)
   const setHome = useStore((s) => s.setHome)
   const catalogError = useStore((s) => s.catalogError)
   const setCatalog = useStore((s) => s.setCatalog)
@@ -347,7 +349,10 @@ export default function App() {
           status bar visible, which is where the way out lives. */}
       {home && !catalogError && (
         <section className="home-screen" aria-label="Your saved sites">
-          <Gallery screen />
+          {/* Comparison takes the home screen when it is open: it is about
+              several sites at once, so it has no place in a panel that
+              describes one. */}
+          {compareOpen ? <CompareSites /> : <Gallery screen />}
         </section>
       )}
 
