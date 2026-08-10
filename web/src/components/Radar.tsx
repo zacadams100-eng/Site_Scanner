@@ -47,6 +47,7 @@ function Dot({ state }: { state: RadarTopic['state'] }) {
 export default function Radar() {
   const data = useStore((s) => s.data)
   const openEvidence = useStore((s) => s.openEvidence)
+  const openInvestigation = useStore((s) => s.openInvestigation)
   const toggleFactor = useStore((s) => s.toggleFactor)
   const selected = useStore((s) => s.selected)
   const [openFlag, setOpenFlag] = useState<string | null>(null)
@@ -228,6 +229,13 @@ export default function Radar() {
                               {inv.evidence_factors.join(' · ')}
                             </p>
                           )}
+                          {/* Into the workspace. The radar names the check;
+                              the workspace assembles what a professional needs
+                              to actually take to it. */}
+                          <button className="ev-open"
+                                  onClick={() => openInvestigation(inv.id)}>
+                            Open investigation →
+                          </button>
                         </div>
                       )}
                     </li>
@@ -403,6 +411,7 @@ function FlagRow({ flag, open, onToggle }:
                  { flag: Flag; open: boolean; onToggle: () => void }) {
   const evidence = Object.entries(flag.evidence)
   const openEvidence = useStore((s) => s.openEvidence)
+  const openInvestigation = useStore((s) => s.openInvestigation)
   return (
     <li className={`flag is-${flag.severity}`}>
       <button className="flag-main" onClick={onToggle} aria-expanded={open}>

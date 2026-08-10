@@ -5,6 +5,63 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Investigation workspace — built to prove the abstraction — 2026-08-10
+
+Where a finding becomes a professional question, in the order a professional
+asks it: why am I seeing this → what does it establish → what does it not →
+what prompted it → what should be checked → what do I take along.
+
+Reachable from the Overview's attention list, the Radar's investigations, and
+the evidence drawer's "raised this". Opening one closes the other — they are
+two depths of the same question, and stacking dialogues leaves no way back.
+
+**The point of this build was not the screen.** It was the constraint: the
+workspace must render an investigation without knowing whether the subject is
+land, habitat, infrastructure, mining or coastline. Domain wording enters
+through injected metadata — `radar.INVESTIGATIONS`, `rule_meta`, `claims.py` —
+and none is written in the workspace.
+
+**That is proven, not asserted, and twice.** `investigation.py` and
+`lib/investigation.ts` each carry a test that assembles a **coastal**
+investigation — shoreline retreat, method `coast-1`, a coastal process study —
+from fabricated metadata for a domain this repository does not implement. If
+either test ever needs a change to the workspace to pass, the abstraction has
+been broken and the diff says which assumption did it. A third test scans the
+module for land vocabulary, and a fourth asserts it imports neither `catalog`
+nor `radar`: a module that cannot see the catalogue cannot form an opinion
+about what a factor means.
+
+The vocabulary scan needed `ast` rather than line-prefix matching, and the
+reason is worth recording: the module's own docstring *has* to name the domains
+it stays neutral about — "it must not know whether the subject is land or
+coastline" is the specification — so a naive scan fails on the sentence that
+states the rule. Docstrings are stripped properly; what is scanned is code and
+the strings that reach a user.
+
+Two things found by driving it:
+
+- **Engine ids leaked into the professional-facing panel.** "Rule:
+  `vegetation_decline`" appeared because only 1 of 25 rules declares a name.
+  Fixed with a generic `shoreline_retreat → Shoreline retreat` fallback rather
+  than 24 hand-written labels — formatting, and deliberately not a lookup
+  table, since a table would need an entry per domain and that is the coupling
+  the module exists to avoid.
+- **A factor read by two rules appeared twice** in the evidence pack. The
+  professional is handed one entry per factor, with both rules' measurements
+  under it.
+
+The claim boundary is unioned from the evidence entries, never recomposed —
+EM12 requires one canonical wording, and an investigation is a view over
+findings that already have one.
+
+818 Python tests (+8), 235 frontend (+7).
+
+**Not built:** Habitat Scanner. The workspace is the thing that had to be
+vertical-agnostic first; the habitat experiment is the proof that the whole
+pipeline is, and it is the next controlled test rather than a second product.
+
+---
+
 ## Two rejected composites, and EM12 adopted — 2026-08-10
 
 Three architectural decisions settled before the Investigation Workspace,

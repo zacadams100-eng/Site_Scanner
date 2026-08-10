@@ -45,6 +45,7 @@ export default function SiteOverview() {
   const projectName = useStore((s) => s.projectName)
   const setTab = useStore((s) => s.setTab)
   const openEvidence = useStore((s) => s.openEvidence)
+  const openInvestigation = useStore((s) => s.openInvestigation)
 
   if (!data) return null
 
@@ -109,7 +110,10 @@ export default function SiteOverview() {
                 <li key={inv.id} className={`ovw-inv is-${inv.priority}`}>
                   <span className={`ovw-pri is-${inv.priority}`}>{inv.priority}</span>
                   <div className="ovw-inv-body">
-                    <span className="ovw-inv-name">{inv.name}</span>
+                    <button className="ovw-inv-name"
+                            onClick={() => openInvestigation(inv.id)}>
+                      {inv.name}
+                    </button>
                     {/* Traceable, per EM8/EM9: a recommendation that does not
                         name what raised it is advice, and this product does
                         not give advice. */}

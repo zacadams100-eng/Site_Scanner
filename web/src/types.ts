@@ -182,6 +182,10 @@ export interface SeriesResponse {
   /** Per-factor traceability. Contextual to this report — the factors the
    *  rules wanted, never the whole catalogue. See evidence.py. */
   evidence?: EvidenceEntry[]
+  /** The investigation workspace: each investigation joined to what raised it
+   *  and the evidence pack behind it. See investigation.py — deliberately
+   *  unable to tell which domain it is assembling for. */
+  workspace?: InvestigationWorkspaceEntry[]
   methodology?: Methodology
 }
 
@@ -680,4 +684,59 @@ export interface Brief {
     limits: string
   }
   principle: string
+}
+
+
+/**
+ * One investigation, assembled.
+ *
+ * Every domain-specific word here arrives as data — the investigation's name
+ * and next step from `radar.INVESTIGATIONS`, the rule's name and threshold
+ * from `rule_meta`, the claim boundary from `claims.py`. Nothing in the
+ * component that renders this decides what any of it means, which is what lets
+ * the same screen serve a domain the code has never seen.
+ */
+export interface RaisedBy {
+  id: string
+  /** The rule's own name; the engine id is a last resort, never a label. */
+  rule: string
+  text: string
+  severity: 'high' | 'medium' | 'low' | null
+  threshold: string
+  threshold_type: string
+  threshold_status: string
+  method: string
+  factors: string[]
+}
+
+export interface EvidencePack {
+  factor: string
+  name: string
+  state: string
+  publisher: string
+  endpoint: string
+  dataset: string
+  licence: string
+  attribution: string
+  runtime: string
+  assessed_at: string
+  methods: string[]
+  measurements: {
+    rule: string
+    rule_name: string
+    threshold: string
+    evidence: Record<string, string | number>
+  }[]
+}
+
+export interface InvestigationWorkspaceEntry {
+  id: string
+  name: string
+  blurb: string
+  next_step: string
+  priority: string
+  raised_by: RaisedBy[]
+  established: string[]
+  not_established: string[]
+  evidence: EvidencePack[]
 }

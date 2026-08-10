@@ -46,6 +46,7 @@ export default function EvidenceDrawer() {
   const factor = useStore((s) => s.evidenceFactor)
   const close = useStore((s) => s.closeEvidence)
   const setTab = useStore((s) => s.setTab)
+  const openInvestigation = useStore((s) => s.openInvestigation)
   const panel = useRef<HTMLDivElement>(null)
 
   const entry = findEntry(data?.evidence, factor)
@@ -138,7 +139,10 @@ export default function EvidenceDrawer() {
             <h3 className="ev-h">Investigation</h3>
             {entry.investigations.map((inv) => (
               <div key={inv.id} className="ev-inv">
-                <span className="ev-inv-name">{inv.name}</span>
+                <button className="ev-inv-name"
+                        onClick={() => openInvestigation(inv.id)}>
+                  {inv.name} →
+                </button>
                 {/* Traceable in both directions: the flag names what it raised,
                     and the investigation names what raised it. */}
                 <span className="ev-inv-why mono">

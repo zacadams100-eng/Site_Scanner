@@ -90,6 +90,9 @@ interface State {
    *  snapshot would go stale the moment the report refreshes. */
   evidenceFactor: string | null
 
+  /** Which investigation the workspace is open on, or null. */
+  investigationId: string | null
+
   sidebarOpen: boolean
   sidebarSection: 'layers' | 'templates' | 'sites' | 'data' | 'analysis'
   panelOpen: boolean
@@ -172,6 +175,8 @@ interface State {
   setBrowserOpen: (o: boolean) => void
   openEvidence: (factor: string) => void
   closeEvidence: () => void
+  openInvestigation: (id: string) => void
+  closeInvestigation: () => void
   setSidebarOpen: (o: boolean) => void
   setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
   setPanelOpen: (o: boolean) => void
@@ -275,6 +280,7 @@ export const useStore = create<State>((set, get) => ({
   activeTab: 'overview',
   browserOpen: false,
   evidenceFactor: null,
+  investigationId: null,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn
   // shape than a mis-tap on a section that was never asked for.
@@ -528,7 +534,11 @@ export const useStore = create<State>((set, get) => ({
   setCompareIndex: (i) => { set({ compareIndex: i }); get().syncUrl() },
   setPlaying: (p) => set({ playing: p }),
   setTab: (t) => set({ activeTab: t }),
-  openEvidence: (factor) => set({ evidenceFactor: factor }),
+  // Opening one closes the other: they are two depths of the same question,
+  // and stacking two dialogues leaves no obvious way back.
+  openEvidence: (factor) => set({ evidenceFactor: factor, investigationId: null }),
+  openInvestigation: (id) => set({ investigationId: id, evidenceFactor: null }),
+  closeInvestigation: () => set({ investigationId: null }),
   closeEvidence: () => set({ evidenceFactor: null }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
   setSidebarOpen: (o) => set({ sidebarOpen: o }),

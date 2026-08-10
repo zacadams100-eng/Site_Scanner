@@ -30,6 +30,7 @@ import comparison
 import radar
 import brief as brief_mod
 import evidence as evidence_mod
+import investigation as investigation_mod
 from historical import view as historical_view
 import series as series_mod
 import telemetry
@@ -536,6 +537,7 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
     # Pair each historical metric with the state the engine decided for its
     # rule. `outcome_for` is a read over an assembled payload — nothing is
     # recomputed, which is EM11 one layer below the UI.
+    evidence = evidence_mod.report(radar_payload, out)
     historical = historical_view.report(out)
     for entry in historical:
         entry["finding"] = radar.outcome_for(radar_payload, entry["rule"])
@@ -583,7 +585,13 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # A read over the payload above, for the same reason `historical` is:
         # a second module that could reach a finding is a second opinion
         # waiting to drift. See evidence.py.
-        "evidence": evidence_mod.report(radar_payload, out),
+        "evidence": evidence,
+        # The investigation workspace: each investigation joined to the
+        # findings that raised it, the claim boundary already composed, and
+        # the evidence pack a professional would be handed. A view over the
+        # three above it — see investigation.py, which is deliberately unable
+        # to tell which domain it is assembling for.
+        "workspace": investigation_mod.report(radar_payload, evidence),
     }
 
 
