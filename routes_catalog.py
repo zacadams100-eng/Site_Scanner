@@ -28,6 +28,7 @@ import insights
 import nlq
 import comparison
 import radar
+import evidence as evidence_mod
 from historical import view as historical_view
 import series as series_mod
 import telemetry
@@ -576,6 +577,12 @@ def get_series(req: SeriesRequest) -> Dict[str, Any]:
         # composing is its job.
         "historical": historical,
         "methodology": historical_view.methodology(),
+        # Per-factor traceability: where each number came from, what the engine
+        # established from it, and — the half that matters — what it did not.
+        # A read over the payload above, for the same reason `historical` is:
+        # a second module that could reach a finding is a second opinion
+        # waiting to drift. See evidence.py.
+        "evidence": evidence_mod.report(radar_payload, out),
     }
 
 

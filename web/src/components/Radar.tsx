@@ -46,6 +46,7 @@ function Dot({ state }: { state: RadarTopic['state'] }) {
 
 export default function Radar() {
   const data = useStore((s) => s.data)
+  const openEvidence = useStore((s) => s.openEvidence)
   const toggleFactor = useStore((s) => s.toggleFactor)
   const selected = useStore((s) => s.selected)
   const [openFlag, setOpenFlag] = useState<string | null>(null)
@@ -339,7 +340,19 @@ export default function Radar() {
                     .filter((r) => logFilter === 'all' || r.state === logFilter)
                     .map((row) => (
                     <tr key={row.factor} className={`log-${row.state}`}>
-                      <td>{row.name}</td>
+                      {/* Every row is a route into the explorer, which is what
+                          makes it reachable for `clear`, `informational` and
+                          all three flavours of `not_assessed`. Flags had a way
+                          in from the moment the drawer existed; the states with
+                          nothing to click were the ones a reader most needs to
+                          interrogate — "not assessed" is the row that most
+                          deserves the question "why?". */}
+                      <td>
+                        <button className="log-open"
+                                onClick={() => openEvidence(row.factor)}>
+                          {row.name}
+                        </button>
+                      </td>
                       <td className="log-state">
                         {row.state === 'assessed' ? 'observed'
                           : row.state === 'generated' ? 'no live source'
@@ -389,6 +402,7 @@ function CoverageBar({ coverage }: { coverage: Coverage }) {
 function FlagRow({ flag, open, onToggle }:
                  { flag: Flag; open: boolean; onToggle: () => void }) {
   const evidence = Object.entries(flag.evidence)
+  const openEvidence = useStore((s) => s.openEvidence)
   return (
     <li className={`flag is-${flag.severity}`}>
       <button className="flag-main" onClick={onToggle} aria-expanded={open}>
@@ -413,6 +427,15 @@ function FlagRow({ flag, open, onToggle }:
               ))}
             </tbody>
           </table>
+          {/* Into the explorer, on the factor this flag rests on. The radar
+              says what crossed a threshold; the explorer answers "and what
+              exactly does that establish" — which is a different question and
+              deserves its own screen rather than a longer tooltip. */}
+          {flag.factors?.[0] && (
+            <button className="ev-open" onClick={() => openEvidence(flag.factors[0])}>
+              Examine this evidence →
+            </button>
+          )}
           <ul className="flag-prov">
             {flag.provenance.map((p) => (
               <li key={p.factor}>

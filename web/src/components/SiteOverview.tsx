@@ -44,6 +44,7 @@ export default function SiteOverview() {
   const data = useStore((s) => s.data)
   const projectName = useStore((s) => s.projectName)
   const setTab = useStore((s) => s.setTab)
+  const openEvidence = useStore((s) => s.openEvidence)
 
   if (!data) return null
 
@@ -131,16 +132,25 @@ export default function SiteOverview() {
         <section className="ovw-section">
           <h3 className="ovw-h">Historical change</h3>
           <ul className="ovw-hist">
-            {history.map((h) => (
-              <li key={h.id} className={`ovw-hist-row ${h.stateClass}`}>
-                <span className="ovw-hist-name">{h.name}</span>
-                <span className="ovw-hist-change mono">
-                  {h.arrow && <span className="ovw-arrow">{h.arrow}</span>}
-                  {h.change}
-                </span>
-                <span className="ovw-hist-state">{h.stateLabel}</span>
-              </li>
-            ))}
+            {history.map((h) => {
+              // The factor behind the row, so the explorer opens on the thing
+              // the reader was already looking at rather than on a list.
+              const factor = data.historical?.find((e) => e.id === h.id)?.factor
+              return (
+                <li key={h.id} className={`ovw-hist-row ${h.stateClass}`}>
+                  <button className="ovw-hist-main"
+                          disabled={!factor}
+                          onClick={() => factor && openEvidence(factor)}>
+                    <span className="ovw-hist-name">{h.name}</span>
+                    <span className="ovw-hist-change mono">
+                      {h.arrow && <span className="ovw-arrow">{h.arrow}</span>}
+                      {h.change}
+                    </span>
+                    <span className="ovw-hist-state">{h.stateLabel}</span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
           <button className="ovw-link" onClick={() => setTab('radar')}>
             Explore the historical record →

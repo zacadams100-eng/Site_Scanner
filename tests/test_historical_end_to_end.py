@@ -32,13 +32,6 @@ import pytest
 import routes_catalog
 
 
-# The archive Sentinel-2 actually has. Months before this are `None`, which is
-# the correct answer and not a gap to paper over (HE3).
-S2_START_YEAR, S2_START_MONTH = 2017, 3
-
-#: April–September, the vegetation window frozen in the methodology.
-WINDOW = (4, 5, 6, 7, 8, 9)
-
 GEOMETRY = {
     "type": "Polygon",
     "coordinates": [[
@@ -48,30 +41,6 @@ GEOMETRY = {
 }
 
 RULE = "historical_vegetation_decline"
-
-
-def s2_ndvi(per_year):
-    """A Sentinel-2 NDVI implementation, in the shape `REAL_SERIES` holds.
-
-    Returns one point per requested step. A month outside the archive, or a
-    year the scenario does not supply, is `None` — a real gap, carried as a
-    gap.
-    """
-    def fn(geometry, steps, area_ha):
-        points = []
-        for t in steps:
-            year, month = int(t[:4]), int(t[5:7])
-            before_archive = (year, month) < (S2_START_YEAR, S2_START_MONTH)
-            value = None
-            if not before_archive and month in WINDOW:
-                value = per_year.get(year)
-            # `valid_fraction` is how much of the AOI the composite actually
-            # saw, and `annual_rollup` weights by it. A gap is 0.0, matching
-            # `ee_series._gap`.
-            points.append({"t": t, "value": value, "interpolated": False,
-                           "valid_fraction": 0.0 if value is None else 0.95})
-        return points
-    return fn
 
 
 def flat(value, years):
@@ -90,33 +59,6 @@ def declining(baseline, recent):
         else:
             per_year[y] = (baseline + recent) / 2
     return per_year
-
-
-@pytest.fixture
-def live_ndvi(monkeypatch):
-    """Install a fixture NDVI as a *real* Earth Engine factor.
-
-    The endpoint matters: `_series_for` derives `source` from it, and only
-    `earth-engine` or `open-data` may produce a finding at all (EM1–EM3, HE2).
-    A fixture registered without a plausible endpoint would be labelled
-    `open-data` and the test would prove the wrong provenance.
-
-    The series cache is cleared on the way in and out. Its key is
-    (factor, geometry, steps) — identical across every scenario here — so
-    without this the second scenario would silently assert against the first
-    one's data.
-    """
-    def install(per_year):
-        routes_catalog.SERIES_CACHE.clear()
-        monkeypatch.setitem(routes_catalog.REAL_SERIES, "ndvi", s2_ndvi(per_year))
-        monkeypatch.setitem(routes_catalog.REAL_SOURCES, "ndvi", {
-            "source": "Copernicus / ESA",
-            "publisher": "European Space Agency",
-            "endpoint": "earthengine.googleapis.com",
-            "status": "verified",
-        })
-    yield install
-    routes_catalog.SERIES_CACHE.clear()
 
 
 def fetch(client, per_year, install):

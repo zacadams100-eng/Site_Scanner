@@ -85,6 +85,11 @@ interface State {
   activeTab: 'overview' | 'radar' | 'findings' | 'table' | 'charts' | 'sources'
   browserOpen: boolean
 
+  /** Which factor the evidence explorer is open on, or null. A factor id
+   *  rather than a copy of the entry: the payload is the source of truth and a
+   *  snapshot would go stale the moment the report refreshes. */
+  evidenceFactor: string | null
+
   sidebarOpen: boolean
   sidebarSection: 'layers' | 'templates' | 'sites' | 'data' | 'analysis'
   panelOpen: boolean
@@ -165,6 +170,8 @@ interface State {
   setPlaying: (p: boolean) => void
   setTab: (t: 'overview' | 'radar' | 'findings' | 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
+  openEvidence: (factor: string) => void
+  closeEvidence: () => void
   setSidebarOpen: (o: boolean) => void
   setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
   setPanelOpen: (o: boolean) => void
@@ -267,6 +274,7 @@ export const useStore = create<State>((set, get) => ({
   // — stays the follow-up rather than the opener.
   activeTab: 'overview',
   browserOpen: false,
+  evidenceFactor: null,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn
   // shape than a mis-tap on a section that was never asked for.
@@ -520,6 +528,8 @@ export const useStore = create<State>((set, get) => ({
   setCompareIndex: (i) => { set({ compareIndex: i }); get().syncUrl() },
   setPlaying: (p) => set({ playing: p }),
   setTab: (t) => set({ activeTab: t }),
+  openEvidence: (factor) => set({ evidenceFactor: factor }),
+  closeEvidence: () => set({ evidenceFactor: null }),
   setBrowserOpen: (o) => set({ browserOpen: o }),
   setSidebarOpen: (o) => set({ sidebarOpen: o }),
   setSidebarSection: (s) => set({ sidebarSection: s }),

@@ -5,6 +5,85 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Evidence explorer — step 3 — 2026-08-10
+
+One question, asked of one factor: **where did this number come from, what did
+Contour establish, and what did it not establish?** A drawer over the whole
+window rather than another tab, reachable from a flag, from an overview row,
+and from every row of the assessment log.
+
+**The claim boundary is the feature.** Everything above it is provenance the
+radar already had. The two blocks at the end are the difference between
+
+    measurement → diagnosis          (what a reader does by default)
+    measurement → investigation      (what Contour actually supports)
+
+They are composed in `evidence.py`, beside the engine that reached the state,
+never in the component — a sentence written into a component is one refactor
+from drifting out of step with the rule it describes. `not_established` is
+**never empty on any path**, and a test asserts that across a mixed report:
+a boundary that goes missing sometimes is worse than none, because the reader
+learns to expect it and reads its absence as "nothing to qualify here".
+
+The states that needed it most are the quiet ones. A not-loaded factor now
+says *"Nothing. This evidence source has not been loaded into this analysis"*
+and *"This is not a finding of absence. A factor that could not be measured is
+unknown, not clear."* That is the most dangerous misreading in the product,
+and it previously had no voice at all.
+
+Provenance is shown as four separate rows because they answer four different
+questions — publisher, endpoint, licence, runtime verification — and
+`Source: Environment Agency` collapses all of them. Licence and clearance stay
+apart: "CC BY-SA 3.0 IGO" is a fact about the data, "conditional" is this
+project's own unverified reading of it. That makes `/api/capabilities` visible
+rather than invisible infrastructure.
+
+**Four defects found while building it, two of them real bugs:**
+
+- **A real source that answered with nothing would have rendered `clear`.**
+  I derived the state from `log[].state`, which says a service was called and
+  replied — not that the reply held anything usable. Only the rule knows that.
+  This is exactly the EM6 failure the project already fixed once, reintroduced
+  one layer up, and it took the *full* suite to surface it: it passed in
+  isolation.
+- **A factor that was never loaded reported as demo data.** With no series
+  entry, my source block defaulted the kind to `generated` — telling a user
+  "demo data" about something simply never fetched. The two causes this
+  product works hardest to keep apart.
+- **Only the first finding on a factor was shown.** One NDVI series carries a
+  trend flag *and* a historical-baseline flag; keeping the first hid half the
+  answer to the only question this screen exists to answer.
+- **"What this does not establish" opened with a positive statement** —
+  "Identifies changes large enough to warrant professional investigation" —
+  because I dumped the rule's whole `purpose` under that heading. Rules now
+  declare `not_evidence_of` as its own field; splitting a sentence on
+  punctuation would be a guess about load-bearing text.
+
+Also: a not-assessed factor read "Assessed 10 Aug 2026", contradicting its own
+state — the timestamp is when the report ran, so the verb changed rather than
+the field. And two rules on one factor rendered two identical "Measurement"
+headings, now named after the rule that produced each.
+
+Driven in Chromium across flagged, not-loaded and no-live-source; Escape
+closes; no console errors. One test-only note worth keeping: an assertion that
+*some* factor be merely not-loaded is environment-dependent — how many are
+not-loaded versus permanently generated depends on how many real
+implementations the process installed — so the mapping is pinned by a direct
+unit test and the integration test only checks consistency with the log.
+
+783 Python tests (+19), 213 frontend (+13).
+
+**Deliberately not built:** a browsable index of all 273 factors. The explorer
+is contextual — its denominator is what this site's analysis touched. A
+catalogue answers "here is our database"; the question is "why is Contour
+saying this".
+
+**Still one historical metric.** LST and built surface stay unbuilt rather than
+thresholded, per the decision to measure first and judge only with a
+defensible basis.
+
+---
+
 ## Site overview — the briefing — 2026-08-10
 
 The landing page for a single site: the screen you can put in front of someone

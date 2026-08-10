@@ -179,6 +179,9 @@ export interface SeriesResponse {
   radar?: Radar
   /** Temporal metrics paired with the finding the engine reached for each. */
   historical?: HistoricalEntry[]
+  /** Per-factor traceability. Contextual to this report — the factors the
+   *  rules wanted, never the whole catalogue. See evidence.py. */
+  evidence?: EvidenceEntry[]
   methodology?: Methodology
 }
 
@@ -547,4 +550,59 @@ export interface Methodology {
   period_years: number
   min_year_coverage: number
   rules: string[]
+}
+
+
+/**
+ * One factor's evidence, as the explorer renders it.
+ *
+ * `claims` is the reason this exists. Everything above it is provenance the
+ * radar already had; the pair of sentences is what stops a reader completing
+ * `measurement → diagnosis` when Contour only supports
+ * `measurement → investigation`.
+ */
+export interface EvidenceFinding {
+  id: string
+  kind: 'flag' | 'info'
+  text: string
+  severity: 'high' | 'medium' | 'low' | null
+  threshold: string
+  evidence: Record<string, string | number>
+  /** The rule's own account of its threshold. Empty for an informational
+   *  finding, which applies none — and must not appear to. */
+  rule_meta: Record<string, string | number>
+}
+
+export interface EvidenceSource {
+  /** Whose data it is. */
+  publisher: string
+  /** Which service actually answered — Sentinel-2 reaches this product
+   *  *through* Earth Engine, and a user told only "Copernicus" would look for
+   *  the number in the wrong place (HE1). */
+  endpoint: string
+  dataset: string
+  /** A fact about the data. */
+  licence: string
+  attribution: string
+  /** This project's own unverified reading of that licence. Not the same
+   *  thing, and never merged with it. */
+  clearance: string
+  /** What this deployment can actually prove, now (EM5). */
+  runtime: string
+  kind: string
+}
+
+export interface EvidenceEntry {
+  factor: string
+  name: string
+  state: 'flagged' | 'clear' | 'informational' | 'not_assessed'
+  reason: 'not_selected' | 'demo_data' | 'no_data' | null
+  severity: 'high' | 'medium' | 'low' | null
+  findings: EvidenceFinding[]
+  source: EvidenceSource
+  investigations: { id: string; name: string; priority: string; why: string[] }[]
+  assessed_at: string
+  /** Lists, not paragraphs: three findings joined into one block is a wall
+   *  of prose in the place a reader is trying to read carefully. */
+  claims: { established: string[]; not_established: string[] }
 }

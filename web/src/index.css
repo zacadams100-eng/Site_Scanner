@@ -2368,3 +2368,133 @@ td.cov-severe { color: var(--text-dim); }
 .ovw-overlap {
   margin: 0 0 6px; font-size: 10.5px; line-height: 1.55; color: var(--text-dim);
 }
+
+/* ---------------------------------------------------------------------------
+   Evidence explorer
+
+   One question, asked of one factor: where did this number come from, what did
+   Contour establish, and what did it not?
+
+   A drawer rather than a tab, because it is a detail view of something the
+   reader was already looking at — and it overlays the whole window rather than
+   the 440px panel, because provenance, thresholds and claim boundaries do not
+   fit in a column and should not be read in one.
+
+   The claim boundary is set as two blocks of equal weight. Drawing "what this
+   establishes" as the headline and "what this does not" as small print would
+   reproduce, in CSS, exactly the misreading the section exists to prevent.
+   --------------------------------------------------------------------------- */
+.ev-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(23, 28, 33, 0.32);
+  display: flex; justify-content: flex-end;
+}
+.ev {
+  width: min(560px, 100%); height: 100%; overflow-y: auto;
+  background: var(--surface); border-left: 1px solid var(--line);
+  padding: 14px 18px 28px;
+  box-shadow: -12px 0 32px rgba(23, 28, 33, 0.10);
+}
+.ev:focus { outline: none; }
+
+.ev-top { display: flex; align-items: center; justify-content: space-between; }
+.ev-back {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-ui); font-size: 11.5px; color: var(--accent);
+}
+.ev-back:hover { text-decoration: underline; }
+
+.ev-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin: 10px 0 8px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.ev-title { margin: 0; font-size: 15.5px; font-weight: 600; color: var(--text); }
+.ev-state { font-size: 11px; white-space: nowrap; color: var(--text-faint); }
+/* The product's one vocabulary for states, reused rather than reinvented. */
+.ev-state.is-flagged { color: var(--warn); }
+.ev-state.is-clear { color: var(--structure); }
+.ev-state.is-informational { color: var(--accent); }
+
+.ev-finding {
+  margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; color: var(--text);
+}
+
+.ev-section { margin: 16px 0; }
+.ev-h {
+  margin: 0 0 8px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-faint);
+}
+.ev-h-sub { margin-top: 14px; }
+.ev-dataset { margin: 0 0 8px; font-size: 12px; color: var(--text); }
+
+.ev-dl { margin: 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.ev-row {
+  display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: 10px; padding: 7px 10px; background: var(--surface-raised);
+}
+.ev-row dt { font-size: 11px; color: var(--text-faint); margin: 0; }
+.ev-row dd { font-size: 12px; color: var(--text); margin: 0; overflow-wrap: anywhere; }
+
+.ev-threshold-note,
+.ev-clearance,
+.ev-attribution {
+  margin: 8px 0 0; font-size: 10.5px; line-height: 1.6; color: var(--text-dim);
+}
+.ev-attribution { font-style: italic; color: var(--text-faint); }
+.ev-when { margin: 8px 0 0; font-size: 10.5px; color: var(--text-faint); }
+
+.ev-inv {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+}
+.ev-inv-name { font-size: 12.5px; color: var(--text); }
+.ev-inv-why { font-size: 10px; color: var(--text-faint); }
+
+/* Two blocks, equal weight. See the note at the top of this section. */
+.ev-claims {
+  margin-top: 18px; display: grid; gap: 10px;
+}
+.ev-claim {
+  padding: 11px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); border-left-width: 3px;
+  background: var(--surface-raised);
+}
+.ev-claim p {
+  margin: 0; font-size: 12px; line-height: 1.65; color: var(--text);
+}
+.ev-claim.is-established { border-left-color: var(--structure); }
+/* Not red. This block is not a warning — it is the honest edge of a claim, and
+   colouring it as an alert would make readers skip it as boilerplate. */
+.ev-claim.is-not-established { border-left-color: var(--accent); }
+
+/* The route in, from a flag's detail. */
+.ev-open {
+  display: inline-block; margin: 8px 0 0;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-ui); font-size: 11.5px; color: var(--accent);
+}
+.ev-open:hover { text-decoration: underline; }
+
+/* The overview's historical rows became buttons when they gained a route into
+   the explorer; they must not start looking like one. */
+.ovw-hist-main {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline; gap: 10px; width: 100%;
+  background: none; border: 0; padding: 0; text-align: left;
+  font-family: var(--font-ui); cursor: pointer; color: inherit;
+}
+.ovw-hist-main:disabled { cursor: default; }
+
+@media (max-width: 560px) {
+  .ev { width: 100%; border-left: 0; }
+}
+
+/* A log row is a route into the explorer. Styled as text rather than a button:
+   the table is a record first, and a wall of buttons would read as a toolbar. */
+.log-open {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit; color: inherit; text-align: left;
+}
+.log-open:hover { color: var(--accent); text-decoration: underline; }

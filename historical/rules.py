@@ -65,6 +65,19 @@ VEGETATION_RULE_META: Dict[str, Any] = {
     "threshold_status": "product-defined; not a regulatory or scientific standard",
     "purpose": ("Identifies changes large enough to warrant professional "
                 "investigation. Not evidence of ecological degradation."),
+    #: The negative on its own, because it is shown under a heading that reads
+    #: "what this does not establish" and the positive half of `purpose` is a
+    #: statement of what the rule *does*. Rendering the whole sentence there
+    #: put "Identifies changes large enough to warrant professional
+    #: investigation" under that heading, which says the opposite of what it
+    #: means. Kept as its own field rather than parsed out of `purpose`: a
+    #: sentence split is a guess about punctuation, and this text is load
+    #: bearing.
+    "not_evidence_of": (
+        "It is not evidence of ecological degradation. A decline in vegetation "
+        "vigour has many ordinary causes, including management, crop rotation "
+        "and seasonal timing."
+    ),
     "method_version": metrics.METHOD_VERSION,
     "measure": "percentage change from the historical baseline",
     "direction": "decline",

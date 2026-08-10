@@ -13,6 +13,7 @@ import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
 import Radar from './components/Radar'
 import SiteOverview from './components/SiteOverview'
+import EvidenceDrawer from './components/EvidenceDrawer'
 import CompareSites from './components/CompareSites'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
@@ -342,6 +343,10 @@ export default function App() {
           )}
         </div>
       </aside>
+
+      {/* The evidence explorer, over everything: it is a detail view of one
+          factor and should not be constrained to the 440px report panel. */}
+      <EvidenceDrawer />
 
       {/* The home screen, over the workspace rather than instead of it.
           Everything underneath stays mounted: MapLibre keeps its GL context,

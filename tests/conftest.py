@@ -213,3 +213,66 @@ def guildford_polygon():
             [-0.58, 51.245], [-0.58, 51.235],
         ]],
     }
+
+
+# ---------------------------------------------------------------------------
+# A live Sentinel-2 factor, without Earth Engine
+# ---------------------------------------------------------------------------
+#: The archive Sentinel-2 actually has. Months before this are `None`, which is
+#: the correct answer and not a gap to paper over (HE3).
+S2_START = (2017, 3)
+
+#: April–September, the vegetation window frozen in the methodology.
+S2_WINDOW = (4, 5, 6, 7, 8, 9)
+
+
+def s2_ndvi(per_year):
+    """A Sentinel-2 NDVI implementation, in the shape `REAL_SERIES` holds.
+
+    Lives here rather than in one test module because two suites now drive the
+    real HTTP path with it. Returns one point per requested step; a month
+    outside the archive, or a year the scenario does not supply, is a gap
+    carried as a gap.
+    """
+    def fn(geometry, steps, area_ha):
+        points = []
+        for t in steps:
+            year, month = int(t[:4]), int(t[5:7])
+            value = None
+            if (year, month) >= S2_START and month in S2_WINDOW:
+                value = per_year.get(year)
+            # `valid_fraction` is how much of the AOI the composite saw, and
+            # `annual_rollup` weights by it. A gap is 0.0, matching
+            # `ee_series._gap`.
+            points.append({"t": t, "value": value, "interpolated": False,
+                           "valid_fraction": 0.0 if value is None else 0.95})
+        return points
+    return fn
+
+
+@pytest.fixture
+def live_ndvi(monkeypatch):
+    """Install a fixture NDVI as a *real* Earth Engine factor.
+
+    The endpoint matters: `_series_for` derives `source` from it, and only
+    `earth-engine` or `open-data` may produce a finding at all (EM1–EM3, HE2).
+    A fixture registered without a plausible endpoint would be labelled
+    `open-data` and the test would prove the wrong provenance.
+
+    The series cache is cleared on the way in and out. Its key is
+    (factor, geometry, steps) — identical across scenarios — so without this a
+    second scenario would silently assert against the first one's data.
+    """
+    import routes_catalog
+
+    def install(per_year):
+        routes_catalog.SERIES_CACHE.clear()
+        monkeypatch.setitem(routes_catalog.REAL_SERIES, "ndvi", s2_ndvi(per_year))
+        monkeypatch.setitem(routes_catalog.REAL_SOURCES, "ndvi", {
+            "source": "Copernicus / ESA",
+            "publisher": "European Space Agency",
+            "endpoint": "earthengine.googleapis.com",
+            "status": "verified",
+        })
+    yield install
+    routes_catalog.SERIES_CACHE.clear()
