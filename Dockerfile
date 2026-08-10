@@ -44,6 +44,9 @@ COPY app.py mock_ee_backend.py routes_catalog.py \
 # of omission tests/test_docker_context.py exists to catch.
 COPY historical/ ./historical/
 
+# The habitat scanner's domain content, as a package, for the same reason.
+COPY habitat/ ./habitat/
+
 # Don't run as root. Cloud Run doesn't require it, but nothing here needs the
 # privileges and the container has network egress.
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin contour

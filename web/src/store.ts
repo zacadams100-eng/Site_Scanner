@@ -3,6 +3,7 @@ import type { Catalog, Cell, DrawMode, Factor, Marker, SeriesResponse } from './
 import { fetchCells, fetchSeries } from './api'
 import { decodeState, writeUrl, type Template } from './lib/permalink'
 import { openOnGallery } from './lib/home'
+import { defaultFactors } from './lib/defaults'
 
 /**
  * One store, and one rule that matters more than the rest:
@@ -307,8 +308,14 @@ export const useStore = create<State>((set, get) => ({
     // Land on the most recent step: users overwhelmingly want "now" first,
     // then scrub backwards to see how it got there. A URL overrides this.
     const fromUrl = decodeState(location.hash)
+    // Only when the URL did not choose: a shared link's factor list is the
+    // sender's analysis and must not be overwritten by a default.
+    const opening = fromUrl.factors?.length
+      ? get().selected
+      : defaultFactors(c.factors.map((f) => f.id))
     set({
       catalog: c,
+      selected: opening,
       timeIndex: fromUrl.t ?? Math.max(0, c.time.steps.length - 1),
     })
     get().hydrateFromUrl()

@@ -46,21 +46,42 @@ def test_land_is_built_from_the_existing_configuration_not_copied():
 
 def test_an_unbuilt_scanner_says_so_rather_than_looking_empty():
     """A scanner with no rules is registered and unbuilt. Saying so is more
-    useful than an empty report that reads as a clean subject."""
-    for sid in ("habitat", "coastal"):
-        s = scanners.resolve(sid)
-        assert s.implemented is False
-        assert s.rules == ()
-        assert s.topics == {}
-        assert s.factors == ()
+    useful than an empty report that reads as a clean subject.
+
+    Coastal only: habitat is scanner #2 and is now built. That this test needed
+    narrowing rather than deleting is the point — the registry distinguishes
+    declared from built, and one of the three has crossed over.
+    """
+    s = scanners.resolve("coastal")
+    assert s.implemented is False
+    assert s.rules == ()
+    assert s.topics == {}
+    assert s.factors == ()
+
+
+def test_habitat_is_built_and_scoped():
+    """Scanner #2: six factors of twenty-seven, five topics, one flagged rule
+    and five informational readings. See HABITAT_SCANNER.md."""
+    h = scanners.resolve("habitat")
+    assert h.implemented is True
+    assert set(h.factors) == {"ndvi", "ndmi", "evi", "lc_tree_pct",
+                              "lc_dominant", "water_occurrence"}
+    flags = [r for r in h.rules if r.kind == "flag"]
+    assert len(flags) == 1, "one defensible threshold, not ten arbitrary ones"
+    assert flags[0].id == "habitat_vegetation_decline"
+
+    # Regional-resolution sources are excluded on purpose: a 9 km ERA5 pixel
+    # over a 20 ha reserve describes a county, not a parcel.
+    for regional in ("air_temp_mean", "lst_day", "soil_moisture"):
+        assert not h.sees(regional)
 
 
 def test_an_unbuilt_scanner_has_no_coverage_rather_than_a_borrowed_one():
     """`None` means no coverage established — distinct from "covers nowhere"
     and from silently inheriting England."""
-    assert scanners.resolve("habitat").coverage is None
     assert scanners.resolve("coastal").coverage is None
     assert scanners.resolve("land").coverage is not None
+    assert scanners.resolve("habitat").coverage is not None
 
 
 def test_resolve_defaults_to_land_and_rejects_the_unknown():
@@ -132,10 +153,9 @@ def test_land_is_explicit_and_identical_to_the_default(mock_client):
 def test_an_unbuilt_scanner_is_refused_with_a_reason(mock_client):
     """Not an empty 200. A report with no findings from a scanner that cannot
     assess anything is indistinguishable from a clean subject."""
-    for sid in ("habitat", "coastal"):
-        r = _series(mock_client, sid)
-        assert r.status_code == 422
-        assert "does not cover" in r.json()["detail"]
+    r = _series(mock_client, "coastal")
+    assert r.status_code == 422
+    assert "does not cover" in r.json()["detail"]
 
 
 def test_an_unknown_scanner_is_a_clear_error(mock_client):

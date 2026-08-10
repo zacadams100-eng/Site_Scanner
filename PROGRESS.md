@@ -5,6 +5,70 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Habitat Scanner — R7, scanner #2 — 2026-08-10
+
+The first real second product. **One flagged check and five informational
+readings** — thin on purpose, and `HABITAT_SCANNER.md` records why: most of the
+ecological questions a habitat scanner should answer cannot be answered
+defensibly from the evidence here, and they are named with their blockers
+rather than filled with invented thresholds.
+
+**The architecture claim held. Habitat required no engine change.** Its rules
+arrive through `radar.rules_from`, the contributing-package contract
+`historical.rules` already used. `radar.py`, `evidence.py`, `investigation.py`,
+`brief.py` and `claims.py` are untouched.
+
+**The threshold is imported, not copied.** `VEGETATION_CHANGE_INVESTIGATION_
+THRESHOLD` comes from `historical.rules` — two scanners holding two copies of
+one number is how they drift, and the first symptom would be the app and the
+brief disagreeing about what crossed. The claim boundary is habitat's own: *not
+evidence of habitat deterioration or of unfavourable condition — a spectral
+index responds to management, grazing, cutting and season as readily as to
+harm, and condition is assessed on the ground against defined criteria.*
+
+**Verifying the "27 factors" claim changed the design.** All 27 exist, but
+"relevant" needed qualifying by *resolution against parcel size*: ERA5-Land is
+9 km and MODIS LST is 1 km, so a pixel over a 20 ha reserve describes a large
+part of a county. Habitat uses six factors — Sentinel-2 (10 m), WorldCover
+(10 m) and JRC water (30 m) — and excludes the regional ones rather than
+presenting county climate as site evidence.
+
+**Two defects found by running it, both invisible in review:**
+
+- **A flagging rule must declare its threshold inside `evidence`.**
+  `radar.py:998` reads `found["evidence"]["threshold"]` and ignores a top-level
+  key. Declared at the top level it simply vanished: no error, no empty string,
+  just a missing step in the evidence chain a professional is meant to check.
+  An undocumented convention in the rule contract, now pinned by a test.
+- **The frontend's opening factor list was land-specific.** `DEFAULT_FACTORS`
+  named `precip_total` and `lst_day`, which habitat does not expose, so every
+  first load 422'd and the app showed an empty map with no stated reason. A
+  single-scanner assumption the audit missed because it is client-side.
+  `lib/defaults.ts` now intersects a preference list with what the scanner
+  actually offers.
+
+Neither was an abstraction failure — the first is a rule-contract detail, the
+second a client default. The engine seam held.
+
+Driven in Chromium at 1440×900 and 390×844 against a backend defaulting to
+habitat: the **entirely generic UI** renders scanner #2 with no
+habitat-specific component. Topics read "Vegetation condition 1/1, 1 flag" and
+four honest "not assessed"; the workspace shows the habitat rule, its
+product-defined threshold and its own limitation. No console errors, no
+horizontal overflow.
+
+861 Python tests (+16), 248 frontend (+4).
+
+**Not built, and named:** fragmentation and connectivity (needs spatial pattern
+analysis the engine does not do — a real gap), land-cover change (WorldCover is
+2020 and 2021 only, and those are different product versions), burn history
+(needs differenced NBR and published severity classes), habitat classification
+(field survey), restoration opportunity (a suitability judgement, EM8).
+
+Coastal remains registered and unbuilt.
+
+---
+
 ## Investigation workspace — production pass — 2026-08-10
 
 The workspace built earlier the same day covered the chain but not the whole

@@ -691,7 +691,7 @@ RULES: Tuple[Rule, ...] = (
 )
 
 
-def _rules_from(module_name: str) -> Tuple[Rule, ...]:
+def rules_from(module_name: str) -> Tuple[Rule, ...]:
     """Rules contributed by another package.
 
     The engine collects rules; it does not know what they measure. There is no
@@ -715,7 +715,7 @@ def _rules_from(module_name: str) -> Tuple[Rule, ...]:
         return ()
 
 
-RULES = RULES + _rules_from("historical.rules")
+RULES = RULES + rules_from("historical.rules")
 
 
 # ---------------------------------------------------------------------------

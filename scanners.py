@@ -31,17 +31,18 @@ records the measurement so the next person can check rather than trust.
 drifts, and the first symptom would be a rule that runs in tests and not in
 production. The registry is a lens over what already exists.
 
-## Habitat and coastal are declared and deliberately empty
+## Habitat is built; coastal is declared and deliberately empty
 
-They have names, ids and no content. That is not an oversight: rules and
+Habitat (scanner #2) contributes its rules through `radar.rules_from`, the same
+package contract `historical.rules` uses. Adding it required **no engine
+change** — the seam already existed.
+
+Coastal has a name, an id and no content. That is not an oversight: rules and
 thresholds are product decisions with scientific consequences, and inventing
 them to make a registry look populated is exactly the failure this codebase
-spends its effort preventing. An empty scanner is honest about being unbuilt —
-it assesses nothing, and every topic it declares reports `not_assessed`, which
-is the correct answer rather than a placeholder.
-
-`coverage` is `None` for both, meaning **no coverage has been established**,
-which is distinct from "covers nowhere" and from silently inheriting England.
+spends its effort preventing. An unbuilt scanner is honest about being unbuilt,
+and `coverage=None` means **no coverage has been established** — distinct from
+"covers nowhere" and from silently inheriting England.
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 
 import catalog
 import radar
+from habitat import rules as habitat_rules
 
 
 @dataclass(frozen=True)
@@ -108,18 +110,29 @@ LAND = Scanner(
     coverage_name="England",
 )
 
-#: Registered, declared, and deliberately empty. See the module docstring: an
-#: empty scanner is honest about being unbuilt, and the alternative is inventing
-#: rules and thresholds that carry scientific claims nobody has checked.
+#: Scanner #2. One flagged check and five informational readings — see
+#: `HABITAT_SCANNER.md`, which records the questions a habitat scanner should
+#: answer and cannot yet, each with its specific blocker, rather than filling
+#: them with invented thresholds.
+#:
+#: Its rules come through `radar.rules_from`, the same contributing-package
+#: contract `historical.rules` uses, so the engine gained nothing to support
+#: this scanner and knows nothing about ecology.
+#:
+#: Coverage is England — not because the factors are England-limited (they are
+#: global Sentinel-2, WorldCover and JRC) but because that is where this
+#: deployment has been exercised, and claiming more would assert something
+#: untested.
 HABITAT = Scanner(
     id="habitat",
     name="Habitat",
     subject="A habitat parcel, reserve or landscape unit",
-    topics={},
-    rules=(),
-    investigations={},
-    factors=(),
-    coverage=None,
+    topics=habitat_rules.TOPICS,
+    rules=radar.rules_from("habitat.rules"),
+    investigations=habitat_rules.INVESTIGATIONS,
+    factors=habitat_rules.FACTORS,
+    coverage=catalog.ENGLAND_BBOX,
+    coverage_name="England",
 )
 
 COASTAL = Scanner(
