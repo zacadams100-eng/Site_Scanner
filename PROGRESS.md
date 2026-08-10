@@ -5,6 +5,89 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Site overview — the briefing — 2026-08-10
+
+The landing page for a single site: the screen you can put in front of someone
+in a meeting without explaining the application first. Four sections —
+evidence, what needs attention, historical change, evidence gaps — and it is
+now the default tab, ahead of Radar. Radar opens mid-analysis and assumes you
+already know what was looked at; the overview states what was established,
+what it prompts, and what could not be established, which is the order someone
+needs when they have not seen the site before.
+
+**A summary is the most quotable screen in the tool, and the quotable version
+of this product is the dishonest one.** So the interesting work is in what it
+refuses to do, and both refusals are enforced rather than intended.
+
+- **No headline number** (EM7). No total, no percentage of health, no traffic
+  light. The four state counts are sized *equally* — a flag count set large
+  above a small coverage line is a score with extra steps, because the eye
+  reads size as importance and stops at the biggest number.
+- **No state of its own** (EM11). The trap here is not thresholds, it is
+  **direction**: an overview wants to draw a falling number red. So the arrow
+  is computed from the sign and the colour from `finding.state`, in two
+  functions that never see each other's input, and the test feeds a −45%
+  change carrying `clear` and asserts it renders a down arrow *and* clear
+  styling. `changeArrow` never receives a state; `findingClass` never receives
+  a number.
+
+**Two defects found by driving it in a browser, both invisible in the code.**
+
+- **The four counts did not add up, and the mock assumed they would.** The
+  screen read `1 flagged · 0 clear · 1 informational · 23 not assessed` against
+  `1 of 24 factors assessed` — which sums to 25. `flagged` and `informational`
+  are independent factor *sets* in `radar._coverage`, and one NDVI series
+  carrying a decline flag and a mean-vigour reading is counted in both. The
+  real partition is `assessed + not_assessed = relevant`. The overview now says
+  so, in one line, and only when the states actually overlap — a note that is
+  always on screen is furniture and stops being read.
+
+  My own test had asserted the four reconcile, and **passed**, because the
+  fixture numbers I invented happened to sum. A test can encode a false
+  invariant as easily as a true one when its fixture is chosen rather than
+  observed.
+
+- **"↓ -23.0%" stated the direction twice** and read as a double negative.
+  `changeText` keeps its sign for the historical panel, which has no arrow;
+  the overview uses the magnitude beside the arrow.
+
+**What the mock asked for that could not be built honestly:**
+
+- **"24.6 ha · Surrey".** The only source of an administrative area in this
+  product is an explicit postcodes.io search; a drawn shape carries none, and
+  reverse geocoding is unreachable from this environment anyway. Deriving a
+  county from a coordinate without a boundary dataset would put a guess in the
+  line a reader trusts most. The header states area and centroid.
+- **Three historical rows.** One exists. `metrics.change_metric` is already
+  generic over family and the frozen methodology declares windows for `lst`
+  (June–August) and `surface` (all months), so the metrics are cheap — but each
+  needs a **threshold**, and a threshold is a named product decision, not a
+  number to invent. Left at one row; the section is driven by
+  `data.historical` and will fill in as metrics are registered. See the open
+  question below.
+
+Checked in Chromium at 1440×900 and 390×844: panel scrolls, no horizontal
+overflow, states collapse to one column, no console errors.
+
+764 Python tests, 200 frontend (+19).
+
+### Open decision — thresholds for LST and built surface
+
+Adding "Surface temperature ↑1.4 °C" and "Built surface +6%" needs one of:
+
+1. **A reporting threshold each**, named and signed like
+   `VEGETATION_CHANGE_INVESTIGATION_THRESHOLD` — a product decision about what
+   magnitude warrants professional investigation.
+2. **An informational treatment** — state the change, raise no flag, apply no
+   threshold. HE9-permitted, needs no product decision, and reads as
+   "measured, not judged".
+
+Option 2 is buildable now and is the honest default; option 1 is the one that
+makes the rows actionable. They are not exclusive — informational first, a
+threshold later when there is a basis for one.
+
+---
+
 ## Historical analysis, tested end to end — step 6 — 2026-08-10
 
 No new feature. Step 5 declared the chain complete, and "complete" was the one

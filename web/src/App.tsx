@@ -12,6 +12,7 @@ import Gallery from './components/Gallery'
 import LoadingSequence from './components/LoadingSequence'
 import Provenance from './components/Provenance'
 import Radar from './components/Radar'
+import SiteOverview from './components/SiteOverview'
 import CompareSites from './components/CompareSites'
 import PlaceSearch from './components/PlaceSearch'
 import Sidebar from './components/Sidebar'
@@ -261,10 +262,11 @@ export default function App() {
             </button>
           </div>
           <div className="tabs" role="tablist">
-            {(['radar', 'findings', 'table', 'charts', 'sources'] as const).map((t) => (
+            {(['overview', 'radar', 'findings', 'table', 'charts', 'sources'] as const).map((t) => (
               <button key={t} role="tab" aria-selected={tab === t}
                       className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'radar' ? 'Radar'
+                {t === 'overview' ? 'Overview'
+                  : t === 'radar' ? 'Radar'
                   : t === 'findings' ? 'Findings'
                   : t === 'table' ? 'Table'
                   : t === 'charts' ? 'Charts' : 'Sources'}
@@ -330,6 +332,7 @@ export default function App() {
 
           {!error && data && (
             <>
+              {tab === 'overview' && <SiteOverview />}
               {tab === 'radar' && <Radar />}
               {tab === 'findings' && <Findings />}
               {tab === 'table' && <AttributeTable />}

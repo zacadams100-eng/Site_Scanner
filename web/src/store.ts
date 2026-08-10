@@ -82,7 +82,7 @@ interface State {
   // in temporal GIS, and in ArcGIS it is a multi-step raster-calculator chore.
   compareIndex: number | null
 
-  activeTab: 'radar' | 'findings' | 'table' | 'charts' | 'sources'
+  activeTab: 'overview' | 'radar' | 'findings' | 'table' | 'charts' | 'sources'
   browserOpen: boolean
 
   sidebarOpen: boolean
@@ -163,7 +163,7 @@ interface State {
   setTimeIndex: (i: number) => void
   setCompareIndex: (i: number | null) => void
   setPlaying: (p: boolean) => void
-  setTab: (t: 'radar' | 'findings' | 'table' | 'charts' | 'sources') => void
+  setTab: (t: 'overview' | 'radar' | 'findings' | 'table' | 'charts' | 'sources') => void
   setBrowserOpen: (o: boolean) => void
   setSidebarOpen: (o: boolean) => void
   setSidebarSection: (s: 'layers' | 'templates' | 'sites' | 'data' | 'analysis') => void
@@ -258,10 +258,14 @@ export const useStore = create<State>((set, get) => ({
   timeIndex: 0,
   playing: false,
   compareIndex: null,
-  // Radar first: "is there anything here I should worry about" is the
-  // question people actually arrive with, and Findings — which says what the
-  // numbers did — is the follow-up to it rather than the opener.
-  activeTab: 'radar',
+  // Overview first: a site's landing page is the briefing, not the toolset.
+  // Radar answers "is there anything here I should worry about" and remains
+  // one click away, but it opens mid-analysis — it assumes you already know
+  // what was looked at. The overview states the evidence, what it prompts and
+  // what could not be established, which is the order someone needs them in
+  // when they have not seen this site before. Findings — what the numbers did
+  // — stays the follow-up rather than the opener.
+  activeTab: 'overview',
   browserOpen: false,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn

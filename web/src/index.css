@@ -2227,3 +2227,144 @@ td.cov-severe { color: var(--text-dim); }
   font-size: 10.5px; line-height: 1.55; color: var(--text-faint);
 }
 .hist-method-rules li { margin-bottom: 3px; }
+
+/* ---------------------------------------------------------------------------
+   Site overview — the briefing
+
+   The screen you can put in front of someone without explaining the
+   application first. That is the goal and also the risk: a summary is the most
+   quotable screen in the tool, and the quotable version of this product is the
+   dishonest one.
+
+   Two rules hold the styling honest.
+
+   **No headline number.** There is no hero figure, no total, no traffic light
+   for the site. The four state counts are sized equally — a flag count set
+   large and a coverage line set small is a score with extra steps, because the
+   eye reads size as importance and stops at the biggest number.
+
+   **Colour comes from state, never from direction.** A falling number is not
+   red here; a *flagged* number is. `is-flagged` / `is-clear` /
+   `is-informational` / `is-not_assessed` use the same tokens as the radar and
+   the historical panel, so a user never learns a second vocabulary.
+   --------------------------------------------------------------------------- */
+.ovw { padding: 2px 0 8px; }
+
+.ovw-head { margin-bottom: 16px; }
+.ovw-title {
+  margin: 0 0 3px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--text);
+}
+.ovw-sub { font-size: 11px; color: var(--text-faint); margin: 0; }
+
+.ovw-section { margin-bottom: 18px; }
+.ovw-h {
+  margin: 0 0 9px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-faint);
+}
+
+/* The four states. Equal weight by design — see the note above. */
+.ovw-states {
+  list-style: none; margin: 0 0 8px; padding: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px;
+}
+.ovw-state {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+  border-left-width: 3px;
+}
+.ovw-state.is-flagged { border-left-color: var(--warn); }
+.ovw-state.is-clear { border-left-color: var(--structure); }
+.ovw-state.is-informational { border-left-color: var(--accent); }
+/* Hatched rather than a flat grey: an unassessed factor is a hole in the
+   evidence, and a solid block reads as a fourth quiet category rather than as
+   absence. Matches the coverage strip. */
+.ovw-state.is-not_assessed {
+  border-left-color: transparent;
+  border-left-style: dashed;
+  border-left-color: var(--paper-200);
+}
+.ovw-num { font-size: 15px; font-weight: 600; color: var(--text); }
+.ovw-state-label { font-size: 11px; color: var(--text-dim); line-height: 1.3; }
+
+/* Never separated from the counts above it. */
+.ovw-coverage { margin: 0 0 6px; font-size: 11px; color: var(--text-dim); }
+.ovw-note {
+  margin: 0; font-size: 10.5px; line-height: 1.55; color: var(--text-faint);
+  font-style: italic;
+}
+
+.ovw-count { margin: 0 0 8px; font-size: 12px; color: var(--text); }
+.ovw-empty {
+  margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--text-dim);
+}
+
+.ovw-attention { list-style: none; margin: 0 0 8px; padding: 0; }
+.ovw-inv {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+  margin-bottom: 6px;
+}
+.ovw-pri {
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 2px 5px; border-radius: 3px;
+  background: var(--paper-100); color: var(--text-dim); white-space: nowrap;
+}
+.ovw-pri.is-high { background: var(--warn); color: var(--paper-000); }
+.ovw-inv-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ovw-inv-name { font-size: 12.5px; color: var(--text); }
+.ovw-inv-why { font-size: 10px; color: var(--text-faint); }
+
+.ovw-hist { list-style: none; margin: 0 0 8px; padding: 0; }
+.ovw-hist-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline; gap: 10px;
+  padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+  margin-bottom: 6px;
+}
+.ovw-hist-name {
+  font-size: 12.5px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ovw-hist-change { font-size: 12px; color: var(--text); }
+.ovw-arrow { margin-right: 3px; }
+.ovw-hist-state { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.ovw-hist-row.is-flagged .ovw-hist-state { color: var(--warn); }
+.ovw-hist-row.is-clear .ovw-hist-state { color: var(--structure); }
+.ovw-hist-row.is-not_assessed .ovw-hist-name { color: var(--text-faint); }
+
+.ovw-gap-causes { list-style: none; margin: 0 0 8px; padding: 0; }
+.ovw-gap {
+  font-size: 11.5px; line-height: 1.6; color: var(--text-dim);
+  padding-left: 11px; position: relative;
+}
+.ovw-gap::before {
+  content: ''; position: absolute; left: 0; top: 7px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--paper-200);
+}
+/* One is a click, the other is a wall — and they should not look alike. */
+.ovw-gap.is-not_selected::before { background: var(--accent); }
+
+.ovw-link {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-ui); font-size: 11.5px; color: var(--accent);
+}
+.ovw-link:hover { text-decoration: underline; }
+
+.ovw-principle {
+  margin: 16px 0 0; padding-top: 11px; border-top: 1px solid var(--line);
+  font-size: 11px; line-height: 1.6; color: var(--text-faint);
+}
+
+@media (max-width: 460px) {
+  .ovw-states { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The four counts are not a partition; this says why when they overlap. Set
+   above the coverage note because it explains the numbers directly above it. */
+.ovw-overlap {
+  margin: 0 0 6px; font-size: 10.5px; line-height: 1.55; color: var(--text-dim);
+}
