@@ -118,14 +118,14 @@ describe('seasonalBias', () => {
     // ten months and drops the two lowest. It looks like a record high.
     const s = seasonalSeries([2017, 2018, 2019, 2020], (y, m) => y === 2017 && m <= 2)
     const b = seasonalBias(s, 2017)
-    expect(b?.direction).toBe('high')
+    expect(b?.direction).toBe('above')
     expect(b?.missing).toEqual(['Jan', 'Feb'])
     expect(b!.magnitude).toBeGreaterThan(0)
   })
 
   it('reads a missing summer as a year biased low', () => {
     const s = seasonalSeries([2017, 2018, 2019, 2020], (y, m) => y === 2019 && (m === 7 || m === 8))
-    expect(seasonalBias(s, 2019)?.direction).toBe('low')
+    expect(seasonalBias(s, 2019)?.direction).toBe('below')
   })
 
   it('calls gaps spread across the year unbiased', () => {
@@ -161,7 +161,7 @@ describe('seasonalBias', () => {
     expect(b.neverObserved).toEqual(['Jan', 'Feb', 'Dec'])
     expect(b.missing).toEqual(['Jul'])
     // July is the seasonal maximum, so losing it pulls 2019 down.
-    expect(b.direction).toBe('low')
+    expect(b.direction).toBe('below')
   })
 
   it('measures bias against a typical year of this factor, not a true twelve', () => {

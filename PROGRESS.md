@@ -5,6 +5,53 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## Locking the historical architecture — 2026-08-10
+
+Contract before code, as with comparison. `HISTORICAL_EVIDENCE_MODEL.md` states
+the rule that decides the whole subsystem:
+
+> **Historical analysis is an evidence source, not a finding system.**
+
+Sentinel-2 and MODIS observations become derived temporal metrics, which enter
+the existing evidence model and produce the existing four finding states
+through the existing investigation engine. No new states, no new severity
+scale, no second interpretation layer. `radar.py` will not learn that
+Sentinel-2 exists; it receives factors, evidence and thresholds exactly as it
+does today, and the historical page is a *view* over the result.
+
+HE1–HE10 restate the evidence model for the places a satellite subsystem is
+uniquely tempted to break it — HE2 (a fabricated fifteen-year trend is the most
+convincing wrong thing this product could draw), HE6 (no usable observations
+give `no_data`, never `clear`), and HE9, which forbids causal language: "NDVI
+has declined 21% relative to the defined baseline" is permitted, "vegetation
+degradation detected" is not.
+
+**The baseline methodology is frozen in the document**, because it is the
+decision that is cheap now and expensive later. Seasonal window declared per
+metric (April–September for vegetation, June–August for LST, all months for
+built surface — a single global window would be wrong for at least one of
+them); usable observation excludes interpolated values; usable year needs three
+observations in the window; baseline is the first three usable years and recent
+the last three; medians throughout so one cloudy composite cannot move a
+fifteen-year figure. `METHOD_VERSION = "hist-1"`, recorded in every result.
+
+**EM11** joins the evidence model: no UI component may independently determine
+a finding state. Once two screens show the same evidence, each grows a small
+local rule, the rules drift, and the product holds three opinions about one
+site. `tests/test_em11_ui_never_decides.py` scans the frontend for a value
+comparison in the same expression as a finding-state literal, and includes a
+control asserting the scan can actually fail.
+
+It found one collision worth fixing: `coverage.ts` had
+`direction: 'high' | 'low'` for seasonal sampling bias — a field that reads as
+"severity: high" and is one careless wiring away from being coloured like one.
+Renamed to `above`/`below`; the user-facing prose still says "reads high",
+because that is how a person describes a number.
+
+Implementation deliberately not started. 717 Python tests (+5), 165 frontend.
+
+---
+
 ## The comparison UI — 2026-08-10
 
 Built to the contract rather than to a table. `/api/compare` assesses 2–4 sites

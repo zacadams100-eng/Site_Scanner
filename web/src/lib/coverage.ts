@@ -128,7 +128,14 @@ export function neverObservedMonths(series: Series): string[] {
 export interface SeasonalBias {
   /** Which way this year's mean is pushed, relative to a typical year of the
    *  same factor as the record is actually able to measure it. */
-  direction: 'high' | 'low' | 'none'
+  /** Which way the missing months push this year's mean.
+   *
+   *  `above`/`below`, not `high`/`low`: those two words are the severity
+   *  vocabulary of the evidence engine, and a field that reads as "severity:
+   *  high" is one careless wiring away from being coloured like one. This is a
+   *  statement about sampling, not about the site. See EVIDENCE_MODEL.md EM11.
+   */
+  direction: 'above' | 'below' | 'none'
   /** Size of the push, in the factor's own units. */
   magnitude: number
   /** Typical year-to-year movement, for scale. */
@@ -205,7 +212,7 @@ export function seasonalBias(series: Series, year: number): SeasonalBias | null 
   // Below the noise floor there is nothing worth telling anyone. Announcing a
   // bias the series' own wobble would swamp is how a caveat becomes clutter.
   const direction = Math.abs(magnitude) <= noise ? 'none'
-                  : magnitude > 0 ? 'high' : 'low'
+                  : magnitude > 0 ? 'above' : 'below'
 
   return { direction, magnitude, noise, missing, neverObserved }
 }
@@ -271,8 +278,15 @@ export function coverageCaveat(series: Series, r: AnnualRow): string | null {
     return `${head} — ${missing}. ${gaps} obviously bias the mean.`
   }
   const isAre = bias.missing.length === 1 ? 'which is' : 'which are'
-  return `${head} — ${missing}, ${isAre} ${bias.direction === 'high' ? 'below' : 'above'} ` +
-         `this factor's typical year, so ${r.year}'s figure reads ${bias.direction}. ` +
+  // The missing months sit on the opposite side to the bias they create:
+  // dropping the cold months is what makes the remaining mean read high.
+  //
+  // The prose keeps "high"/"low" because that is how a person describes a
+  // number; only the field value is `above`/`below`, to keep it out of the
+  // severity vocabulary. See the note on `direction`.
+  const reads = bias.direction === 'above' ? 'high' : 'low'
+  return `${head} — ${missing}, ${isAre} ${bias.direction === 'above' ? 'below' : 'above'} ` +
+         `this factor's typical year, so ${r.year}'s figure reads ${reads}. ` +
          `Not comparable with the other years.`
 }
 

@@ -118,6 +118,28 @@ may never be presented without its coverage.** Fewer flags can mean less looked
 at, and a comparison that hides that misleads in favour of the least
 investigated site. See `COMPARISON_CONTRACT.md`.
 
+### EM11 — No UI component may independently determine a finding state
+
+`flagged`, `clear`, `informational` and `not_assessed` are decided once, by the
+evidence engine, and every interface renders that decision. A component may
+*read* a state and style it; it may never *derive* one from a value.
+
+The historical chart must not decide "looks like a decline, show it red". The
+radar must not decide it either. Neither must an export, a PDF, or a
+comparison table.
+
+The failure this prevents is not hypothetical — it is what happens by default
+once two screens show the same evidence. Each grows a small local rule, the
+rules drift, and the product ends up holding three opinions about one site:
+radar says flagged, history says stable, the report says concerning. There must
+be **one interpretation, viewed several ways.**
+
+`tests/test_em11_ui_never_decides.py` scans the frontend for a value comparison
+in the same expression as a finding-state literal. That test catches the
+realistic mistake; the guarantee itself is architectural, and reviewers should
+treat any new threshold constant in `web/src/` as a defect until proven
+otherwise.
+
 ### EM9 — Every claim is traceable
 
 Factor, source, publisher, timestamp and assessment state, for every flag,
