@@ -101,6 +101,23 @@ consequence of an observation; "this site is suitable for development" is a
 professional opinion, and it belongs to the person whose name goes on the
 report. Every investigation traces to the flags that raised it and stops there.
 
+### EM10 — Comparison describes differences; it never ranks
+
+Comparison may describe differences between sites. It must not produce an
+overall ranking, score, grade, suitability assessment, recommendation or
+winner, and it must not order sites in a way that implies preference.
+
+EM7 already forbids scores across the whole product. EM10 exists separately
+because comparison is the first feature that will actively tempt someone to
+break EM7 — the user asks "which is best?" in plain language, the answer feels
+helpful, and a sortable total column arrives without anyone deciding to add
+ranking.
+
+It carries one further rule that has no equivalent elsewhere: **a flag count
+may never be presented without its coverage.** Fewer flags can mean less looked
+at, and a comparison that hides that misleads in favour of the least
+investigated site. See `COMPARISON_CONTRACT.md`.
+
 ### EM9 — Every claim is traceable
 
 Factor, source, publisher, timestamp and assessment state, for every flag,

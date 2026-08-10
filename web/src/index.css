@@ -2012,3 +2012,10 @@ td.cov-severe { color: var(--text-dim); }
 /* Disabled rather than hidden: "Not loaded 0" is itself a useful reading, and
    a filter row that changes shape between sites is hard to scan. */
 .log-filter:disabled { opacity: .45; cursor: default; }
+
+/* One line, because "observed" is a claim and the reader should not have to
+   infer which claim. */
+.log-key {
+  margin: 0 0 8px; font-size: 10.5px; line-height: 1.55; color: var(--text-faint);
+}
+.log-key b { font-weight: 600; color: var(--text-dim); }

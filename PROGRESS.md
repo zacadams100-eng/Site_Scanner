@@ -5,6 +5,52 @@ is overwritten, so the history of what was true when stays visible.
 
 ---
 
+## The comparison contract, written before the feature — 2026-08-10
+
+Comparison is the first thing Contour will build that actively tempts a
+developer to break EM7. The user asks "so which one is best?" in plain
+language, the answer feels helpful, and a sortable totals column arrives
+without anyone deciding to add ranking. So the specification came first:
+`COMPARISON_CONTRACT.md`, then **EM10**, then the tests, then the engine. No UI
+yet, deliberately — built UI-first, the natural shape of a comparison table is
+a column of sites and a row of totals, and the eye demands the totals be
+sortable.
+
+**The product answers "how do the evidence profiles differ", never "which site
+wins".** The trap it is shaped around:
+
+    Site A   4 flagged   18 observed    6 not assessed
+    Site C   0 flagged   11 observed   13 not assessed
+
+Site C reads as the better site. Site C is the *less examined* site. So **no
+flag count may ever be presented without its coverage**, and `coverage_warning`
+fires unprompted when the sites were not examined to comparable depth.
+
+Three layers and a hard stop: counts, topic-by-topic evidence, then
+deterministic differences over values *every* site observed. A factor only one
+site observed is a coverage difference, never a value difference — "Site A has
+more flood risk than Site B" when B was never checked is the specific error
+Layer 2 exists to make impossible.
+
+Two bugs found by writing the tests:
+
+- **My own disclaimer failed the forbidden-word scan** — `LIMITS` said "which
+  is preferable". The scan cannot tell denial from assertion, so the fixed
+  disclaimers are now excluded and *pinned* by a separate test instead, and
+  every sentence composed from site data goes through the strict scan.
+- **The coverage warning missed 4-observed versus 1-observed.** Comparing
+  *shares* of a 24-factor denominator hides large relative gaps when both sites
+  are sparse: 12 points of share, four times the evidence. A ratio check now
+  runs alongside the share check.
+
+Also renamed the log filter from "Assessed" to **"Observed"**, with a one-line
+key. "Assessed" reads as "we looked at it"; the claim is that a real source
+returned a usable value, and those are different.
+
+704 Python tests (+16), 165 frontend.
+
+---
+
 ## Freezing the evidence model — 2026-08-10
 
 Consolidation rather than features. The nine invariants that define what

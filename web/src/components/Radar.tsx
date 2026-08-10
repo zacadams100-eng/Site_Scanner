@@ -303,7 +303,11 @@ export default function Radar() {
                   haystack. The counts are on the buttons so the shape of the
                   evidence is readable without clicking anything. */}
               <div className="log-filters" role="group" aria-label="Filter the log">
-                {([['all', 'All'], ['assessed', 'Assessed'],
+                {/* "Assessed" was doing too much work: it reads as "we looked
+                    at it", when it means "a real source returned a usable
+                    value". Those are different claims, and this filter is the
+                    one place a professional counts the evidence. */}
+                {([['all', 'All'], ['assessed', 'Observed'],
                    ['not_selected', 'Not loaded'],
                    ['generated', 'No live source']] as const).map(([id, label]) => {
                   const n = id === 'all' ? log.length
@@ -319,6 +323,10 @@ export default function Radar() {
                   )
                 })}
               </div>
+              <p className="log-key">
+                <b>Observed</b> means a real source returned a usable value for
+                this area — not merely that the factor was loaded.
+              </p>
               <table className="log-table">
                 <tbody>
                   {log
@@ -327,7 +335,7 @@ export default function Radar() {
                     <tr key={row.factor} className={`log-${row.state}`}>
                       <td>{row.name}</td>
                       <td className="log-state">
-                        {row.state === 'assessed' ? 'assessed'
+                        {row.state === 'assessed' ? 'observed'
                           : row.state === 'generated' ? 'no live source'
                           : 'not loaded'}
                       </td>
