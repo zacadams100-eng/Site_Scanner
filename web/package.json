@@ -8,12 +8,13 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/build-hero-field.mjs",
-    "prebuild": "node scripts/copy-maplibre-worker.mjs && node scripts/build-hero-field.mjs && node scripts/build-sitemap.mjs",
+    "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/build-hero-field.mjs && node scripts/build-assets.mjs && node scripts/build-sitemap.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs && node scripts/build-hero-field.mjs && node scripts/build-assets.mjs && node scripts/build-sitemap.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "assets": "node scripts/build-assets.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Shell from './Shell'
 import HeroField from './HeroField'
+import Asset, { AssetCredits } from './Asset'
+import { SUPPLIED } from './assets.generated'
 import { PAGES, PRIMARY_CTA, APP_PATH } from './site'
 
 /**
@@ -20,10 +22,17 @@ import { PAGES, PRIMARY_CTA, APP_PATH } from './site'
 function Hero() {
   return (
     <section className="mk-hero">
-      {/* Behind the headline, not instead of it. Loads after first paint and
-          is decorative throughout — the page reads identically if it never
-          arrives. */}
-      <HeroField />
+      {/* Two states, one layout. Once a loop or an aerial is supplied it
+          becomes the hero; until then the generated field sheet holds the
+          space. The sheet is not a placeholder for the photograph — it is what
+          the hero looks like with no photography, and it is finished. */}
+      {SUPPLIED.heroVideo.file || SUPPLIED.heroStill.file ? (
+        <div className="mk-hero-media">
+          <Asset id={SUPPLIED.heroVideo.file ? 'heroVideo' : 'heroStill'} priority />
+        </div>
+      ) : (
+        <HeroField />
+      )}
       <div className="mk-wrap">
         <p className="mk-kicker">Environmental site intelligence</p>
         <h1 className="mk-h1">
@@ -100,9 +109,108 @@ export function Home() {
         </div>
       </section>
 
+      <ProductSection />
+      <FieldSection />
+      <BeforeAfterSection />
       <ScannerTeasers />
       <CtaBand />
     </Shell>
+  )
+}
+
+
+/**
+ * The product, shown rather than described.
+ *
+ * Screenshots of the real interface beside the raw material it reads —
+ * satellite, terrain, classification. Set as plates on paper, not as a feature
+ * grid: the claim is "this is a working instrument", and a template makes
+ * anything look like a template.
+ */
+function ProductSection() {
+  return (
+    <section className="mk-band mk-band-paper">
+      <div className="mk-wrap">
+        <p className="mk-kicker">The instrument / 01</p>
+        <h2 className="mk-h2">What it actually looks like</h2>
+        <p className="mk-lede mk-lede-sm">
+          A map you draw on, and a report that states what was found, what was
+          checked and cleared, and what could not be assessed at all.
+        </p>
+
+        <div className="mk-plates mk-plates-hero mk-plates-gap">
+          <Asset id="productReport" tilt={-1.2} tape="tl" caption="Site report · evidence coverage" />
+          <Asset id="productMap" tilt={1.6} caption="Map canvas · drawn site" />
+        </div>
+
+        <p className="mk-plate-note">
+          The evidence beneath every finding — imagery, terrain and
+          classification, read for the area you draw.
+        </p>
+        <div className="mk-plates mk-plates-stagger">
+          <Asset id="productSatellite" tilt={-2} halftone caption="Satellite" />
+          <Asset id="productTerrain" tilt={1.4} halftone caption="Terrain" />
+          <Asset id="productAnalysis" tilt={-1} halftone caption="Classification" />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The field-science section.
+ *
+ * The product exists because someone has to walk the site eventually. This
+ * says so, with photographs of the work rather than of software.
+ */
+function FieldSection() {
+  return (
+    <section className="mk-band mk-band-field">
+      <div className="mk-wrap">
+        <p className="mk-kicker">Field record / 02</p>
+        <h2 className="mk-h2">Built for people who go and look</h2>
+        <p className="mk-lede mk-lede-sm">
+          Site Scanner does not replace a survey. It decides what the survey
+          should be about — so the day in the field is spent on the questions
+          that were still open when you set off.
+        </p>
+
+        <div className="mk-plates mk-plates-field">
+          <Asset id="fieldSurvey" tilt={-2.4} tape="both" caption="Survey in progress" />
+          <Asset id="fieldNotebook" tilt={1.8} torn caption="Field record" />
+          <Asset id="fieldEquipment" tilt={-1.4} halftone caption="Instruments" />
+        </div>
+
+        <Asset id="fieldLandscape" className="mk-plate-wide" caption="The subject" />
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Before and after.
+ *
+ * Two frames of the same place, one plain and one carrying the analysis. It is
+ * the single clearest statement of what the product does, which is why it gets
+ * its own band and no competing furniture.
+ */
+function BeforeAfterSection() {
+  return (
+    <section className="mk-band">
+      <div className="mk-wrap">
+        <p className="mk-kicker">Before / after</p>
+        <h2 className="mk-h2">The same site, read</h2>
+        <div className="mk-plates mk-plates-2 mk-plates-ba">
+          <Asset id="beforeAnalysis" caption="Before · imagery only" />
+          <Asset id="afterAnalysis" caption="After · constraints and findings" />
+        </div>
+        <div className="mk-plates mk-plates-2 mk-plates-archive">
+          <Asset id="marketingMap" tilt={-1.6} halftone caption="Archival survey" />
+          <Asset id="marketingProperty" tilt={1.2} caption="Land under assessment" />
+        </div>
+        <AssetCredits />
+      </div>
+    </section>
   )
 }
 

@@ -3767,3 +3767,220 @@ td.cov-severe { color: var(--text-dim); }
   .hf-annot { opacity: .7; }
   .hf-sweep { display: none; }
 }
+
+/* ===========================================================================
+   PLATES — supplied imagery, and the frames waiting for it
+   ---------------------------------------------------------------------------
+   A "plate" is one photograph, screenshot or clip on the public site, in the
+   sense a printed field guide means it: a picture pinned to a page with a
+   number and a caption.
+
+   The collage vocabulary is opt-in per plate — tilt, tape, torn edge, overlap,
+   halftone. Nothing here applies unless a component asks for it, so the mess
+   is composed rather than automatic. That is the difference between a scrapbook
+   and an art-directed page: every angle is a decision someone made.
+   ========================================================================= */
+
+.plate {
+  position: relative; margin: 0; overflow: hidden;
+  background: var(--bone-200);
+  border: 1px solid var(--rule-400);
+  /* Photographs print on paper. The offset shadow is a physical print lying on
+     a surface, not a SaaS card floating over one — hard, close and warm. */
+  box-shadow: 3px 4px 0 rgb(21 24 23 / .07);
+}
+.plate-media { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ------------------------------------------------------------ collage marks */
+
+.plate-tilt { transform: rotate(var(--tilt, -1.5deg)); }
+.plate-overlap { margin-top: -14%; z-index: 2; }
+
+/* Masking tape. Two rectangles, slightly translucent, rotated against the
+   plate they hold — the small counter-angle is what makes it read as tape
+   rather than as a stripe. */
+.plate-tape::before, .plate-tape-both::after {
+  content: ''; position: absolute; z-index: 3;
+  width: 92px; height: 26px;
+  background: rgb(233 227 205 / .82);
+  border-left: 1px solid rgb(21 24 23 / .06);
+  border-right: 1px solid rgb(21 24 23 / .06);
+  box-shadow: 0 1px 2px rgb(21 24 23 / .08);
+}
+.plate-tape-tl::before, .plate-tape-both::before {
+  top: -12px; left: -22px; transform: rotate(-34deg);
+}
+.plate-tape-tr::before { top: -12px; right: -22px; transform: rotate(34deg); }
+.plate-tape-both::after { top: -12px; right: -22px; transform: rotate(34deg); left: auto; }
+
+/* Torn along the bottom. A mask rather than a border image: it removes paper
+   instead of drawing a jagged line on top of it, so whatever is behind the
+   plate shows through the tear. */
+.plate-torn {
+  --tear: polygon(0 0, 100% 0, 100% 94%, 96% 97%, 92% 93%, 87% 98%, 82% 94%,
+                  76% 99%, 70% 95%, 64% 99%, 58% 94%, 52% 98%, 46% 93%,
+                  40% 98%, 34% 94%, 28% 99%, 22% 95%, 16% 99%, 10% 94%,
+                  5% 98%, 0 94%);
+  clip-path: var(--tear);
+  border-bottom: 0; box-shadow: none;
+}
+
+/* Print halftone for the archival plates: a dot screen over the image, the way
+   a photograph looked reproduced in a field guide or an expedition catalogue. */
+.plate-halftone .plate-media { filter: saturate(.7) contrast(1.08); }
+.plate-halftone.is-supplied::after {
+  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  mix-blend-mode: multiply; opacity: .5;
+  background-image: radial-gradient(circle at center, rgb(21 24 23 / .5) 0.6px, transparent 0.9px);
+  background-size: 3.5px 3.5px;
+}
+
+/* Lifted clear of the tear on a torn plate: the clip-path cuts the whole
+   figure, and a caption sitting on the bottom edge came out with its
+   descenders removed. */
+.plate-torn .plate-cap { bottom: 8%; }
+.plate-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  padding: 7px 10px; margin: 0;
+  font-family: var(--font-display); font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--bone-100); background: rgb(13 32 25 / .82);
+}
+
+/* ------------------------------------------------------- the awaiting frame */
+
+/* Not a grey box. A shot list: which file, what it should show, what size to
+   export. The page is readable as a brief while the photography is being
+   commissioned, and stops being one the moment a file lands. */
+.plate.is-awaiting {
+  background:
+    repeating-linear-gradient(-45deg,
+      transparent 0 11px, rgb(116 122 98 / .05) 11px 22px),
+    var(--bone-050);
+  border-style: dashed; border-color: var(--stone-500); box-shadow: none;
+}
+.plate-awaiting {
+  position: absolute; inset: 0; padding: 20px;
+  display: flex; flex-direction: column; justify-content: center; gap: 7px;
+  text-align: center;
+}
+.plate-awaiting p { margin: 0; }
+.plate-slot {
+  font-size: 9px; letter-spacing: .26em; color: var(--signal-700);
+}
+.plate-path {
+  font-size: 10.5px; color: var(--ink-900);
+  word-break: break-all;
+}
+.plate-brief {
+  font-size: 12px; line-height: 1.5; color: var(--text-dim);
+  max-width: 34ch; margin: 2px auto 0 !important;
+}
+.plate-spec { font-size: 9px; letter-spacing: .16em; color: var(--stone-600); }
+
+/* Corner ticks, the way a print is marked up for trimming. */
+.plate-corner {
+  position: absolute; width: 9px; height: 9px;
+  border: 0 solid var(--stone-500);
+}
+.plate-corner-tl { top: 7px; left: 7px; border-top-width: 1px; border-left-width: 1px; }
+.plate-corner-tr { top: 7px; right: 7px; border-top-width: 1px; border-right-width: 1px; }
+.plate-corner-bl { bottom: 7px; left: 7px; border-bottom-width: 1px; border-left-width: 1px; }
+.plate-corner-br { bottom: 7px; right: 7px; border-bottom-width: 1px; border-right-width: 1px; }
+
+.mk-credits {
+  margin: 26px 0 0; font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--stone-600);
+}
+
+/* ------------------------------------------------------------- arrangements */
+
+/* Deliberately not a grid of equal cells. A field guide sets a large plate
+   against two small ones and lets the caption run under whichever it belongs
+   to — regular grids are what make a page look like a template. */
+.mk-plates { display: grid; gap: 20px; align-items: start; }
+.mk-plates-2 { grid-template-columns: 1fr 1fr; }
+.mk-plates-hero { grid-template-columns: 1.6fr 1fr; }
+.mk-plates-3 { grid-template-columns: repeat(3, 1fr); }
+.mk-plates-stagger { grid-template-columns: 1fr 1fr 1fr; }
+.mk-plates-stagger > *:nth-child(2) { margin-top: 34px; }
+.mk-plates-stagger > *:nth-child(3) { margin-top: 16px; }
+
+.mk-band-paper {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgb(116 122 98 / .05) 27px 28px),
+    var(--bone-050);
+}
+
+@media (max-width: 760px) {
+  /* The collage stacks. Tilt and overlap survive at a reduced amount — they
+     are the character — but the staggering does not, because a column of
+     offset plates on a phone is just inconsistent margins. */
+  .mk-plates-2, .mk-plates-3, .mk-plates-hero, .mk-plates-stagger {
+    grid-template-columns: 1fr;
+  }
+  .mk-plates-stagger > *:nth-child(2), .mk-plates-stagger > *:nth-child(3) { margin-top: 0; }
+  .plate-tilt { transform: rotate(calc(var(--tilt, -1.5deg) * .5)); }
+  .plate-overlap { margin-top: -8%; }
+  .plate-brief { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A looping clip is motion the visitor did not ask for. The poster frame is
+     the same picture, held still. */
+  .plate video { display: none; }
+  .plate.is-supplied:has(video) {
+    background-image: var(--poster); background-size: cover; background-position: center;
+  }
+}
+
+/* Section-specific plate arrangements. Each is a composition rather than a
+   reusable grid — that is the point of them. */
+.mk-plates-gap { margin-top: 30px; }
+.mk-plates-field { display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 22px; margin-top: 28px; }
+.mk-plates-ba { margin-top: 26px; gap: 16px; }
+.mk-plates-archive { margin-top: 30px; }
+.mk-plate-wide { margin-top: 30px; }
+.mk-plate-note {
+  margin: 52px 0 22px; font-family: var(--font-display); font-size: 12px;
+  font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--structure);
+}
+/* The field band is the one dark section: a page of paper plates reads better
+   with one spread that inverts, and this is the section about being outside. */
+.mk-band-field { background: var(--forest-900); color: var(--bone-100); }
+.mk-band-field .mk-h2, .mk-band-field .mk-kicker { color: var(--bone-100); }
+.mk-band-field .mk-lede { color: var(--forest-200); }
+.mk-band-field .plate.is-awaiting {
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 11px, rgb(241 238 229 / .05) 11px 22px),
+    rgb(241 238 229 / .04);
+  border-color: rgb(241 238 229 / .3);
+}
+.mk-band-field .plate-path { color: var(--bone-100); }
+.mk-band-field .plate-brief { color: var(--forest-200); }
+.mk-band-field .plate-slot { color: var(--signal-500); }
+.mk-band-field .plate-corner { border-color: rgb(241 238 229 / .4); }
+
+/* When real hero media arrives it fills the frame the field sheet held. */
+.mk-hero-media { position: absolute; inset: 0; overflow: hidden; }
+.mk-hero-media .plate {
+  width: 100%; height: 100%; border: 0; box-shadow: none; aspect-ratio: auto !important;
+}
+.mk-hero-media .plate-media { filter: saturate(.78) contrast(1.03); }
+/* Same contrast protection the generated sheet gets, so the headline holds
+   over a photograph as well as over cartography. */
+.mk-hero-media::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(to right, rgb(250 248 243 / .95) 0%, rgb(250 248 243 / .84) 28%,
+                              rgb(250 248 243 / .2) 52%, rgb(250 248 243 / 0) 70%);
+}
+@media (max-width: 760px) {
+  .mk-plates-field { grid-template-columns: 1fr; }
+  .mk-hero-media::after {
+    background: linear-gradient(to bottom, rgb(250 248 243 / .93) 0%,
+                                           rgb(250 248 243 / .8) 46%,
+                                           rgb(250 248 243 / .35) 100%);
+  }
+}
