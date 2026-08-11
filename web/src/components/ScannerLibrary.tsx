@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import BrandMark from './BrandMark'
 import type { ScannerInfo } from '../types'
+import { voiceFor } from '../lib/scannerVoice'
 
 /**
  * The scanner library — the application's front door.
@@ -137,8 +138,14 @@ function ScannerPlate({ scanner, index, onOpen }:
     scanner.coverage_name ? { label: 'Coverage', value: scanner.coverage_name } : null,
   ].filter((x): x is { label: string; value: string } => x != null)
 
+  // The instrument case: each scanner is its own drawer, with its own
+  // vocabulary and its own mark. `data-scanner` drives the palette, exactly as
+  // it does in the workspace, so a scanner looks the same in the case as it
+  // does in the hand.
+  const voice = voiceFor(scanner.id)
+
   return (
-    <li className="lib-plate">
+    <li className="lib-plate" data-scanner={scanner.id}>
       <button className="lib-plate-face" type="button" onClick={onOpen}
               aria-label={`Open the ${scanner.name} scanner`}>
         <Contours />
@@ -146,8 +153,13 @@ function ScannerPlate({ scanner, index, onOpen }:
         <span className="lib-plate-index mono">{String(index).padStart(2, '0')}</span>
 
         <span className="lib-plate-body">
+          <span className="lib-plate-inst mono">
+            Field instrument {voice.instrument}
+          </span>
           <span className="lib-plate-name">{scanner.name}</span>
+          <span className="lib-plate-title">{voice.title}</span>
           <span className="lib-plate-subject">{scanner.subject}</span>
+          <span className="lib-plate-question">{voice.question}</span>
         </span>
 
         {stats.length > 0 && (

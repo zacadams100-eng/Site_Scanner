@@ -4122,3 +4122,260 @@ td.cov-severe { color: var(--text-dim); }
   .mk-inline-cta p { flex-basis: 100%; font-size: 14px; }
   .mk-inline-cta .mk-cta { flex: 1 1 auto; text-align: center; }
 }
+
+/* ===========================================================================
+   THREE INSTRUMENTS
+   ---------------------------------------------------------------------------
+   One case, one set of engineering, three sets of dials.
+
+   Everything below hangs off `[data-scanner]` on the application root. No
+   component knows a scanner id — the workspace, radar, evidence drawer and
+   report all render whatever the API describes, and the difference between
+   the three is this stylesheet plus one lookup table in `lib/scannerVoice.ts`.
+   A fourth scanner needs a palette block here and a row there.
+
+   The palettes are deliberately not the obvious ones. Land is not "green",
+   Habitat is not "darker green" and Coastal is not "blue": land is a survey
+   sheet in parchment and survey yellow, habitat is a herbarium in moss and
+   specimen red, coastal is an Admiralty chart in ink and chart blue. They
+   share the bone ground and the charcoal type, which is what keeps them one
+   company's equipment rather than three products.
+   ========================================================================= */
+
+.app {
+  /* Instrument defaults. Each scanner block below overrides only what it
+     changes, so an unlisted scanner still renders in the house style. */
+  --inst-ink: var(--forest-800);
+  --inst-accent: var(--signal-700);
+  --inst-wash: var(--bone-050);
+  --inst-rule: var(--rule-400);
+  --inst-sig: var(--khaki-600);
+}
+
+/* Land — a survey sheet. Parchment ground, terrain green, survey yellow for
+   the marks a surveyor makes by hand. */
+.app[data-scanner="land"] {
+  --inst-ink: #2f4033;
+  --inst-accent: #a8410f;
+  --inst-wash: #f4f1e6;
+  --inst-rule: #c8c2ad;
+  --inst-sig: #7b8468;
+  --inst-mark: #8a6520;
+}
+
+/* Habitat — a herbarium sheet. Moss and chlorophyll against cream, with the
+   muted red of a specimen label rather than an alert. */
+.app[data-scanner="habitat"] {
+  --inst-ink: #24402c;
+  --inst-accent: #8a4038;
+  --inst-wash: #f2f2e6;
+  --inst-rule: #c3c9b4;
+  --inst-sig: #5f7c42;
+  --inst-mark: #6b7f3f;
+}
+
+/* Coastal — an Admiralty chart. Ink on off-white, faded chart blue, and the
+   one orange kept for a warning because that is what orange means at sea. */
+.app[data-scanner="coastal"] {
+  --inst-ink: #1c3040;
+  --inst-accent: #b4531a;
+  --inst-wash: #eef1f0;
+  --inst-rule: #b6c2c4;
+  --inst-sig: #4b7387;
+  --inst-mark: #2f6076;
+}
+
+/* --------------------------------------------------------------- nameplate */
+
+.ident {
+  position: relative; overflow: hidden;
+  margin: 0 0 20px; padding: 20px 34px 18px 22px;
+  background: var(--inst-wash);
+  border: 1px solid var(--inst-rule);
+  border-left: 3px solid var(--inst-ink);
+}
+.ident-body { position: relative; z-index: 1; max-width: 34ch; }
+.ident-inst {
+  margin: 0 0 10px; font-size: 9px; letter-spacing: .26em;
+  text-transform: uppercase; color: var(--inst-sig);
+}
+.ident-num { color: var(--inst-ink); font-weight: 500; }
+.ident-title {
+  margin: 0 0 6px; font-family: var(--font-display); font-size: 26px;
+  font-weight: 700; line-height: 1; letter-spacing: .01em;
+  text-transform: uppercase; color: var(--inst-ink);
+}
+.ident-question {
+  margin: 0 0 4px; font-size: 14.5px; font-style: italic; color: var(--text-dim);
+}
+.ident-strap {
+  margin: 0 0 10px; font-family: var(--font-display); font-size: 12px;
+  font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--inst-ink);
+}
+.ident-subject {
+  margin: 0; font-size: 10px; letter-spacing: .1em; color: var(--text-faint);
+}
+/* The margin note, set vertically up the right edge the way a plate number is
+   printed on a survey sheet. One of the small eccentricities — and every one
+   of them is a true statement about the instrument. */
+.ident-margin {
+  position: absolute; right: 6px; bottom: 12px; z-index: 1; margin: 0;
+  writing-mode: vertical-rl; font-size: 8px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--inst-sig); opacity: .75;
+}
+.ident-sig {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  width: 200px; height: 112px; opacity: .38;
+  stroke: var(--inst-sig); fill: var(--inst-sig); pointer-events: none;
+}
+.ident-sig-contour { fill: none; }
+.ident-sig-waterline { fill: none; }
+
+/* ------------------------------------------------------------ field checks */
+
+.checks-list { list-style: none; margin: 12px 0 0; padding: 0;
+               display: flex; flex-direction: column; gap: 8px; }
+/* An index card: tab on the left, body, stamp on the right. */
+.check {
+  position: relative; display: grid;
+  grid-template-columns: 92px 1fr auto; align-items: start; gap: 14px;
+  padding: 12px 14px 12px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--inst-rule);
+}
+.check-tab {
+  padding: 12px 10px 12px 12px; margin: -12px 0 -12px 0;
+  font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--text-faint); align-self: stretch;
+  border-right: 1px dashed var(--line);
+}
+.check-name {
+  margin: 0 0 3px; font-family: var(--font-display); font-size: 13px;
+  font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text);
+}
+.check-detail { margin: 0 0 5px; font-size: 12.5px; color: var(--text-dim); }
+.check-cover { margin: 0; font-size: 10px; color: var(--text-faint); }
+.check-state { display: flex; flex-direction: column; align-items: center;
+               gap: 3px; padding-right: 4px; min-width: 74px; }
+.check-glyph { font-size: 15px; line-height: 1; color: var(--inst-rule); }
+.check-label {
+  font-size: 8px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-faint); text-align: center;
+}
+/* State is carried by the glyph first and the colour second, so the list reads
+   in greyscale and to a colour-blind reader. */
+.check-flagged { border-left-color: var(--flag); }
+.check-flagged .check-glyph { color: var(--flag); }
+.check-flagged .check-label { color: var(--flag); }
+.check-clear { border-left-color: var(--inst-sig); }
+.check-clear .check-glyph { color: var(--inst-sig); }
+.check-partial { border-left-color: var(--amber-500); }
+.check-partial .check-glyph { color: var(--amber-600); }
+.check-not_assessed { border-left-style: dashed; }
+.check-not_assessed .check-name { color: var(--text-dim); }
+
+/* ------------------------------------------------------- signal unavailable */
+
+/* Not a disabled row. A capability note: what was asked, why nothing was
+   read, and what would make it readable. */
+.gaps { margin-top: 4px; }
+.gaps-head { display: flex; align-items: baseline; gap: 10px; }
+.gaps-count {
+  font-size: 11px; padding: 1px 7px; color: var(--text-faint);
+  border: 1px solid var(--line);
+}
+.gaps-note {
+  margin: 6px 0 14px; font-size: 12px; color: var(--text-dim); max-width: 54ch;
+}
+.gap-group + .gap-group { margin-top: 16px; }
+.gap-topic {
+  margin: 0 0 7px; font-size: 9px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--inst-sig);
+  padding-bottom: 5px; border-bottom: 1px solid var(--line);
+}
+.gap-list { list-style: none; margin: 0; padding: 0;
+            display: flex; flex-direction: column; gap: 7px; }
+.gap-card {
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px dashed var(--rule-400);
+}
+.gap-head { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.gap-glyph { font-size: 13px; line-height: 1; color: var(--text-faint); }
+.gap-status {
+  font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--text-faint);
+}
+.gap-ask {
+  margin: 0 0 8px; font-size: 13px; color: var(--text);
+  /* The check's own words for what it was looking for. */
+  font-style: italic;
+}
+.gap-detail {
+  display: grid; grid-template-columns: 92px 1fr; gap: 4px 12px; margin: 0;
+}
+.gap-detail dt {
+  font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-faint); padding-top: 2px;
+}
+.gap-detail dd { margin: 0; font-size: 12px; color: var(--text-dim); }
+.gap-needs { display: flex; flex-wrap: wrap; gap: 5px; }
+.gap-chip {
+  font-size: 9.5px; padding: 1px 6px; color: var(--text-dim);
+  background: var(--bone-100); border: 1px solid var(--line);
+}
+
+/* ------------------------------------------------------------------ mobile */
+
+@media (max-width: 760px) {
+  .ident { padding: 16px 16px 14px; }
+  .ident-title { font-size: 21px; }
+  .ident-sig { width: 150px; opacity: .2; right: -30px; }
+  .ident-margin { display: none; }
+  .ident-body { max-width: none; }
+  /* The tab goes above the body rather than beside it: a 92px column on a
+     390px screen leaves the topic name three words wide. */
+  .check { grid-template-columns: 1fr auto; gap: 10px; padding: 10px 12px; }
+  .check-tab {
+    grid-column: 1 / -1; margin: 0 0 2px; padding: 0 0 6px;
+    border-right: 0; border-bottom: 1px dashed var(--line);
+  }
+  .gap-detail { grid-template-columns: 1fr; gap: 2px; }
+  .gap-detail dt { padding-top: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ident-sig { animation: none !important; }
+}
+
+/* --------------------------------------------------- the instrument case */
+
+/* Each drawer in the case carries its own palette, the same one the workspace
+   uses. A scanner looks the same in the library as it does in the hand, which
+   is what makes the library a case of instruments rather than a menu. */
+.lib-plate[data-scanner="land"] .lib-plate-face { --case: #2f4033; --case-sig: #7b8468; }
+.lib-plate[data-scanner="habitat"] .lib-plate-face { --case: #24402c; --case-sig: #5f7c42; }
+.lib-plate[data-scanner="coastal"] .lib-plate-face { --case: #1c3040; --case-sig: #4b7387; }
+.lib-plate[data-scanner] .lib-plate-face { background: var(--case, var(--forest-800)); }
+.lib-plate[data-scanner] .lib-contours { color: var(--case-sig, currentColor); }
+
+.lib-plate-inst {
+  display: block; font-size: 8.5px; letter-spacing: .24em;
+  text-transform: uppercase; color: var(--forest-200); opacity: .8;
+  margin-bottom: 7px;
+}
+.lib-plate-title {
+  display: block; font-family: var(--font-display); font-size: 12px;
+  font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--signal-500); margin-top: 2px;
+}
+.lib-plate-question {
+  display: block; margin-top: 7px; font-size: 13px; font-style: italic;
+  color: var(--forest-100); opacity: .85;
+}
+@media (max-width: 760px) {
+  .lib-plate-question { font-size: 12px; }
+}

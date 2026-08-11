@@ -162,7 +162,8 @@ export default function App() {
   if (library) return <ScannerLibrary />
 
   return (
-    <div className={`app${sidebarOpen ? '' : ' rail-collapsed'}${panelOpen ? '' : ' panel-closed'}`}>
+    <div data-scanner={scannerId}
+         className={`app${sidebarOpen ? '' : ' rail-collapsed'}${panelOpen ? '' : ' panel-closed'}`}>
       <header className="topbar">
         {/* The wordmark is the way back. A user must always know which
             scanner they are in and how to leave it, and burying that in a

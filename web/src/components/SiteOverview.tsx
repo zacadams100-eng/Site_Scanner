@@ -1,4 +1,7 @@
 import { useStore } from '../store'
+import ScannerIdentity from './ScannerIdentity'
+import FieldChecks from './FieldChecks'
+import SignalGaps from './SignalGap'
 import {
   assessedText, attentionRows, coverageBar, evidenceRows, gapCauses,
   historicalRows, overlapNote, siteFacts,
@@ -67,6 +70,8 @@ export default function SiteOverview() {
 
   return (
     <div className="ovw">
+      <ScannerIdentity />
+
       {/* The header of a field assessment: what this is, and the measurements
           that identify it. Labelled rather than run together in a caption. */}
       <header className="ovw-head">
@@ -98,6 +103,15 @@ export default function SiteOverview() {
             </div>
           </div>
           <p className="ovw-coverage mono">{assessedText(coverage)}</p>
+        </section>
+      )}
+
+      {/* The scanner's own checklist, in its own vocabulary. Placed above the
+          evidence counts because "which checks ran" is the question that makes
+          those counts mean anything. */}
+      {data.radar?.topics && (
+        <section className="ovw-section">
+          <FieldChecks topics={data.radar.topics} />
         </section>
       )}
 
@@ -196,6 +210,15 @@ export default function SiteOverview() {
           <button className="ovw-link" onClick={() => setTab('radar')}>
             Explore the historical record →
           </button>
+        </section>
+      )}
+
+      {/* Every check that could not run, as a capability note rather than a
+          greyed-out row. See SignalGap.tsx — this is the component the
+          product's credibility rests on. */}
+      {data.radar?.topics && (
+        <section className="ovw-section">
+          <SignalGaps topics={data.radar.topics} />
         </section>
       )}
 
