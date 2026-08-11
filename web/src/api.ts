@@ -40,12 +40,24 @@ export async function fetchCatalog(scanner?: string): Promise<Catalog> {
   return res.json()
 }
 
+/**
+ * Every request that runs an assessment names the scanner that runs it.
+ *
+ * This was missing, and it was not cosmetic: `ScannedRequest.scanner` defaults
+ * to `land` on the backend, so a report requested from inside the Habitat
+ * scanner came back assessed by Land's rules against Land's factor list. The
+ * shell said HABITAT, the layers were habitat layers, and the findings were
+ * not. Scanner identity has to travel with the work, not only with the
+ * catalogue that describes it.
+ */
 export function fetchSeries(
   geometry: GeoJSON.Polygon,
   factorIds: string[],
+  scanner: string,
   signal?: AbortSignal,
 ): Promise<SeriesResponse> {
-  return post<SeriesResponse>('/api/series', { geometry, factor_ids: factorIds }, signal)
+  return post<SeriesResponse>('/api/series',
+    { geometry, factor_ids: factorIds, scanner }, signal)
 }
 
 /**
@@ -59,17 +71,19 @@ export function fetchBrief(
   geometry: GeoJSON.Polygon,
   factorIds: string[],
   siteName: string,
+  scanner: string,
   signal?: AbortSignal,
 ): Promise<Brief> {
   return post<Brief>('/api/brief',
-    { geometry, factor_ids: factorIds, site_name: siteName }, signal)
+    { geometry, factor_ids: factorIds, site_name: siteName, scanner }, signal)
 }
 
 export function fetchCells(
   geometry: GeoJSON.Polygon,
+  scanner: string,
   signal?: AbortSignal,
 ): Promise<CellsResponse> {
-  return post<CellsResponse>('/api/cells', { geometry, resolution: 14 }, signal)
+  return post<CellsResponse>('/api/cells', { geometry, resolution: 14, scanner }, signal)
 }
 
 /** True when the mock backend answered — surfaced in the UI so nobody mistakes
@@ -105,8 +119,9 @@ export function ask(
 export function compareSites(
   sites: { id: string; name: string; geometry: GeoJSON.Polygon }[],
   factorIds: string[],
+  scanner: string,
   signal?: AbortSignal,
 ): Promise<Comparison> {
   return post<Comparison>('/api/compare',
-                          { sites, factor_ids: factorIds }, signal)
+                          { sites, factor_ids: factorIds, scanner }, signal)
 }

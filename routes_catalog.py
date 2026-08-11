@@ -141,9 +141,16 @@ def get_catalog(scanner: str = scanners.DEFAULT_SCANNER) -> Dict[str, Any]:
             "id": scanner.id, "name": scanner.name, "subject": scanner.subject,
             "implemented": scanner.implemented,
         },
+        # The counts are the registry's own, not a description of it. A
+        # declared-but-unbuilt scanner reports zeroes because it has nothing,
+        # which is the honest thing for a library card to show — the
+        # alternative is a frontend inventing plausible numbers for a product
+        # that does not exist yet.
         "scanners": [
             {"id": s.id, "name": s.name, "subject": s.subject,
-             "implemented": s.implemented}
+             "implemented": s.implemented,
+             "topic_count": len(s.topics), "factor_count": len(s.factors),
+             "coverage_name": s.coverage_name}
             for s in (scanners.resolve(i) for i in scanners.ids())
         ],
         "coverage": {"name": scanner.coverage_name or "not established",

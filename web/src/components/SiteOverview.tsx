@@ -1,7 +1,7 @@
 import { useStore } from '../store'
 import {
-  assessedText, attentionRows, evidenceRows, gapCauses, historicalRows,
-  locationLine, overlapNote,
+  assessedText, attentionRows, coverageBar, evidenceRows, gapCauses,
+  historicalRows, overlapNote, siteFacts,
 } from '../lib/overview'
 
 /**
@@ -27,6 +27,13 @@ import {
  * no traffic light for the site. A summary screen is precisely where "Site
  * health: 72/100" gets proposed, and a score hides its own inputs while the
  * whole argument for this tool is that it shows them.
+ *
+ * The redesign put a large figure on this screen, and exactly one: **evidence
+ * coverage**. It is safe at that size because it rates the assessment rather
+ * than the site, and it moves the opposite way to a score — it falls as less
+ * is known. The four state counts stay at equal weight beneath it, because the
+ * eye reads size as importance and a flag count set large is a verdict with
+ * extra steps. `lib/overview.test.ts` pins both properties.
  *
  * **No state of its own** (EM11). Every label and every colour comes from
  * `lib/overview.ts`, which reads the engine's `state`. The specific trap here
@@ -55,15 +62,44 @@ export default function SiteOverview() {
   const overlap = overlapNote(coverage)
   const history = historicalRows(data.historical)
   const attention = attentionRows(data.radar?.investigations)
+  const facts = siteFacts(data.area_ha, data.centroid)
+  const bar = coverageBar(coverage)
 
   return (
     <div className="ovw">
+      {/* The header of a field assessment: what this is, and the measurements
+          that identify it. Labelled rather than run together in a caption. */}
       <header className="ovw-head">
-        <h2 className="ovw-title">{projectName || 'Site overview'}</h2>
-        <p className="ovw-sub mono">
-          {locationLine(data.area_ha, data.centroid)}
-        </p>
+        <span className="field-label">Site</span>
+        <h2 className="ovw-title">{projectName || 'Untitled site'}</h2>
+        {facts.length > 0 && (
+          <dl className="ovw-facts">
+            {facts.map((f) => (
+              <div className="ovw-fact" key={f.label}>
+                <dt className="ovw-fact-label">{f.label}</dt>
+                <dd className="ovw-fact-value mono">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </header>
+
+      {/* ---- Evidence coverage ---------------------------------------- */}
+      {/* The only large figure on this screen. See the module note: it rates
+          the assessment, not the site, and it falls as less is known. */}
+      {bar && (
+        <section className="ovw-section ovw-cover">
+          <h3 className="ovw-h">Evidence coverage</h3>
+          <div className="ovw-cover-row">
+            <span className="readout readout-lg">{bar.pct}<span className="ovw-pct">%</span></span>
+            <div className="ovw-cover-bar" role="img"
+                 aria-label={`${bar.assessed} of ${bar.relevant} factors assessed`}>
+              <span className="ovw-cover-fill" style={{ width: `${bar.pct}%` }} />
+            </div>
+          </div>
+          <p className="ovw-coverage mono">{assessedText(coverage)}</p>
+        </section>
+      )}
 
       {/* ---- Evidence ------------------------------------------------- */}
       <section className="ovw-section">
@@ -78,8 +114,9 @@ export default function SiteOverview() {
         </ul>
         {/* Never omitted and never separated from the counts above it: a flag
             count without its denominator misleads in favour of the site that
-            was looked at least. */}
-        <p className="ovw-coverage mono">{assessedText(coverage)}</p>
+            was looked at least. Shown here only when the bar above is absent,
+            so the statement appears exactly once. */}
+        {!bar && <p className="ovw-coverage mono">{assessedText(coverage)}</p>}
         {/* The four counts above are not a partition — `flagged` and
             `informational` are independent factor sets and one factor can be
             in both. This is the screen where a reader will try to add them, so

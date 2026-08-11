@@ -203,3 +203,56 @@ export function locationLine(areaHa: number | undefined,
   if (centroid) parts.push(`${centroid.lat.toFixed(4)}, ${centroid.lng.toFixed(4)}`)
   return parts.join(' · ')
 }
+
+/**
+ * The same facts, labelled, for the header block.
+ *
+ * A field assessment names its measurements rather than running them together
+ * in a caption — "AREA 24.6 ha" is readable at a glance in a way that
+ * "24.6 ha · 51.2400, -0.5700" is not. Same rule as `locationLine`: **no
+ * county, ever.** A shape the user drew has no administrative area attached,
+ * and deriving one from a coordinate without a boundary dataset would put a
+ * guess in the position a reader trusts most.
+ *
+ * A fact that is missing is omitted rather than shown empty or filled with a
+ * placeholder — a labelled blank reads as a value the product failed to load.
+ */
+export interface SiteFact { label: string; value: string }
+
+export function siteFacts(areaHa: number | undefined,
+                          centroid: { lng: number; lat: number } | undefined): SiteFact[] {
+  const out: SiteFact[] = []
+  if (areaHa !== undefined && areaHa !== null) {
+    out.push({ label: 'Area', value: `${areaHa.toLocaleString()} ha` })
+  }
+  if (centroid) {
+    out.push({ label: 'Latitude', value: centroid.lat.toFixed(4) })
+    out.push({ label: 'Longitude', value: centroid.lng.toFixed(4) })
+  }
+  return out
+}
+
+/**
+ * Evidence coverage as a proportion, for the bar.
+ *
+ * **This is not a score, and the distinction is the whole reason it is safe to
+ * draw large.** EM7 forbids a number that rates the site; coverage rates *the
+ * assessment*. It cannot flatter a site, because it falls when less is known —
+ * the direction a score would move is the opposite of the direction this one
+ * does. A site at 90% coverage is not better than one at 50%; more of it was
+ * legible.
+ *
+ * `assessed / relevant`, both of which the engine computes. Returns null when
+ * there is nothing to divide, so the bar is absent rather than showing a
+ * confident 0% for a report that has not run.
+ */
+export interface CoverageBar { assessed: number; relevant: number; pct: number }
+
+export function coverageBar(coverage: Coverage | undefined): CoverageBar | null {
+  if (!coverage || !coverage.relevant) return null
+  return {
+    assessed: coverage.assessed,
+    relevant: coverage.relevant,
+    pct: Math.round((coverage.assessed / coverage.relevant) * 100),
+  }
+}

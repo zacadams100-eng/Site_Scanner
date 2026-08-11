@@ -34,7 +34,7 @@ export default function BrandMark({ className }: { className?: string }) {
       {/* Contour rings on the back: concentric, the way a dome is drawn on a
           topographic sheet. Arcs were tried first and read as a mouth, which
           made the mark a cartoon. */}
-      <g stroke="var(--paper-100, #f8f6f2)" strokeWidth="1.1" fill="none" opacity=".5">
+      <g stroke="var(--bone-100, #f8f6f2)" strokeWidth="1.1" fill="none" opacity=".5">
         <ellipse cx="16" cy="18.2" rx="6" ry="4.2" />
         <ellipse cx="16" cy="18.2" rx="3.2" ry="2.2" />
       </g>
@@ -42,8 +42,8 @@ export default function BrandMark({ className }: { className?: string }) {
       {/* Eyes, above the head line — the read that says "frog" at 16px. */}
       <circle cx="11.4" cy="9.6" r="4.1" fill="currentColor" />
       <circle cx="20.6" cy="9.6" r="4.1" fill="currentColor" />
-      <circle cx="11.4" cy="9.6" r="2.2" fill="var(--paper-000, #fff)" />
-      <circle cx="20.6" cy="9.6" r="2.2" fill="var(--paper-000, #fff)" />
+      <circle cx="11.4" cy="9.6" r="2.2" fill="var(--bone-000, #fff)" />
+      <circle cx="20.6" cy="9.6" r="2.2" fill="var(--bone-000, #fff)" />
       <circle cx="11.4" cy="9.6" r="1.1" fill="currentColor" />
       <circle cx="20.6" cy="9.6" r="1.1" fill="currentColor" />
     </svg>

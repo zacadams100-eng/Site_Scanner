@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assessedText, attentionRows, changeArrow, changeMagnitude, evidenceRows,
-  gapCauses, historicalRows, locationLine, overlapNote,
+  assessedText, attentionRows, changeArrow, changeMagnitude, coverageBar,
+  evidenceRows, gapCauses, historicalRows, locationLine, overlapNote, siteFacts,
 } from './overview'
 import type { Coverage, HistoricalEntry, Investigation } from '../types'
 
@@ -208,5 +208,65 @@ describe('location line', () => {
   it('drops what it does not have instead of printing a placeholder', () => {
     expect(locationLine(undefined, undefined)).toBe('')
     expect(locationLine(24.6, undefined)).toBe('24.6 ha')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The header facts, and the one number the overview is allowed to draw large
+// ---------------------------------------------------------------------------
+describe('site facts', () => {
+  it('labels each measurement rather than running them together', () => {
+    expect(siteFacts(24.6, { lng: -0.57, lat: 51.24 })).toEqual([
+      { label: 'Area', value: '24.6 ha' },
+      { label: 'Latitude', value: '51.2400' },
+      { label: 'Longitude', value: '-0.5700' },
+    ])
+  })
+
+  it('never invents an administrative area', () => {
+    // Same rule as locationLine, restated where the redesign moved the header.
+    // A drawn shape has no county, and a briefing header is exactly where an
+    // invented one would be believed.
+    const text = siteFacts(24.6, { lng: -0.57, lat: 51.24 })
+      .map((f) => `${f.label} ${f.value}`).join(' ')
+    expect(text).not.toMatch(/[A-Z][a-z]+shire|Surrey|County|District|Borough/)
+  })
+
+  it('omits a fact it does not have rather than labelling a blank', () => {
+    expect(siteFacts(undefined, undefined)).toEqual([])
+    expect(siteFacts(24.6, undefined)).toEqual([{ label: 'Area', value: '24.6 ha' }])
+  })
+})
+
+describe('coverage bar', () => {
+  it('is assessed over relevant, and nothing else', () => {
+    expect(coverageBar(coverage({ relevant: 24, assessed: 6 })))
+      .toEqual({ assessed: 6, relevant: 24, pct: 25 })
+  })
+
+  it('is absent rather than a confident zero when there is nothing to divide', () => {
+    // A report that has not run must not render "0%" — that reads as a
+    // measured result rather than as the absence of one.
+    expect(coverageBar(undefined)).toBeNull()
+    expect(coverageBar(coverage({ relevant: 0, assessed: 0 }))).toBeNull()
+  })
+
+  it('is coverage, not a score: it falls as less is known', () => {
+    // The reason this is the one number the overview may draw large. EM7
+    // forbids rating the site; this rates the assessment, and it moves in the
+    // opposite direction to the number a score would be — more unassessed
+    // factors make it worse, never better.
+    const looked = coverageBar(coverage({ relevant: 24, assessed: 20 }))!
+    const barely = coverageBar(coverage({ relevant: 24, assessed: 2 }))!
+    expect(looked.pct).toBeGreaterThan(barely.pct)
+  })
+
+  it('does not move when findings change, only when coverage does', () => {
+    // A site with every assessed factor flagged and one with every assessed
+    // factor clear have identical coverage. If this ever differs, coverage has
+    // been quietly turned into a verdict.
+    const allFlagged = coverageBar(coverage({ assessed: 6, flagged: 6, clear: 0 }))!
+    const allClear = coverageBar(coverage({ assessed: 6, flagged: 0, clear: 6 }))!
+    expect(allFlagged).toEqual(allClear)
   })
 })

@@ -166,20 +166,25 @@ const fade = (max = 1): ExpressionSpecification => [
   11.5, max,
 ]
 
-const LAND = '#fdfcfa'
-const URBAN = '#ebe7de'
-const GREEN = '#e4ebdf'
-const WATER = '#dbe7ec'
-const WATER_LINE = '#b7cdd6'
-const BUILDING = '#e8e3d9'
-const BUILDING_LINE = '#d8d1c4'
-const ROAD_CASING = '#ffffff'
-const ROAD_MAJOR = '#8a9a7e'
-const ROAD_MINOR = '#c2bcae'
-const RAIL = '#a9a396'
-const LABEL = '#6b6559'
-const PLACE_LABEL = '#4a463d'
-const LABEL_HALO = '#fdfcfa'
+/* The cartography is a bone ground with khaki vegetation and a muted mineral
+   water — a vintage topographic sheet rather than a road atlas. Deliberately
+   low-contrast: this is the surface the drawn site, the value ramp and the
+   signal-orange markers sit on top of, and every step it takes towards being
+   interesting is a step the data takes towards being unreadable. */
+const LAND = '#f6f3ea'
+const URBAN = '#e7e2d4'
+const GREEN = '#e2e7d8'
+const WATER = '#dae4e2'
+const WATER_LINE = '#b3c5c0'
+const BUILDING = '#e3ddcd'
+const BUILDING_LINE = '#d2cbb8'
+const ROAD_CASING = '#fdfcf7'
+const ROAD_MAJOR = '#9aa184'
+const ROAD_MINOR = '#c6c0ad'
+const RAIL = '#a8a291'
+const LABEL = '#6a6a5b'
+const PLACE_LABEL = '#3f453c'
+const LABEL_HALO = '#f6f3ea'
 
 /** Road classes, widest first — the order they must be drawn in. */
 const MAJOR = ['motorway', 'trunk', 'primary']

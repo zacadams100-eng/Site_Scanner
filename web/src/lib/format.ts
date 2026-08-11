@@ -112,19 +112,22 @@ export function rampPosition(v: number, factor: Factor): number {
  * impossible to keep coherent, and a consistent ramp means users learn to read
  * it once.
  *
- * Rebuilt for a paper ground: it starts near the page so a low value recedes
- * into it, and runs through the brand's moss to a deep instrument blue. The
+ * Built for a bone ground: it starts near the page so a low value recedes into
+ * it, runs through khaki and lichen, and lands on the brand's deep forest. The
  * lightness falls monotonically along the ramp, which is what keeps it
  * readable in greyscale and to a colour-blind reader — the ordering survives
  * even when the hue does not.
+ *
+ * Signal orange is deliberately absent. The ramp describes magnitude, and
+ * orange in this system means attention; a high value is not a warning.
  */
 const RAMP: [number, number, number][] = [
-  [246, 243, 235],
-  [214, 220, 200],
-  [166, 189, 158],
-  [109, 150, 126],
-  [56, 111, 116],
-  [23, 71, 97],
+  [241, 238, 229],
+  [211, 214, 195],
+  [166, 181, 145],
+  [107, 141, 106],
+  [52, 97, 74],
+  [13, 32, 25],
 ]
 
 export function rampColor(t: number, alpha = 1): string {
@@ -138,14 +141,14 @@ export function rampColor(t: number, alpha = 1): string {
 }
 
 /** Stable colour per series, for multi-line charts and legends. */
-// Moss leads, because the first series is the one drawn on the map and the map
-// draws it in the brand's green. The rest fan out in hue at a lightness that
-// holds against paper — nothing fluorescent, nothing that vibrates next to its
-// neighbour, and no two adjacent entries confusable in greyscale.
+// Forest leads, because the first series is the one drawn on the map and the
+// map draws it in the brand's green. The rest fan out in hue at a lightness
+// that holds against bone — nothing fluorescent, nothing that vibrates next to
+// its neighbour, and no two adjacent entries confusable in greyscale.
 const SERIES_COLORS = [
-  '#4d6048', '#1f88b4', '#a8722c', '#7b5ea7',
-  '#2f7d6b', '#b4534f', '#5d7f2f', '#8a5a78',
-  '#3f6b96', '#96742f', '#547a5c', '#7a4f3a',
+  '#16352a', '#a8410f', '#3f6b96', '#7b5ea7',
+  '#5f7c42', '#96742f', '#2f7d6b', '#8a5a78',
+  '#b4534f', '#547a5c', '#7a4f3a', '#4a5a75',
 ]
 
 export function seriesColor(i: number): string {

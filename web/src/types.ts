@@ -69,6 +69,14 @@ export interface ScannerInfo {
   name: string
   subject: string
   implemented: boolean
+  /** What the registry actually holds for this scanner. A declared-but-unbuilt
+   *  scanner reports zeroes and an empty coverage name, which is what the
+   *  library shows — the alternative is the frontend inventing plausible
+   *  numbers for a product that does not exist yet. Optional so a backend
+   *  predating them still parses. */
+  topic_count?: number
+  factor_count?: number
+  coverage_name?: string
 }
 
 export interface Catalog {

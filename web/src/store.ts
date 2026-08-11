@@ -656,8 +656,11 @@ export const useStore = create<State>((set, get) => ({
 
     try {
       const [data, cells] = await Promise.all([
-        fetchSeries(aoi, selected, ctrl.signal),
-        fetchCells(aoi, ctrl.signal),
+        // The active scanner goes with the request. Without it the backend
+        // falls back to its default and assesses a habitat site with land's
+        // rules — see api.ts.
+        fetchSeries(aoi, selected, get().scannerId, ctrl.signal),
+        fetchCells(aoi, get().scannerId, ctrl.signal),
       ])
       if (ctrl.signal.aborted) return
       set({ data, cells: cells.cells, loading: false, timeIndex: settleTime(data, selected, get().timeIndex) })

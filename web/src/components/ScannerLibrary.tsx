@@ -1,13 +1,14 @@
 import { useStore } from '../store'
+import BrandMark from './BrandMark'
 import type { ScannerInfo } from '../types'
 
 /**
- * The scanner library — the first screen.
+ * The scanner library — the application's front door.
  *
  * Site Scanner is a platform of specialist scanners, and the first decision is
  * which one you need. That is a product statement, so it gets a screen rather
  * than a dropdown: a picker in a toolbar says "mode", and a library says
- * "these are different tools".
+ * "these are different instruments".
  *
  * ## One source of truth
  *
@@ -15,21 +16,29 @@ import type { ScannerInfo } from '../types'
  * backend registry. There is no frontend roadmap array — a second list would
  * drift, and the first symptom would be a card offering a scanner the API
  * refuses. Availability is `implemented`, decided by whether the scanner has
- * any rules.
+ * any rules. The topic and factor counts are the registry's own, so a scanner
+ * moving from declared to built changes this screen with no frontend edit.
  *
- * ## Why unavailable scanners are shown at all
+ * ## Two compositions, because they are two different statements
  *
- * Because the shape of the product is the message. Six verticals with two
- * live says "platform, early"; two cards says "two tools". What they must not
- * do is pretend — an unavailable scanner has no call to action, cannot be
- * clicked, and says so in words rather than by being greyed.
+ * The available scanners are **plates**: full-width, dark, indexed, with the
+ * name set large in condensed caps and the registry's own counts beside it.
+ * They are the decision, and they are sized like one.
+ *
+ * The declared scanners are a **roster** — a compact technical index, not
+ * cards. This is deliberate and it is the part that keeps the screen honest.
+ * Six identical cards with four greyed out reads as "four things are broken".
+ * A list under the heading "In development" reads as a roadmap, which is what
+ * it is. What it must never do is pretend: an unavailable scanner has no call
+ * to action, cannot be clicked, and says so in words rather than by being
+ * dimmed.
  *
  * ## Design
  *
- * Field equipment, not dashboard. The index number, the coordinate ticks and
- * the contour field are the visual language of a technical catalogue; they are
- * drawn from the existing token system rather than a new palette, so the
- * library and the workspace are recognisably one product.
+ * Field equipment catalogue. The index number and the contour field are the
+ * language of a technical catalogue; every colour comes from the shared token
+ * system, so the library and the workspace are recognisably one product rather
+ * than two designs.
  */
 export default function ScannerLibrary() {
   const catalog = useStore((s) => s.catalog)
@@ -43,25 +52,38 @@ export default function ScannerLibrary() {
     <div className="lib">
       <div className="lib-inner">
         <header className="lib-head">
-          <p className="lib-kicker">Site Scanner</p>
+          <div className="lib-brand">
+            <BrandMark className="lib-brand-mark" />
+            <span className="lib-kicker">Site Scanner</span>
+          </div>
           <h1 className="lib-title">Choose your scanner</h1>
           <p className="lib-sub">
-            Specialist tools for understanding land, ecology and environmental
-            conditions. Each scanner establishes evidence about a place, states
-            what that evidence does not settle, and names what a professional
-            should investigate next.
+            Specialist instruments for reading a real place. Each scanner
+            establishes evidence about a site, states what that evidence does
+            not settle, and names what a professional should investigate next.
           </p>
+          {/* The shape of the platform, in one line of measurement. Counted
+              from the registry, so it cannot claim more than exists. */}
+          {scanners.length > 0 && (
+            <p className="lib-tally mono">
+              {scanners.length} scanners
+              <span className="lib-tally-sep" aria-hidden>·</span>
+              {available.length} available
+              <span className="lib-tally-sep" aria-hidden>·</span>
+              {upcoming.length} in development
+            </p>
+          )}
         </header>
 
         {available.length > 0 && (
           <section className="lib-section" aria-labelledby="lib-available">
             <h2 className="lib-label" id="lib-available">
-              Available<span className="lib-count">{available.length}</span>
+              Available<span className="lib-count mono">{available.length}</span>
             </h2>
-            <ul className="lib-grid is-primary">
+            <ul className="lib-plates">
               {available.map((s, i) => (
-                <ScannerCard key={s.id} scanner={s} index={i + 1}
-                             onOpen={() => choose(s.id)} />
+                <ScannerPlate key={s.id} scanner={s} index={i + 1}
+                              onOpen={() => choose(s.id)} />
               ))}
             </ul>
           </section>
@@ -70,14 +92,25 @@ export default function ScannerLibrary() {
         {upcoming.length > 0 && (
           <section className="lib-section" aria-labelledby="lib-upcoming">
             <h2 className="lib-label" id="lib-upcoming">
-              In development<span className="lib-count">{upcoming.length}</span>
+              In development<span className="lib-count mono">{upcoming.length}</span>
             </h2>
-            <ul className="lib-grid is-secondary">
+            {/* A roster, not a grid of disabled cards. See the module note. */}
+            <ul className="lib-roster">
               {upcoming.map((s, i) => (
-                <ScannerCard key={s.id} scanner={s}
-                             index={available.length + i + 1} />
+                <li className="lib-roster-row" key={s.id}>
+                  <span className="lib-roster-index mono">
+                    {String(available.length + i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="lib-roster-name">{s.name}</span>
+                  <span className="lib-roster-subject">{s.subject}</span>
+                  <span className="lib-roster-status">Not built</span>
+                </li>
               ))}
             </ul>
+            <p className="lib-roster-note">
+              Declared in the registry so the platform's shape is honest. None
+              of them can assess anything yet, and none of them is offered.
+            </p>
           </section>
         )}
 
@@ -91,33 +124,51 @@ export default function ScannerLibrary() {
   )
 }
 
-function ScannerCard({ scanner, index, onOpen }:
-                     { scanner: ScannerInfo; index: number; onOpen?: () => void }) {
-  const live = Boolean(onOpen)
-  const Tag = live ? 'button' : 'div'
+/** One available scanner, as a plate. Dark ground, index, name, and the
+ *  registry's own counts — a specialist instrument in a case, not a tile. */
+function ScannerPlate({ scanner, index, onOpen }:
+                      { scanner: ScannerInfo; index: number; onOpen: () => void }) {
+  // Only rendered when the registry supplied them. A zero is a fact; an absent
+  // field is a backend that predates the count, and inventing one there would
+  // be exactly the fabrication this screen is built to avoid.
+  const stats = [
+    scanner.topic_count != null ? { label: 'Topics', value: String(scanner.topic_count) } : null,
+    scanner.factor_count != null ? { label: 'Factors', value: String(scanner.factor_count) } : null,
+    scanner.coverage_name ? { label: 'Coverage', value: scanner.coverage_name } : null,
+  ].filter((x): x is { label: string; value: string } => x != null)
 
   return (
-    <li className={`lib-card${live ? '' : ' is-upcoming'}`}>
-      <Tag className="lib-card-face"
-           {...(live
-             ? { onClick: onOpen, type: 'button' as const,
-                 'aria-label': `Open the ${scanner.name} scanner` }
-             : { 'aria-disabled': true })}>
-        {/* Decorative: a contour field, drawn rather than imported so it
-            inherits the theme and costs no request. */}
+    <li className="lib-plate">
+      <button className="lib-plate-face" type="button" onClick={onOpen}
+              aria-label={`Open the ${scanner.name} scanner`}>
         <Contours />
 
-        <span className="lib-index mono">{String(index).padStart(2, '0')}</span>
-        <span className="lib-name">{scanner.name}</span>
-        <span className="lib-subject">{scanner.subject}</span>
+        <span className="lib-plate-index mono">{String(index).padStart(2, '0')}</span>
 
-        <span className="lib-card-foot">
-          <span className={`lib-status${live ? ' is-live' : ''}`}>
-            {live ? 'Available' : 'In development'}
-          </span>
-          {live && <span className="lib-cta">Open scanner →</span>}
+        <span className="lib-plate-body">
+          <span className="lib-plate-name">{scanner.name}</span>
+          <span className="lib-plate-subject">{scanner.subject}</span>
         </span>
-      </Tag>
+
+        {stats.length > 0 && (
+          <span className="lib-plate-stats">
+            {stats.map((s) => (
+              <span className="lib-stat" key={s.label}>
+                <span className="lib-stat-label">{s.label}</span>
+                <span className="lib-stat-value mono">{s.value}</span>
+              </span>
+            ))}
+          </span>
+        )}
+
+        <span className="lib-plate-open">
+          Open scanner
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5 12h13M13 6l6 6-6 6" />
+          </svg>
+        </span>
+      </button>
     </li>
   )
 }
@@ -127,12 +178,12 @@ function ScannerCard({ scanner, index, onOpen }:
  *  reader. */
 function Contours() {
   return (
-    <svg className="lib-contours" viewBox="0 0 320 180" aria-hidden
+    <svg className="lib-contours" viewBox="0 0 640 200" aria-hidden
          preserveAspectRatio="none">
-      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
         <path key={i} fill="none" stroke="currentColor" strokeWidth="1"
-              d={`M-10 ${34 + i * 22} C 60 ${14 + i * 22}, 120 ${58 + i * 22},
-                  180 ${30 + i * 22} S 280 ${10 + i * 22}, 330 ${40 + i * 22}`} />
+              d={`M-10 ${28 + i * 24} C 120 ${4 + i * 24}, 240 ${62 + i * 24},
+                  360 ${26 + i * 24} S 560 ${0 + i * 24}, 660 ${38 + i * 24}`} />
       ))}
     </svg>
   )

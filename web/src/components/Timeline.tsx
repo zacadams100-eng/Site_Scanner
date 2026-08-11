@@ -110,7 +110,7 @@ export default function Timeline() {
     const chartH = h - stripH - 3
 
     // Year gridlines, so 180 monthly steps stay legible.
-    ctx.strokeStyle = 'rgba(35,35,35,0.07)'
+    ctx.strokeStyle = 'rgba(21,24,23,0.07)'
     ctx.lineWidth = 1
     steps.forEach((s, i) => {
       if (!s.endsWith('-01')) return
@@ -131,7 +131,7 @@ export default function Timeline() {
     const y = (v: number) => chartH - ((v - lo) / span) * (chartH - 6) - 3
 
     // Fill under the line, broken at gaps.
-    ctx.fillStyle = 'rgba(77,96,72,0.10)'
+    ctx.fillStyle = 'rgba(22,53,42,0.10)'
     let runStart = -1
     for (let i = 0; i <= values.length; i++) {
       const v = values[i]
@@ -163,7 +163,9 @@ export default function Timeline() {
     // The comparison marker, when a second position is pinned.
     if (compareIndex !== null && compareIndex >= 0 && compareIndex < steps.length) {
       const cx = x(compareIndex)
-      ctx.strokeStyle = 'rgba(31,136,180,0.95)'
+      // Signal orange: the pinned comparison is a "here, now" mark, and in
+      // this system that is the one thing the accent is for.
+      ctx.strokeStyle = 'rgba(230,106,44,0.95)'
       ctx.lineWidth = 1.5
       ctx.setLineDash([3, 2])
       ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, chartH); ctx.stroke()
@@ -175,9 +177,12 @@ export default function Timeline() {
       const px = x(i)
       const bw = Math.max(1, w / steps.length)
       const f = p.valid_fraction
+      // Forest, not the accent. This strip is a measurement — how much of the
+      // area produced a usable observation — and orange here would read as an
+      // alert on every month that happened to be clear.
       ctx.fillStyle = p.value === null
-        ? 'rgba(216,211,201,0.95)'
-        : `rgba(31,136,180,${0.18 + 0.6 * f})`
+        ? 'rgba(184,181,170,0.9)'
+        : `rgba(22,53,42,${0.16 + 0.62 * f})`
       ctx.fillRect(px - bw / 2, chartH + 3, bw, stripH)
     })
   }, [primarySeries, steps, compareIndex])

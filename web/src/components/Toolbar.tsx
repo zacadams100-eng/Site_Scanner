@@ -22,6 +22,7 @@ import { briefHtml, openBriefWindow } from '../lib/brief'
  */
 export default function Toolbar() {
   const aoi = useStore((s) => s.aoi)
+  const scannerId = useStore((s) => s.scannerId)
   const data = useStore((s) => s.data)
   const selected = useStore((s) => s.selected)
   const timeIndex = useStore((s) => s.timeIndex)
@@ -73,7 +74,7 @@ export default function Toolbar() {
     if (!aoi) return
     setBriefPending(true)
     try {
-      const b = await fetchBrief(aoi, selected, projectName || '')
+      const b = await fetchBrief(aoi, selected, projectName || '', scannerId)
       openBriefWindow(briefHtml(b), b.site.name)
     } catch (e) {
       setFlash(e instanceof Error ? e.message : 'Could not build the brief')

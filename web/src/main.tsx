@@ -8,6 +8,12 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource/ibm-plex-sans/400.css'
 import '@fontsource/ibm-plex-sans/500.css'
 import '@fontsource/ibm-plex-sans/600.css'
+// Display: condensed, from the same superfamily as the interface and the mono,
+// so the product reads as one family at three widths rather than as a UI face
+// with a borrowed headline font.
+import '@fontsource/ibm-plex-sans-condensed/500.css'
+import '@fontsource/ibm-plex-sans-condensed/600.css'
+import '@fontsource/ibm-plex-sans-condensed/700.css'
 import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
 import '@fontsource/ibm-plex-mono/400.css'

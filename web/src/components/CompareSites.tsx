@@ -45,6 +45,7 @@ const STATE_LABEL: Record<CompareTopicCell['state'], string> = {
 
 export default function CompareSites() {
   const saved = useStore((s) => s.saved)
+  const scannerId = useStore((s) => s.scannerId)
   const selected = useStore((s) => s.selected)
   const compareIds = useStore((s) => s.compareIds)
   const setComparing = useStore((s) => s.setComparing)
@@ -65,6 +66,7 @@ export default function CompareSites() {
     compareSites(
       sites.map((s) => ({ id: s.id, name: s.name, geometry: s.geometry })),
       selected.slice(0, 16),
+      scannerId,
       control.signal,
     )
       .then(setResult)
@@ -74,7 +76,7 @@ export default function CompareSites() {
       .finally(() => setLoading(false))
     return () => control.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compareIds.join(','), selected.join(',')])
+  }, [compareIds.join(','), selected.join(','), scannerId])
 
   if (compareIds.length === 0) return null
 
