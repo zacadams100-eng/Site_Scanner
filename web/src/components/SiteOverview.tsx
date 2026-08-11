@@ -71,7 +71,7 @@ export default function SiteOverview() {
           that identify it. Labelled rather than run together in a caption. */}
       <header className="ovw-head">
         <span className="field-label">Site</span>
-        <h2 className="ovw-title">{projectName || 'Untitled site'}</h2>
+        <h1 className="ovw-title">{projectName || 'Untitled site'}</h1>
         {facts.length > 0 && (
           <dl className="ovw-facts">
             {facts.map((f) => (
@@ -89,7 +89,7 @@ export default function SiteOverview() {
           the assessment, not the site, and it falls as less is known. */}
       {bar && (
         <section className="ovw-section ovw-cover">
-          <h3 className="ovw-h">Evidence coverage</h3>
+          <h2 className="ovw-h">Evidence coverage</h2>
           <div className="ovw-cover-row">
             <span className="readout readout-lg">{bar.pct}<span className="ovw-pct">%</span></span>
             <div className="ovw-cover-bar" role="img"
@@ -103,7 +103,7 @@ export default function SiteOverview() {
 
       {/* ---- Evidence ------------------------------------------------- */}
       <section className="ovw-section">
-        <h3 className="ovw-h">Evidence</h3>
+        <h2 className="ovw-h">Evidence</h2>
         <ul className="ovw-states">
           {rows.map((r) => (
             <li key={r.key} className={`ovw-state is-${r.key}`}>
@@ -128,7 +128,7 @@ export default function SiteOverview() {
 
       {/* ---- What needs attention ------------------------------------- */}
       <section className="ovw-section">
-        <h3 className="ovw-h">What needs attention</h3>
+        <h2 className="ovw-h">What needs attention</h2>
         {attention.length === 0 ? (
           // Not "nothing to worry about". With most of the catalogue still
           // generated, an empty list far more often means nothing could be
@@ -171,7 +171,7 @@ export default function SiteOverview() {
       {/* ---- Historical change ---------------------------------------- */}
       {history.length > 0 && (
         <section className="ovw-section">
-          <h3 className="ovw-h">Historical change</h3>
+          <h2 className="ovw-h">Historical change</h2>
           <ul className="ovw-hist">
             {history.map((h) => {
               // The factor behind the row, so the explorer opens on the thing
@@ -201,7 +201,7 @@ export default function SiteOverview() {
 
       {/* ---- Evidence gaps -------------------------------------------- */}
       <section className="ovw-section ovw-gaps">
-        <h3 className="ovw-h">Evidence gaps</h3>
+        <h2 className="ovw-h">Evidence gaps</h2>
         <p className="ovw-count">
           {coverage?.not_assessed ?? 0} factors could not be assessed
         </p>

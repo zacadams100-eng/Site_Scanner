@@ -242,7 +242,7 @@ export default function App() {
               aria-pressed={drawMode === t.id}
               aria-label={t.label}
             >
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+              <svg viewBox="0 0 24 24" aria-hidden width="19" height="19" fill="none"
                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 {t.icon}
               </svg>
@@ -251,14 +251,14 @@ export default function App() {
           <span className="tool-sep" aria-hidden />
           <button className="tool" onClick={undo} disabled={!canUndo}
                   title="Undo (Cmd+Z)" aria-label="Undo">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+            <svg viewBox="0 0 24 24" aria-hidden width="19" height="19" fill="none"
                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 6 4 10l4 4" /><path d="M4 10h9a5 5 0 0 1 0 10H9" />
             </svg>
           </button>
           <button className="tool" onClick={redo} disabled={!canRedo}
                   title="Redo (Cmd+Shift+Z)" aria-label="Redo">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+            <svg viewBox="0 0 24 24" aria-hidden width="19" height="19" fill="none"
                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m16 6 4 4-4 4" /><path d="M20 10h-9a5 5 0 0 0 0 10h4" />
             </svg>
@@ -266,7 +266,7 @@ export default function App() {
           {aoi && (
             <button className="tool tool-clear" onClick={() => setAoi(null)}
                     title="Remove the drawn shape" aria-label="Remove the drawn shape">
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+              <svg viewBox="0 0 24 24" aria-hidden width="19" height="19" fill="none"
                    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <path d="M6 6 18 18M18 6 6 18" />
               </svg>
@@ -295,7 +295,12 @@ export default function App() {
           </div>
           <div className="tabs" role="tablist">
             {(['overview', 'radar', 'findings', 'table', 'charts', 'sources'] as const).map((t) => (
+              // A tab that names no panel is only half the pattern: a screen
+              // reader announces "tab, selected" and has nothing to say about
+              // what it selected. `aria-controls` points at the panel body,
+              // which carries the matching `role="tabpanel"` below.
               <button key={t} role="tab" aria-selected={tab === t}
+                      id={`tab-${t}`} aria-controls="report-panel"
                       className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
                 {t === 'overview' ? 'Overview'
                   : t === 'radar' ? 'Radar'
@@ -319,7 +324,12 @@ export default function App() {
           <Toolbar />
         </div>
 
-        <div className="panel-body">
+        {/* One panel reused by six tabs rather than six panels, because only
+            the selected tab is ever rendered. `aria-labelledby` follows the
+            selection so the panel is announced as belonging to the tab that is
+            actually showing. */}
+        <div className="panel-body" id="report-panel" role="tabpanel"
+             aria-labelledby={`tab-${tab}`}>
           {catalogError && (
             <div className="notice notice-error">
               <strong>Can't reach the API.</strong>
@@ -361,6 +371,17 @@ export default function App() {
               the user is reading in order to say "working on it" takes away
               the answer to tell them about the question. */}
           {loading && <LoadingSequence variant={data ? 'strip' : 'full'} />}
+
+          {/* An assessment takes seconds and, until now, said nothing to a
+              screen reader: the skeleton is decorative and the report simply
+              appeared. `polite` rather than `assertive` — this is progress on
+              something the user asked for, not an interruption. */}
+          <p className="sr-only" role="status" aria-live="polite">
+            {error ? `Assessment failed. ${error}`
+              : loading ? 'Assessing the site.'
+              : data ? `Report ready for ${formatArea(data.area_ha)}.`
+              : ''}
+          </p>
 
           {!error && data && (
             <>

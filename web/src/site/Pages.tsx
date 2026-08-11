@@ -159,6 +159,11 @@ export function Scanners() {
             about what may be claimed — so a result means the same thing
             whichever scanner produced it.
           </p>
+          {/* The available group was the only one without a heading, which
+              left the two scanner cards as h3s directly under the h1 and put a
+              gap in the document outline. It also read oddly: "In development"
+              was labelled and the thing you can actually use was not. */}
+          <h2 className="mk-h2 mk-h2-sp">Available now</h2>
           <div className="mk-cards">
             <Link className="mk-card" to={PAGES.land.path}>
               <span className="mk-card-idx mono">01</span>

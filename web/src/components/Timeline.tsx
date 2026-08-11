@@ -220,8 +220,8 @@ export default function Timeline() {
         title={playing ? 'Pause (space)' : 'Play (space)'}
       >
         {playing
-          ? <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="0.8" /><rect x="9.3" y="2.5" width="3.2" height="11" rx="0.8" /></svg>
-          : <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor"><path d="M4.5 2.5l9 5.5-9 5.5z" /></svg>}
+          ? <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden><rect x="3.5" y="2.5" width="3.2" height="11" rx="0.8" /><rect x="9.3" y="2.5" width="3.2" height="11" rx="0.8" /></svg>
+          : <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden><path d="M4.5 2.5l9 5.5-9 5.5z" /></svg>}
       </button>
 
       <div className="time-readout">
