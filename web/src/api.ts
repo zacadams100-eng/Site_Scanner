@@ -13,13 +13,44 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * How long one request may take before the app stops waiting.
+ *
+ * Generous, because a real Earth Engine assessment across a dozen factors is
+ * genuinely slow and cutting it off early would be worse than waiting. But not
+ * unbounded: a backend that accepts a connection and never answers used to
+ * leave the loading sequence running for as long as the tab stayed open, with
+ * nothing to distinguish it from slow.
+ */
+const REQUEST_TIMEOUT_MS = 90_000
+
+/** The caller's cancellation and the deadline, as one signal. Aborting for
+ *  either reason stops the request; the two are told apart afterwards, because
+ *  a user changing their mind is not a failure and a deadline is. */
+function withDeadline(signal?: AbortSignal): AbortSignal {
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, deadline]) : deadline
+}
+
 async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: withDeadline(signal),
+    })
+  } catch (e) {
+    // `AbortSignal.timeout` aborts with a TimeoutError, which is how this is
+    // distinguished from the caller cancelling — the store ignores the latter
+    // and must not ignore this.
+    if ((e as Error).name === 'TimeoutError') {
+      throw new ApiError(
+        'The server did not respond within 90 seconds. It may be busy — try again.', 504)
+    }
+    throw e
+  }
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`
     try {
@@ -31,7 +62,15 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     }
     throw new ApiError(detail, res.status)
   }
-  return res.json()
+  // A 200 carrying a truncated or non-JSON body is a server fault, not
+  // something the reader can act on. Surfacing the parser's own words —
+  // "Expected property name or '}' in JSON at position 12" — puts a stack
+  // trace where an explanation belongs.
+  try {
+    return await res.json() as T
+  } catch {
+    throw new ApiError('The server sent a reply this app could not read.', res.status)
+  }
 }
 
 export async function fetchCatalog(scanner?: string): Promise<Catalog> {
@@ -57,7 +96,26 @@ export function fetchSeries(
   signal?: AbortSignal,
 ): Promise<SeriesResponse> {
   return post<SeriesResponse>('/api/series',
-    { geometry, factor_ids: factorIds, scanner }, signal)
+    { geometry, factor_ids: factorIds, scanner }, signal).then(assertSeries)
+}
+
+/**
+ * The response is the shape the rest of the app assumes it is.
+ *
+ * `post` guarantees valid JSON and nothing more. A 200 carrying `{}` parses
+ * perfectly and then fails several layers away, where the first consumer
+ * reaches into `series` for a factor: the user saw "Cannot read properties of
+ * undefined (reading 'ndvi')" in a panel that should have said the report
+ * could not be built.
+ *
+ * Checked here, at the boundary, so the error names the actual problem and
+ * every reader downstream can trust the type it was given.
+ */
+function assertSeries(r: SeriesResponse): SeriesResponse {
+  if (!r || typeof r !== 'object' || !r.series || !Array.isArray(r.steps)) {
+    throw new ApiError('The server returned a report with no data in it.', 502)
+  }
+  return r
 }
 
 /**
