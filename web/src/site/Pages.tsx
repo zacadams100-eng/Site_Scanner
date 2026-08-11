@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Shell from './Shell'
+import HeroField from './HeroField'
 import { PAGES, PRIMARY_CTA, APP_PATH } from './site'
 
 /**
@@ -19,6 +20,10 @@ import { PAGES, PRIMARY_CTA, APP_PATH } from './site'
 function Hero() {
   return (
     <section className="mk-hero">
+      {/* Behind the headline, not instead of it. Loads after first paint and
+          is decorative throughout — the page reads identically if it never
+          arrives. */}
+      <HeroField />
       <div className="mk-wrap">
         <p className="mk-kicker">Environmental site intelligence</p>
         <h1 className="mk-h1">

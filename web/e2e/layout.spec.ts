@@ -78,3 +78,30 @@ test('every report tab whose content overflows can be scrolled', async ({ page }
 
   expect(await overflowsHorizontally(page)).toBe(false)
 })
+
+/**
+ * The hero is decoration and must behave like it.
+ *
+ * It sits behind the headline and the primary call to action, so the ways it
+ * can go wrong are all ways it takes something from them: stealing a tab stop,
+ * being read aloud, pushing the page sideways, or failing to load and leaving
+ * a hole where the copy should be.
+ */
+test('the hero sheet decorates without interfering', async ({ page }) => {
+  await page.goto('/')
+  const hero = page.locator('.hf')
+  await expect(hero).toHaveAttribute('aria-hidden', 'true')
+
+  // The headline and CTA do not depend on it, so they are up before it is.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('link', { name: /request a site scan/i }).first()).toBeVisible()
+
+  // Loaded from a generated asset after first paint.
+  await expect(hero).toHaveClass(/is-ready/, { timeout: 20_000 })
+  expect(await overflowsHorizontally(page), 'the hero pushes the page sideways').toBe(false)
+
+  // Nothing inside it may take focus: it is a picture, not a control.
+  const focusables = await page.locator(
+    '.hf a, .hf button, .hf input, .hf [tabindex]:not([tabindex="-1"])').count()
+  expect(focusables, 'the hero contains something focusable').toBe(0)
+})

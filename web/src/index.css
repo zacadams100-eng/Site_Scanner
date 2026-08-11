@@ -3494,3 +3494,276 @@ td.cov-severe { color: var(--text-dim); }
   overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
   border: 0;
 }
+
+/* ===========================================================================
+   HERO FIELD SHEET
+   ---------------------------------------------------------------------------
+   The homepage hero: a topographic sheet of England and Wales being read by an
+   instrument, on a 16-second loop.
+
+   Every rule below animates `transform` or `opacity` and nothing else, so the
+   whole thing runs on the compositor. There is no JavaScript in the loop at
+   all — the canvases are drawn once at mount and never touched again, which is
+   why a fifteen-second cinematic background costs approximately nothing to
+   keep running.
+
+   The loop is seamless because the resting state at 0% and 100% is identical:
+   sheet visible, contours and graticule faint, no labels, no collage, no
+   branding. The loop adds those and takes them away again.
+
+   Colour is rationed exactly as it is everywhere else in this product. The
+   sheet is bone, khaki and faded blue; signal orange appears twice, on the
+   scan sweep and the completion mark, and nowhere else.
+   ========================================================================= */
+
+.hf {
+  position: absolute; inset: 0; overflow: hidden;
+  background: var(--bone-050);
+  /* Nothing here is content. It is behind live text and must never take a
+     click or a tab stop from it. */
+  pointer-events: none; user-select: none;
+  opacity: 0; transition: opacity 1.2s ease;
+}
+.hf.is-ready { opacity: 1; }
+
+.hf-plate {
+  position: absolute; inset: -4%;
+  background-size: cover; background-position: center;
+  filter: saturate(.72) contrast(1.04);
+  opacity: .5;
+}
+
+/* The drift. A slow closed path — out, across, and back to exactly where it
+   started, which is what makes the loop invisible. Deliberately small: this is
+   a survey sheet being examined, not a flight over terrain. */
+.hf-drift {
+  position: absolute; inset: 0;
+  animation: hf-drift 16s cubic-bezier(.45, 0, .55, 1) infinite;
+  will-change: transform;
+}
+@keyframes hf-drift {
+  0%   { transform: scale(1.06) translate3d(0, 0, 0); }
+  35%  { transform: scale(1.10) translate3d(-1.6%, -1.1%, 0); }
+  65%  { transform: scale(1.11) translate3d(-0.6%, -2.0%, 0); }
+  100% { transform: scale(1.06) translate3d(0, 0, 0); }
+}
+
+.hf-sheet, .hf-grid {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover;
+}
+.hf-sheet { opacity: 1; }
+
+/* The graticule breathes in and out once per loop. At rest it is faint rather
+   than absent: the brief's "GIS information remains visible" is what the
+   opening frame already looks like, which is also what makes it loop. */
+.hf-grid { opacity: .3; animation: hf-grid 16s ease-in-out infinite; }
+@keyframes hf-grid {
+  0%, 100% { opacity: .18; }
+  30%, 70% { opacity: .5; }
+}
+
+/* --------------------------------------------------------------- place marks */
+
+.hf-marks { position: absolute; inset: 0; }
+.hf-mark {
+  position: absolute; transform: translate(10px, -50%);
+  display: flex; flex-direction: column; gap: 1px;
+  opacity: 0;
+  animation: hf-mark 16s ease-in-out infinite;
+}
+@keyframes hf-mark {
+  0%, 8%    { opacity: 0; transform: translate(4px, -50%); }
+  20%, 62%  { opacity: 1; transform: translate(10px, -50%); }
+  78%, 100% { opacity: 0; transform: translate(14px, -50%); }
+}
+.hf-tick {
+  position: absolute; left: -10px; top: 50%;
+  width: 7px; height: 1px; background: var(--char-700); opacity: .55;
+}
+.hf-name {
+  font-family: var(--font-display); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--char-800);
+  white-space: nowrap;
+}
+.hf-coord {
+  font-size: 8.5px; letter-spacing: .06em; color: var(--stone-600);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ collage */
+
+/* Line-work, not stickers. Everything is stroked and nothing is filled except
+   the sun's disc, so the interventions read as drawings on the sheet rather
+   than as images pasted onto it. */
+.hf-collage { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hf-collage g { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.hf-sun {
+  stroke: var(--amber-600); stroke-width: 2.2;
+  opacity: 0; transform-origin: 1128px 286px;
+  animation: hf-sun 16s ease-in-out infinite;
+}
+.hf-sun circle { fill: var(--amber-500); fill-opacity: .16; }
+@keyframes hf-sun {
+  0%, 32%   { opacity: 0; transform: rotate(-6deg) scale(.94); }
+  44%, 62%  { opacity: .85; transform: rotate(0deg) scale(1); }
+  74%, 100% { opacity: 0; transform: rotate(5deg) scale(1.03); }
+}
+
+.hf-sprig {
+  stroke: var(--forest-700); stroke-width: 1.6;
+  opacity: 0; animation: hf-sprig 16s ease-in-out infinite;
+}
+@keyframes hf-sprig {
+  0%, 36%   { opacity: 0; transform: translateY(10px); }
+  48%, 64%  { opacity: .7; transform: translateY(0); }
+  76%, 100% { opacity: 0; transform: translateY(-6px); }
+}
+
+.hf-annot {
+  stroke: var(--signal-700); stroke-width: 1.5;
+  opacity: 0; animation: hf-annot 16s ease-in-out infinite;
+}
+.hf-annot circle { fill: var(--signal-700); }
+@keyframes hf-annot {
+  0%, 40%   { opacity: 0; }
+  52%, 68%  { opacity: .8; }
+  80%, 100% { opacity: 0; }
+}
+
+/* -------------------------------------------------------------------- sweep */
+
+/* The instrument reading the sheet. One pass, left to right, once per loop.
+   A hairline rather than a bar: this is a scan line, not a shine. */
+.hf-sweep {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--signal-500);
+  box-shadow: 0 0 0 1px rgb(230 106 44 / .18);
+  opacity: 0;
+  animation: hf-sweep 16s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+@keyframes hf-sweep {
+  0%, 6%   { left: -2%; opacity: 0; }
+  12%      { opacity: .55; }
+  52%      { opacity: .55; }
+  58%      { left: 102%; opacity: 0; }
+  100%     { left: 102%; opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------- HUD */
+
+/* Field-equipment labelling: cornered, mono, tiny, tracked wide. Fixed to the
+   frame rather than drifting with the sheet — an instrument's own markings do
+   not move with the thing it is pointed at. */
+.hf-hud { position: absolute; inset: 0; }
+.hf-hud span {
+  position: absolute; font-size: 9px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--stone-600);
+  opacity: 0; animation: hf-hud 16s ease-in-out infinite;
+}
+.hf-hud-tl { top: 16px; left: 18px; }
+.hf-hud-tr { top: 16px; right: 18px; animation-delay: .4s !important; }
+.hf-hud-bl { bottom: 16px; left: 18px; animation-delay: .8s !important; }
+.hf-hud-br { bottom: 16px; right: 18px; }
+@keyframes hf-hud {
+  0%, 10%   { opacity: 0; }
+  24%, 70%  { opacity: .85; }
+  84%, 100% { opacity: 0; }
+}
+
+/* The one moment the hero states a result. Orange, late, and brief — the same
+   rule the application follows for the word "flagged". */
+.hf-complete {
+  color: var(--signal-700) !important;
+  animation: hf-complete 16s ease-in-out infinite !important;
+}
+@keyframes hf-complete {
+  0%, 56%   { opacity: 0; }
+  64%, 74%  { opacity: 1; }
+  86%, 100% { opacity: 0; }
+}
+
+/* ------------------------------------------------------------ paper surface */
+
+/* Film grain. An SVG turbulence rather than a bitmap: no request, no cache
+   entry, and it scales to any viewport. This is what stops the flat vector
+   fills reading as a chart. */
+.hf-grain {
+  position: absolute; inset: 0; opacity: .42; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+}
+
+/* Holds the eye in the middle of the sheet and keeps the headline legible
+   where it actually sits. Not a decorative gradient — it is doing contrast
+   work, which is why it is here and why nothing else in this file is one. */
+.hf-vignette {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to right, rgb(250 248 243 / .96) 0%, rgb(250 248 243 / .88) 26%,
+                              rgb(250 248 243 / .28) 48%, rgb(250 248 243 / 0) 66%),
+    linear-gradient(to bottom, rgb(250 248 243 / .34) 0%, rgb(250 248 243 / 0) 22%,
+                               rgb(250 248 243 / 0) 74%, rgb(250 248 243 / .5) 100%);
+}
+
+/* ------------------------------------------------------------- hero framing */
+
+/* The hero becomes the sheet's frame. Content keeps its own stacking context
+   so nothing above can be painted over by the canvases below. */
+.mk-hero {
+  position: relative; overflow: hidden;
+  min-height: min(78vh, 660px); display: flex; align-items: center;
+}
+.mk-hero > .mk-wrap { position: relative; z-index: 1; }
+.mk-hero .mk-lede, .mk-hero .mk-who { max-width: 46ch; }
+
+/* --------------------------------------------------------------- small screens */
+
+/* Simplified rather than shrunk. The drift is smaller because a phone viewport
+   magnifies the same percentage into a much larger apparent movement; the
+   sweep and the collage go entirely, because at this size they land on top of
+   the headline rather than beside it; and the sheet sits lower so the text has
+   clean paper to sit on. */
+@media (max-width: 760px) {
+  .hf-sweep, .hf-sprig, .hf-annot { display: none; }
+  .hf-drift { animation-duration: 20s; }
+  @keyframes hf-drift {
+    0%   { transform: scale(1.04) translate3d(0, 0, 0); }
+    50%  { transform: scale(1.06) translate3d(-0.8%, -0.8%, 0); }
+    100% { transform: scale(1.04) translate3d(0, 0, 0); }
+  }
+  .hf-hud-tr, .hf-hud-bl { display: none; }
+  /* Quieter ground: the sheet is behind an entire screen of copy here, not
+     beside a column of it. */
+  .hf-sheet { opacity: .5; }
+  .hf-grid { opacity: .16; animation: none; }
+  .hf-marks { display: none; }
+  .hf-sun { transform-origin: 1128px 286px; }
+  .hf-vignette {
+    background:
+      linear-gradient(to bottom, var(--bone-050) 0%, rgb(250 248 243 / .82) 42%, rgb(250 248 243 / .1) 78%);
+  }
+  .hf-name { font-size: 9px; }
+  .hf-coord { display: none; }
+}
+
+/* --------------------------------------------------------------- stillness */
+
+/* Asked for no motion: the sheet stays, composed on the frame the loop is
+   built around, and nothing moves. Not "less motion" — none. The labels and
+   the HUD are pinned visible so the still frame is the complete picture rather
+   than an arbitrary instant of an animation that never runs. */
+@media (prefers-reduced-motion: reduce) {
+  .hf-drift, .hf-grid, .hf-mark, .hf-sun, .hf-sprig, .hf-annot,
+  .hf-sweep, .hf-hud span, .hf-complete {
+    animation: none !important;
+  }
+  .hf-drift { transform: scale(1.04); }
+  .hf-mark { opacity: 1; transform: translate(10px, -50%); }
+  .hf-grid { opacity: .34; }
+  .hf-hud span { opacity: .8; }
+  .hf-sun { opacity: .7; }
+  .hf-sprig { opacity: .6; }
+  .hf-annot { opacity: .7; }
+  .hf-sweep { display: none; }
+}
