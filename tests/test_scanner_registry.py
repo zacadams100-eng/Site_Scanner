@@ -52,11 +52,12 @@ def test_an_unbuilt_scanner_says_so_rather_than_looking_empty():
     """A scanner with no rules is registered and unbuilt. Saying so is more
     useful than an empty report that reads as a clean subject.
 
-    Coastal only: habitat is scanner #2 and is now built. That this test needed
-    narrowing rather than deleting is the point — the registry distinguishes
-    declared from built, and one of the three has crossed over.
+    Forestry only. This test has now been narrowed twice — habitat crossed
+    over as scanner #2, coastal as scanner #3 — and that it narrows rather than
+    breaks is the point: the registry distinguishes declared from built, and
+    the distinction survives scanners moving between the two.
     """
-    s = scanners.resolve("coastal")
+    s = scanners.resolve("forestry")
     assert s.implemented is False
     assert s.rules == ()
     assert s.topics == {}
@@ -83,9 +84,9 @@ def test_habitat_is_built_and_scoped():
 def test_an_unbuilt_scanner_has_no_coverage_rather_than_a_borrowed_one():
     """`None` means no coverage established — distinct from "covers nowhere"
     and from silently inheriting England."""
-    assert scanners.resolve("coastal").coverage is None
-    assert scanners.resolve("land").coverage is not None
-    assert scanners.resolve("habitat").coverage is not None
+    assert scanners.resolve("forestry").coverage is None
+    for built in ("land", "habitat", "coastal"):
+        assert scanners.resolve(built).coverage is not None
 
 
 def test_resolve_defaults_to_land_and_rejects_the_unknown():
@@ -207,7 +208,8 @@ def test_the_catalogue_lists_every_scanner_with_its_availability(mock_client):
 
     assert set(listed) == set(scanners.ids())
     assert len(listed) == 6, "six verticals, so the shape of the product shows"
-    assert {i for i, s in listed.items() if s["implemented"]} == {"land", "habitat"}
+    assert {i for i, s in listed.items() if s["implemented"]} == \
+        {"land", "habitat", "coastal"}
 
     for s in listed.values():
         assert s["name"] and s["subject"], "a card without a subject is a logo"
@@ -217,7 +219,7 @@ def test_a_declared_scanner_is_registered_but_carries_no_content():
     """Registering is not implementing. The four future verticals exist so the
     roadmap has one source of truth, and carry nothing that could be mistaken
     for functionality."""
-    for sid in ("coastal", "forestry", "water", "terrain"):
+    for sid in ("forestry", "water", "terrain"):
         s = scanners.resolve(sid)
         assert s.implemented is False
         assert (s.topics, s.rules, s.investigations, s.factors) == ({}, (), {}, ())

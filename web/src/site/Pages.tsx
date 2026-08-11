@@ -107,7 +107,7 @@ function ScannerPlatform() {
     <section className="mk-band mk-band-paper">
       <div className="mk-wrap">
         <p className="mk-kicker">The platform / 01</p>
-        <h2 className="mk-h2">Six scanners. Two you can run today.</h2>
+        <h2 className="mk-h2">Six scanners. Three you can run today.</h2>
         <p className="mk-lede mk-lede-sm">
           Each scanner asks a different professional question of the same
           place. They share one evidence engine, one set of finding states and
@@ -135,12 +135,20 @@ function ScannerPlatform() {
               index can establish.</p>
             <span className="mk-scanner-go">Habitat Scanner →</span>
           </Link>
+          <Link className="mk-scanner-plate" to={PAGES.coastal.path}>
+            <span className="mk-scanner-idx mono">03</span>
+            <BrandMark className="mk-scanner-mark" />
+            <h3>Coastal</h3>
+            <p className="mk-scanner-sub">Coastal site and frontage assessment</p>
+            <p>Low-lying exposure and change in surface water extent. A site
+              assessment rather than a shoreline analysis — and it says which
+              it is.</p>
+            <span className="mk-scanner-go">Coastal Scanner →</span>
+          </Link>
         </div>
 
         <p className="mk-group-label mono">In development</p>
         <ul className="mk-roadmap mk-roadmap-lg">
-          <li><span className="mk-roadmap-idx mono">03</span><b>Coastal</b>
-            <span>Coastal conditions and change</span></li>
           <li><span className="mk-roadmap-idx mono">04</span><b>Forestry</b>
             <span>Forest condition and management</span></li>
           <li><span className="mk-roadmap-idx mono">05</span><b>Water</b>
@@ -359,11 +367,16 @@ export function Scanners() {
               <p>What has changed in what is here.</p>
               <span className="mk-card-go">Habitat Scanner →</span>
             </Link>
+            <Link className="mk-card" to={PAGES.coastal.path}>
+              <span className="mk-card-idx mono">03</span>
+              <h3>Coastal</h3>
+              <p>How exposed this frontage is, and how the water has moved.</p>
+              <span className="mk-card-go">Coastal Scanner →</span>
+            </Link>
           </div>
 
           <h2 className="mk-h2 mk-h2-sp">In development</h2>
           <ul className="mk-roadmap">
-            <li><b>Coastal</b><span>Coastal conditions and change</span></li>
             <li><b>Forestry</b><span>Forest condition and management</span></li>
             <li><b>Water</b><span>Water and catchment assessment</span></li>
             <li><b>Terrain</b><span>Terrain and physical site conditions</span></li>
@@ -471,6 +484,87 @@ export function HabitatScanner() {
             where to spend a survey day.</p>
 
           <p><Link className="mk-cta" to={PRIMARY_CTA.path}>{PRIMARY_CTA.label}</Link></p>
+        </div>
+      </section>
+    </Shell>
+  )
+}
+
+export function CoastalScanner() {
+  return (
+    <Shell page={PAGES.coastal}>
+      <section className="mk-band">
+        <div className="mk-wrap">
+          <h1 className="mk-h1 mk-h1-sm">Coastal</h1>
+          <p className="mk-lede">
+            Coastal site and frontage assessment. It reads the area you draw
+            and reports how low the ground is and how the extent of surface
+            water has moved over the satellite record.
+          </p>
+
+          <h2>What it investigates</h2>
+          <ul className="mk-list">
+            <li><b>Low-lying exposure</b> — the lowest ground in the area,
+              against a 5 m screening height.</li>
+            <li><b>Tidal and surface water</b> — how often water is detected
+              here, and for how much of the year.</li>
+            <li><b>Surface water change</b> — whether detected water extent has
+              gained or lost ground over the record.</li>
+            <li><b>Coastal landform</b> — how steeply the ground rises.</li>
+          </ul>
+
+          <h2>What evidence it uses</h2>
+          <p>
+            LiDAR-derived terrain for elevation and gradient, and the JRC
+            Global Surface Water record — a classification of where water was
+            detected from 1984 onward — for occurrence, seasonality and change.
+          </p>
+
+          <h2>What the output means</h2>
+          <p>
+            Two checks can flag. Ground at or below 5 m above ordnance datum is
+            reported as low-lying exposure, and a change of 10 percentage
+            points or more in surface water extent is reported as movement
+            worth explaining. Both numbers are <em>Contour reporting
+            thresholds</em> — product decisions about when something deserves a
+            professional's attention, not regulatory levels.
+          </p>
+
+          <h2>What it does not establish</h2>
+          <p>
+            <strong>It is not a shoreline analysis.</strong> There is no
+            coastline dataset behind it, so it cannot measure shoreline
+            retreat, cannot calculate an erosion rate, and cannot verify that
+            the site you drew is coastal at all — that judgement is yours.
+          </p>
+          <p>
+            Low ground is not a prediction of flooding. The check knows nothing
+            about the defences protecting this frontage or the extreme sea
+            levels here, and a defended site and an undefended site at the same
+            height read identically to it.
+          </p>
+          <p>
+            A change in detected water extent is not erosion. It can be
+            accretion, managed realignment, a new drainage regime, or a change
+            in how the classifier handled a tidal flat. Which it is, is the
+            question the finding hands to a coastal engineer.
+          </p>
+
+          <h2>Who it is for</h2>
+          <p>
+            Anyone screening a coastal or estuarine site before commissioning
+            the coastal flood risk assessment or the process review that will
+            actually settle it.
+          </p>
+
+          <div className="mk-actions">
+            <Link className="mk-cta mk-cta-lg" to={PRIMARY_CTA.path}>
+              {PRIMARY_CTA.label}
+            </Link>
+            <Link className="mk-ghost" to={PAGES.scanners.path}>
+              All scanners →
+            </Link>
+          </div>
         </div>
       </section>
     </Shell>

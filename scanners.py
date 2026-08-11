@@ -52,6 +52,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 
 import catalog
 import radar
+from coastal import rules as coastal_rules
 from habitat import rules as habitat_rules
 
 
@@ -135,21 +136,41 @@ HABITAT = Scanner(
     coverage_name="England",
 )
 
+#: Scanner #3, and the one that tests the architecture rather than extends it:
+#: habitat is still terrestrial vegetation read from the same imagery as land,
+#: whereas coastal asks about elevation and water extent. It needed no engine
+#: change either — `radar.rules_from` again.
+#:
+#: Its two flagged checks act on factors **no land rule uses**: land already
+#: owns Flood Zone 2 and 3, standing water and seasonal water, and restating
+#: those under a coastal heading would be one check wearing two hats.
+#:
+#: Deliberately named "coastal site assessment" rather than shoreline analysis.
+#: There is no coastline dataset here, so the product cannot verify a site is
+#: coastal and cannot measure shoreline retreat; `coastal/rules.py` states both
+#: limits and `docs/SCANNER_SPECIFICATION.md` records what would lift them.
+#:
+#: Coverage is England, for the same reason habitat's is: it is where this
+#: deployment has been exercised.
+COASTAL = Scanner(
+    id="coastal",
+    name="Coastal",
+    subject="Coastal site and frontage assessment",
+    topics=coastal_rules.TOPICS,
+    rules=radar.rules_from("coastal.rules"),
+    investigations=coastal_rules.INVESTIGATIONS,
+    factors=coastal_rules.FACTORS,
+    coverage=catalog.ENGLAND_BBOX,
+    coverage_name="England",
+)
+
 #: Declared verticals, in the order the library shows them. Each has a name, a
 #: subject and no content — registered so the product roadmap has one source of
 #: truth rather than a backend registry and a frontend list that drift.
 #:
 #: Registering is not implementing. `implemented` is False for every one of
 #: these, the API refuses a request naming them, and the library shows them as
-#: unavailable. What they are *not* is functionality: no topics, no rules, no
-#: thresholds, no factors, no coverage.
-COASTAL = Scanner(
-    id="coastal",
-    name="Coastal",
-    subject="Coastal conditions and change",
-    topics={}, rules=(), investigations={}, factors=(), coverage=None,
-)
-
+#: unavailable.
 FORESTRY = Scanner(
     id="forestry",
     name="Forestry",
@@ -172,7 +193,7 @@ TERRAIN = Scanner(
 )
 
 
-#: Order matters: this is the order the scanner library renders, so the two
+#: Order matters: this is the order the scanner library renders, so the three
 #: built scanners come first.
 SCANNERS: Dict[str, Scanner] = {
     s.id: s for s in (LAND, HABITAT, COASTAL, FORESTRY, WATER, TERRAIN)

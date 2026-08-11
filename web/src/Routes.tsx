@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes as RouterRoutes } from 'react-router-dom'
 import {
-  About, CaseStudies, Contact, HabitatScanner, Home, LandScanner, NotFound,
+  About, CaseStudies, CoastalScanner, Contact, HabitatScanner, Home, LandScanner,
+  NotFound,
   Privacy, RequestScan, Scanners, ThankYou,
 } from './site/Pages'
 import { APP_PATH, PAGES } from './site/site'
@@ -54,6 +55,7 @@ export default function Routes() {
         <Route path={PAGES.scanners.path} element={<Scanners />} />
         <Route path={PAGES.land.path} element={<LandScanner />} />
         <Route path={PAGES.habitat.path} element={<HabitatScanner />} />
+        <Route path={PAGES.coastal.path} element={<CoastalScanner />} />
         <Route path={PAGES.about.path} element={<About />} />
         <Route path={PAGES.caseStudies.path} element={<CaseStudies />} />
         <Route path={PAGES.contact.path} element={<Contact />} />

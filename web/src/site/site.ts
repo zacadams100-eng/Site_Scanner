@@ -78,6 +78,19 @@ export const PAGES: Record<string, PageMeta> = {
     ],
     indexable: true,
   },
+  coastal: {
+    path: '/scanners/coastal',
+    title: 'Coastal Scanner | Site Scanner',
+    description:
+      'Coastal site and frontage assessment: low-lying exposure and change '
+      + 'in surface water extent, with the limits of a polygon-based '
+      + 'assessment stated rather than implied.',
+    crumbs: [
+      { label: 'Site Scanner', path: '/' },
+      { label: 'Scanners', path: '/scanners' },
+    ],
+    indexable: true,
+  },
   about: {
     path: '/about',
     title: 'About | Site Scanner',

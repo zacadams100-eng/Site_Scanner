@@ -32,8 +32,17 @@ test('a site can be drawn and its report read', async ({ page }) => {
   const guard = watchConsole(page)
 
   await openLibrary(page)
-  // The library states what exists before anything is chosen.
-  await expect(page.locator('.lib-plate')).toHaveCount(2)
+  // The library shows exactly the scanners the API reports as implemented.
+  // Asserted against the API rather than a literal, because the literal was 2
+  // and Coastal shipping made it 3 — a test that breaks when the product grows
+  // is a test that gets edited rather than read.
+  const built = await page.evaluate(async () => {
+    const r = await fetch('/api/catalog?scanner=land')
+    const j = await r.json()
+    return (j.scanners as { implemented: boolean }[]).filter((s) => s.implemented).length
+  })
+  expect(built).toBeGreaterThanOrEqual(3)
+  await expect(page.locator('.lib-plate')).toHaveCount(built)
 
   await launchScanner(page, 'Land')
   await drawSite(page)
