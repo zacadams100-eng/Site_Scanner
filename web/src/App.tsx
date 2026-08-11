@@ -1,11 +1,18 @@
-import { useCallback, useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, type ReactNode } from 'react'
 import { useStore } from './store'
 import { fetchCatalog } from './api'
+// Statically imported, because it already was: Toolbar, Sidebar and
+// AttributeTable all import this module, so the `await import()` that used
+// to be here deferred nothing and the bundler said so.
+import { readAoiFile } from './lib/exports'
 import MapCanvas from './components/MapCanvas'
 import CertaintyLegend from './components/CertaintyLegend'
 import Timeline from './components/Timeline'
 import AttributeTable from './components/AttributeTable'
-import ChartStack from './components/ChartStack'
+// Observable Plot and its d3 modules are ~90 kB gzipped and are needed by
+// exactly one tab. Deferring them gets the map on screen sooner, which is
+// the thing this application is for.
+const ChartStack = lazy(() => import('./components/ChartStack'))
 import FactorBrowser from './components/FactorBrowser'
 import Findings from './components/Findings'
 import Gallery from './components/Gallery'
@@ -126,7 +133,6 @@ export default function App() {
       e.preventDefault()
       const file = e.dataTransfer?.files?.[0]
       if (!file) return
-      const { readAoiFile } = await import('./lib/exports')
       try {
         setAoiFromDrop(await readAoiFile(file))
       } catch {
@@ -362,7 +368,12 @@ export default function App() {
               {tab === 'radar' && <Radar />}
               {tab === 'findings' && <Findings />}
               {tab === 'table' && <AttributeTable />}
-              {tab === 'charts' && <><Compare /><ChartStack /></>}
+              {tab === 'charts' && (
+                <><Compare />
+                  <Suspense fallback={<div className="chart-stack" />}>
+                    <ChartStack />
+                  </Suspense></>
+              )}
               {tab === 'sources' && <Provenance />}
             </>
           )}

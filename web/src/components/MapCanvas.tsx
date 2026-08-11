@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import * as turf from '@turf/turf'
+// Individual packages rather than the `@turf/turf` monolith. The wholesale
+// import pulls every turf module into the bundle to reach seven functions;
+// these are the seven.
+import bbox from '@turf/bbox'
+import circle from '@turf/circle'
+import convex from '@turf/convex'
+import distance from '@turf/distance'
+import explode from '@turf/explode'
+import kinks from '@turf/kinks'
+import simplify from '@turf/simplify'
 
 import { useStore } from '../store'
 import { rampColor, rampPosition } from '../lib/format'
@@ -487,8 +496,8 @@ export default function MapCanvas() {
     })
 
     const circlePolygon = (c: maplibregl.LngLat, edge: maplibregl.LngLat): GeoJSON.Polygon => {
-      const km = turf.distance([c.lng, c.lat], [edge.lng, edge.lat], { units: 'kilometers' })
-      return turf.circle([c.lng, c.lat], Math.max(km, 0.01), { steps: 64 }).geometry
+      const km = distance([c.lng, c.lat], [edge.lng, edge.lat], { units: 'kilometers' })
+      return circle([c.lng, c.lat], Math.max(km, 0.01), { steps: 64 }).geometry
     }
 
     // The handlers take a plain LngLat rather than an event, so mouse and
@@ -538,14 +547,14 @@ export default function MapCanvas() {
         // release keeps every downstream call fast, and the shape looks the
         // same at the zoom it was drawn at.
         const tol = 0.00004 * Math.pow(2, Math.max(0, 13 - map.getZoom()))
-        const simplified = turf.simplify(raw, { tolerance: tol, highQuality: true })
+        const simplified = simplify(raw, { tolerance: tol, highQuality: true })
         poly = simplified.geometry
 
         // Freehand shapes self-intersect constantly. Catching it here produces
         // a message the user can act on; letting it through produces an opaque
         // failure three calls later.
-        if (turf.kinks(simplified).features.length > 0) {
-          const hull = turf.convex(turf.explode(simplified))
+        if (kinks(simplified).features.length > 0) {
+          const hull = convex(explode(simplified))
           if (hull) poly = hull.geometry as GeoJSON.Polygon
         }
       }
@@ -822,7 +831,7 @@ export default function MapCanvas() {
     if (!aoi) { src.setData(EMPTY); return }
     src.setData({ type: 'Feature', geometry: aoi, properties: {} })
     if (skipFit.current) { skipFit.current = false; return }
-    const [w, s, e, n] = turf.bbox({ type: 'Feature', geometry: aoi, properties: {} }) as
+    const [w, s, e, n] = bbox({ type: 'Feature', geometry: aoi, properties: {} }) as
       [number, number, number, number]
     map.fitBounds([[w, s], [e, n]], {
       padding: chromePadding(),

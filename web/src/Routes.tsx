@@ -1,10 +1,34 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes as RouterRoutes } from 'react-router-dom'
-import App from './App'
 import {
   About, CaseStudies, Contact, HabitatScanner, Home, LandScanner, NotFound,
   Privacy, RequestScan, Scanners, ThankYou,
 } from './site/Pages'
 import { APP_PATH, PAGES } from './site/site'
+
+/**
+ * The application is loaded on demand.
+ *
+ * It carries MapLibre, seven turf modules and Observable Plot — a GIS engine,
+ * a geometry library and a plotting library, none of which a marketing page
+ * uses. Statically imported they landed in the single entry chunk, so someone
+ * reading the About page downloaded a map renderer to read prose.
+ *
+ * The split is drawn here rather than deeper because it matches the one real
+ * boundary in this codebase: the public site and the application share a brand
+ * and nothing else.
+ */
+const App = lazy(() => import('./App'))
+
+/** Deliberately close to nothing.
+ *
+ *  This shows for the few hundred milliseconds of a chunk fetch, and the
+ *  application renders its own considered loading sequence immediately
+ *  afterwards. A second spinner before that one would be a flash of
+ *  furniture, not reassurance. */
+function AppLoading() {
+  return <div className="app-boot" role="status" aria-label="Loading the scanner" />
+}
 
 /**
  * The two experiences, kept apart.
@@ -37,7 +61,8 @@ export default function Routes() {
         <Route path={PAGES.thanks.path} element={<ThankYou />} />
         <Route path={PAGES.privacy.path} element={<Privacy />} />
 
-        <Route path={`${APP_PATH}/*`} element={<App />} />
+        <Route path={`${APP_PATH}/*`}
+               element={<Suspense fallback={<AppLoading />}><App /></Suspense>} />
 
         <Route path="*" element={<NotFound />} />
       </RouterRoutes>

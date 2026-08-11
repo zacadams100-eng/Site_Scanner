@@ -3479,3 +3479,8 @@ td.cov-severe { color: var(--text-dim); }
   /* Room for the sticky bar, so it never covers the last line of a page. */
   .mk-foot { padding-bottom: 96px; }
 }
+
+/* The gap between the route matching and the application chunk arriving.
+   Paints the app's ground colour so the split is a continuous surface rather
+   than a white flash between two dark screens. */
+.app-boot { position: fixed; inset: 0; background: var(--bg, #12100c); }
