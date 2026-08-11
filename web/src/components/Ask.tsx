@@ -24,6 +24,9 @@ const PLACEHOLDER = 'Has tree cover dropped since 2019?'
 export default function Ask() {
   const aoi = useStore((s) => s.aoi)
   const catalog = useStore((s) => s.catalog)
+  // The question is answered from the active scanner's factors, so it has to
+  // travel with it — see `ask` in api.ts.
+  const scannerId = useStore((s) => s.scannerId)
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState<AskResponse | null>(null)
   const [pending, setPending] = useState(false)
@@ -43,7 +46,7 @@ export default function Ask() {
     setPending(true)
     setError(null)
     try {
-      setResult(await ask(aoi, q, controller.signal))
+      setResult(await ask(aoi, q, scannerId, controller.signal))
     } catch (e) {
       if ((e as Error).name === 'AbortError') return
       setError(e instanceof ApiError ? e.message : 'Could not reach the API.')

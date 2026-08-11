@@ -103,12 +103,20 @@ export async function detectMock(): Promise<boolean> {
   }
 }
 
+/** Ask is scanner-scoped too.
+ *
+ *  `AskRequest` extends `ScannedRequest`, so the backend resolves a scanner for
+ *  every question and reads the factor list through it. Omitting the field here
+ *  did not fail — it silently took the default, and a question asked inside
+ *  Habitat was answered from Land's factors. Same defect as the report path,
+ *  one route further on. */
 export function ask(
   geometry: GeoJSON.Polygon,
   question: string,
+  scanner: string,
   signal?: AbortSignal,
 ): Promise<AskResponse> {
-  return post<AskResponse>('/api/ask', { geometry, question }, signal)
+  return post<AskResponse>('/api/ask', { geometry, question, scanner }, signal)
 }
 
 /** Compare 2–4 saved sites' evidence profiles.

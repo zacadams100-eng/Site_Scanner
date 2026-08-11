@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -20,5 +21,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
+  },
+  // Two runners, two directories. Vitest's default glob would otherwise pick
+  // up `e2e/*.spec.ts`, import `@playwright/test` outside a Playwright run and
+  // fail three files — a red suite reporting nothing about the code.
+  test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })

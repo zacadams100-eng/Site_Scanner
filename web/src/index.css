@@ -1093,7 +1093,13 @@ h1, h2, h3 {
 }
 .tab.is-active .tab-count { background: var(--forest-800); color: var(--bone-050); }
 
-.findings { padding: 6px 0 18px; }
+/* Its own scroller, like every other tab root — `.panel-body` is
+   `overflow: hidden` and delegates the scrolling to whichever tab is showing.
+   This one was missed because the findings list is short enough to fit at
+   desktop height, so it only clipped on a phone: 515px of findings in a 242px
+   panel, with the last third simply unreachable. Caught by the e2e rule rather
+   than by eye, which is the whole reason that rule is phrased as a rule. */
+.findings { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 0 18px; }
 .finding-list { list-style: none; margin: 0; padding: 0; }
 .finding {
   display: flex; gap: 10px; padding: 12px 16px 12px 14px;

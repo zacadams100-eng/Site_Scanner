@@ -26,3 +26,9 @@ dist-ssr
 # Copied from node_modules by scripts/copy-maplibre-worker.mjs
 public/maplibre/
 public/demo.html
+
+# Playwright output. Reports and traces are build products of a test run, not
+# source — they are large, machine-specific, and regenerated on every run.
+/test-results/
+/playwright-report/
+/blob-report/
