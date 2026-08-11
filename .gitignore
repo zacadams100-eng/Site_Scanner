@@ -21,3 +21,12 @@ venv/
 # Generated into the Vite build by vercel.json buildCommand
 web/public/demo.html
 verify-report.md
+
+# Agent skills installed by `npx skills add`.
+#
+# Vendored tooling, not project code — ~300 files that have nothing to do with
+# Site Scanner and would show up in every diff and every clone. skills-lock.json
+# IS tracked, so `npx skills install` reproduces the exact same set: the lockfile
+# is the record, the payload is not.
+.agents/skills/
+.claude/skills/
