@@ -200,3 +200,75 @@ No reviews, case studies, statistics, response times, team members, addresses,
 phone numbers, client names, project outcomes, company registration details or
 aggregate ratings. No `Organization` or `LocalBusiness` schema. No placeholder
 `og:url` or canonical. No measurement ID.
+
+---
+
+# Production-quality audit — second pass
+
+The same 20-item checklist, re-run against the site that now exists, plus the
+application. Every row was checked in a browser against a running backend, not
+read off the source. Four classifications:
+
+**A** already correct · **B** missing, fixed · **C** not appropriate here ·
+**D** needs a product or business decision
+
+| # | Item | | Finding |
+| --- | --- | --- | --- |
+| 1 | Deployment URL | **D** | `vercel.json` is complete: SPA rewrite, CSP, security headers, immutable asset caching, `must-revalidate` on the document. The *domain* is a business decision, and everything that depends on it is gated on `VITE_SITE_ORIGIN` rather than guessed. |
+| 2 | view-source / initial HTML | **D** | A 2,099-byte SPA shell carrying the homepage's real title, description and Open Graph tags. Fine for the application; a limit for the marketing pages, whose copy is invisible to a crawler that does not execute JavaScript. See "The one open SEO question" below. |
+| 3 | 404 page | **B / D** | The page exists, is `noindex, follow`, offers a way back, and is now covered by an e2e test. **But it answers HTTP 200**, because the SPA rewrite serves `index.html` for everything — a soft 404. Fixing it properly needs a serverless catch-all or prerendering; both are deployment decisions, so this is recorded rather than guessed at. |
+| 4 | Vite + React production behaviour | **A** | Builds clean with no warnings. Verified by serving the built output, not the dev server. |
+| 5 | Unique page titles | **A** | 10 of 10 unique, from one route table. Asserted by unit test and re-verified in a browser. |
+| 6 | Meta descriptions | **A** | 10 of 10 unique and specific. |
+| 7 | `og:image` | **D** | Absent because no branded social image exists. A generated placeholder would be worse: it is cached by every platform that reads it. Needs an asset, not code. |
+| 8 | Structured data | **A** | `BreadcrumbList` only, gated on a configured origin. `Organization` was correctly refused — it needs a legal entity nobody has supplied, and invented structured data is a machine-readable lie. |
+| 9 | Multiple H1s | **A** | Exactly one per route, all ten verified. |
+| 10 | Missing H1 | **B** | The public site was fine. The **report view had no h1 at all** — the site name was an `h2` under nothing. Promoted, with its sections following to `h2`. No visual change; the CSS is class-based. |
+| 11 | Canonical tags | **A** | Emitted only with `VITE_SITE_ORIGIN`. Omission is recoverable; a wrong canonical tells a search engine the real page is somewhere else. |
+| 12 | `llms.txt` | **C** | Not added. It is a proposed convention with thin adoption, and this site is ten pages of plain prose that any crawler can already read. It would be a file asserting we are current with a fashion, maintained by nobody. Revisit if the documentation grows. |
+| 13 | robots.txt / AI crawlers | **A / D** | `robots.txt` exists and reasons in the file: `/app` disallowed (client-side state, nothing to index), `/thank-you` disallowed, everything else open. **No AI-specific blocks**, deliberately — this product's problem is being found, not being read. Whether to exclude AI crawlers is a commercial decision, not a technical default. |
+| 14 | Favicon | **B** | `favicon.svg` was present and served. Added a 180×180 `apple-touch-icon.png` — iOS does not synthesise one from SVG and falls back to a screenshot of the page — and a `theme-color`. No web manifest: without a real install experience it is a file that exists to be found by an audit. |
+| 15 | `sitemap.xml` | **A** | Generated at build from the route table, so it cannot list URLs that no longer exist. Skipped entirely without an origin, because a sitemap of relative paths is invalid. |
+| 16 | `html lang` | **A** | `lang="en"` on every route. |
+| 17 | Image alt text | **A / B** | No `<img>` in the product is missing `alt`. Seven **icon SVGs inside labelled buttons** were exposed to the accessibility tree as unnamed graphics — now hidden, since the button's own name is the information. |
+| 18 | Source maps | **A** | Not emitted in production; Vite's default is off and nothing overrides it. No action, and none wanted: this repository is public, so the source is not secret, but shipping maps to every visitor costs bandwidth for nothing. |
+| 19 | Console errors | **A / B** | Zero across the whole journey at both viewports. Now **enforced** rather than observed: the e2e suite fails on any console error or uncaught exception, third-party tile noise excluded. |
+| 20 | Bundle size | **B** | Was one 1,694 kB chunk for every route — the About page downloaded MapLibre, seven turf modules and Observable Plot to render three paragraphs. Now 81 kB gzipped for the public site, 298 kB for the application, 96 kB for charts on demand. |
+
+## Site Scanner is not a marketing website
+
+The checklist assumes a content site. This is a browser-based GIS application
+with a marketing site attached, and the two want opposite things.
+
+- **The public site** — homepage, scanner pages, about, contact, privacy — is
+  content, and every SEO item above applies to it in full.
+- **The application** at `/app` is not content and should not be treated as
+  content. Its state is a drawn shape and an open investigation held in a URL
+  fragment that never reaches a server. There is nothing to index, and an
+  assessment URL in search results would be **someone else's site**. It is
+  disallowed in `robots.txt` for that reason, not for SEO hygiene.
+
+Nothing was added to the application to satisfy a checklist. No structured data
+describes a report, no headings were invented to fill an outline, and no
+rendering strategy changed to make the HTML source look busier.
+
+## The one open SEO question
+
+The marketing pages render client-side, so their copy is invisible to a crawler
+that does not execute JavaScript. Google generally does execute it; most other
+crawlers, and most social-preview fetchers, do not.
+
+This did not get fixed, and the reason is that the fix is a decision rather than
+a task:
+
+- **Prerendering** the ten public routes to static HTML at build time would
+  resolve it, keep the SPA intact, and cost one build plugin. It would also
+  give the 404 a real status code.
+- **SSR** would resolve it and impose a server, a runtime and a rendering
+  discipline on a codebase that currently deploys as static files plus one
+  function.
+
+Prerendering is the proportionate answer **if and when organic search matters
+commercially**. Until then this is a known limit, not an accident. Rebuilding
+the architecture so that view-source looks impressive would be work done for an
+audience of one, and that audience is a checklist.

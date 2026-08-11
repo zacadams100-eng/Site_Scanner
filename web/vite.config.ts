@@ -22,6 +22,14 @@ export default defineConfig({
     port: 5173,
     proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
   },
+  // The same proxy for `vite preview`, so the *built* output can be driven
+  // against a real backend. Without it the only way to exercise a production
+  // bundle is to deploy it, which is a slow way to discover that something
+  // only breaks after minification.
+  preview: {
+    port: 4173,
+    proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
+  },
   // Two runners, two directories. Vitest's default glob would otherwise pick
   // up `e2e/*.spec.ts`, import `@playwright/test` outside a Playwright run and
   // fail three files — a red suite reporting nothing about the code.
