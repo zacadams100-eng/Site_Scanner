@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Shell from './Shell'
 import HeroField from './HeroField'
 import Asset, { AssetCredits } from './Asset'
+import BrandMark from '../components/BrandMark'
 import { SUPPLIED } from './assets.generated'
 import { PAGES, PRIMARY_CTA, APP_PATH } from './site'
 
@@ -66,34 +67,6 @@ export function Home() {
     <Shell page={PAGES.home}>
       <Hero />
 
-      <section className="mk-band">
-        <div className="mk-wrap">
-          <h2 className="mk-h2">What a scan establishes</h2>
-          <ol className="mk-chain">
-            <li><span className="mk-step mono">01</span>
-              <h3>Evidence</h3>
-              <p>Every factor is traced to its publisher, the service that
-                answered, and whether this deployment has actually run it
-                live.</p></li>
-            <li><span className="mk-step mono">02</span>
-              <h3>Findings</h3>
-              <p>Four states, kept apart: flagged, checked and clear,
-                informational, and not assessed — with three different reasons
-                a check could not run.</p></li>
-            <li><span className="mk-step mono">03</span>
-              <h3>Limits</h3>
-              <p>Every finding states what it does not establish. A measured
-                change is not a diagnosis, and the difference is written into
-                the result.</p></li>
-            <li><span className="mk-step mono">04</span>
-              <h3>Investigations</h3>
-              <p>What a professional would check next, traced back to the
-                findings that raised it — and an evidence pack to take to
-                them.</p></li>
-          </ol>
-        </div>
-      </section>
-
       <section className="mk-band mk-band-alt">
         <div className="mk-wrap">
           <h2 className="mk-h2">What Site Scanner will not do</h2>
@@ -109,10 +82,11 @@ export function Home() {
         </div>
       </section>
 
-      <ProductSection />
+      <ScannerPlatform />
+      <InstrumentSection />
       <FieldSection />
-      <BeforeAfterSection />
-      <ScannerTeasers />
+      <AssessmentSection />
+      <ChangeSection />
       <CtaBand />
     </Shell>
   )
@@ -120,38 +94,190 @@ export function Home() {
 
 
 /**
- * The product, shown rather than described.
+ * The six-scanner platform, stated before anything is explained.
  *
- * Screenshots of the real interface beside the raw material it reads —
- * satellite, terrain, classification. Set as plates on paper, not as a feature
- * grid: the claim is "this is a working instrument", and a template makes
- * anything look like a template.
+ * The two built scanners are plates; the four that are not are a list. That
+ * asymmetry is the content — six equal cards with four greyed out reads as
+ * "four things are broken", and it also implies you could buy them. You
+ * cannot. The application's own library makes the same split, in the same
+ * order, with the same words.
  */
-function ProductSection() {
+function ScannerPlatform() {
   return (
     <section className="mk-band mk-band-paper">
       <div className="mk-wrap">
-        <p className="mk-kicker">The instrument / 01</p>
-        <h2 className="mk-h2">What it actually looks like</h2>
+        <p className="mk-kicker">The platform / 01</p>
+        <h2 className="mk-h2">Six scanners. Two you can run today.</h2>
         <p className="mk-lede mk-lede-sm">
-          A map you draw on, and a report that states what was found, what was
-          checked and cleared, and what could not be assessed at all.
+          Each scanner asks a different professional question of the same
+          place. They share one evidence engine, one set of finding states and
+          one rule about what may be claimed.
         </p>
 
-        <div className="mk-plates mk-plates-hero mk-plates-gap">
-          <Asset id="productReport" tilt={-1.2} tape="tl" caption="Site report · evidence coverage" />
-          <Asset id="productMap" tilt={1.6} caption="Map canvas · drawn site" />
+        <p className="mk-group-label mono">Available</p>
+        <div className="mk-scanner-plates">
+          <Link className="mk-scanner-plate" to={PAGES.land.path}>
+            <span className="mk-scanner-idx mono">01</span>
+            <BrandMark className="mk-scanner-mark" />
+            <h3>Land</h3>
+            <p className="mk-scanner-sub">Site constraints and land assessment</p>
+            <p>Designations, flood, ground and planning evidence — what
+              constrains what can be done here.</p>
+            <span className="mk-scanner-go">Land Scanner →</span>
+          </Link>
+          <Link className="mk-scanner-plate" to={PAGES.habitat.path}>
+            <span className="mk-scanner-idx mono">02</span>
+            <BrandMark className="mk-scanner-mark" />
+            <h3>Habitat</h3>
+            <p className="mk-scanner-sub">Ecological condition and habitat investigation</p>
+            <p>Fifteen years of Sentinel-2 observation, with a stated
+              reporting threshold and an explicit limit on what a spectral
+              index can establish.</p>
+            <span className="mk-scanner-go">Habitat Scanner →</span>
+          </Link>
+        </div>
+
+        <p className="mk-group-label mono">In development</p>
+        <ul className="mk-roadmap mk-roadmap-lg">
+          <li><span className="mk-roadmap-idx mono">03</span><b>Coastal</b>
+            <span>Coastal conditions and change</span></li>
+          <li><span className="mk-roadmap-idx mono">04</span><b>Forestry</b>
+            <span>Forest condition and management</span></li>
+          <li><span className="mk-roadmap-idx mono">05</span><b>Water</b>
+            <span>Water and catchment assessment</span></li>
+          <li><span className="mk-roadmap-idx mono">06</span><b>Terrain</b>
+            <span>Terrain and physical site conditions</span></li>
+        </ul>
+        <p className="mk-note">
+          Declared in the registry and built in none of it. The
+          {' '}<a href={APP_PATH}>scanner library</a> says so in the product too.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The instrument.
+ *
+ * The application beside the evidence it reads. This is the section carrying
+ * the actual claim — that a pile of environmental data becomes a structured
+ * site investigation — so it is the one that most needs real screenshots and
+ * the one that says loudest when they are missing.
+ */
+function InstrumentSection() {
+  return (
+    <section className="mk-band">
+      <div className="mk-wrap">
+        <p className="mk-kicker">The instrument / 02</p>
+        <h2 className="mk-h2">Draw a site. Read what is there.</h2>
+        <p className="mk-lede mk-lede-sm">
+          A map you draw on, and a report that separates what was found, what
+          was checked and cleared, and what could not be assessed at all.
+        </p>
+
+        <div className="mk-plates mk-plates-instrument">
+          <Asset id="productLand" tilt={-1.1} tape="tl" caption="Land · workspace" />
+          <Asset id="productHabitat" tilt={1.3} caption="Habitat · workspace" />
         </div>
 
         <p className="mk-plate-note">
-          The evidence beneath every finding — imagery, terrain and
-          classification, read for the area you draw.
+          Every factor is read for the area you draw, from the evidence below.
         </p>
-        <div className="mk-plates mk-plates-stagger">
-          <Asset id="productSatellite" tilt={-2} halftone caption="Satellite" />
-          <Asset id="productTerrain" tilt={1.4} halftone caption="Terrain" />
-          <Asset id="productAnalysis" tilt={-1} halftone caption="Classification" />
+        <div className="mk-plates mk-plates-evidence">
+          <Asset id="evidenceSatellite" halftone caption="Satellite" />
+          <Asset id="evidenceTerrain" halftone caption="Terrain" />
+          <Asset id="evidenceVegetation" halftone caption="Vegetation" />
+          <Asset id="evidenceHydrology" halftone caption="Hydrology" />
+          <Asset id="evidenceHistorical" halftone caption="Historical" />
         </div>
+
+        {/* The one mid-page ask. It sits here because this is where someone
+            has just understood what the thing does and has not yet been told
+            anything else — and because the next CTA is four thousand pixels
+            away. Quiet: a line and two links, not another orange band. */}
+        <div className="mk-inline-cta">
+          <p>Have a site you need to understand?</p>
+          <Link className="mk-cta" to={PRIMARY_CTA.path}>{PRIMARY_CTA.label}</Link>
+          <Link className="mk-ghost" to={PAGES.scanners.path}>Explore scanners →</Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The assessment: radar, evidence, investigations.
+ *
+ * Three panels of the report, shown as plates. The order is the order the
+ * product works in — coverage, then the trace behind a finding, then what to
+ * do about it.
+ */
+function AssessmentSection() {
+  return (
+    <section className="mk-band mk-band-paper">
+      <div className="mk-wrap">
+        <p className="mk-kicker">The assessment / 04</p>
+        <h2 className="mk-h2">What was found, what was missed, what to check</h2>
+        <p className="mk-lede mk-lede-sm">
+          There is no site score. A number that hides its own inputs is the
+          opposite of what this is for. The one figure set large is evidence
+          coverage — it rates the assessment, not the site, and it falls as
+          less is known.
+        </p>
+
+        <div className="mk-plates mk-plates-3 mk-plates-assess">
+          <Asset id="productRadar" tilt={-1.4} caption="Radar · coverage first" />
+          <Asset id="productEvidence" tilt={1} tape="tr" caption="Evidence · traced" />
+          <Asset id="productOverview" tilt={-0.8} caption="Overview · four states" />
+        </div>
+
+        <ol className="mk-chain mk-chain-tight">
+          <li><span className="mk-step mono">01</span><h3>Flagged</h3>
+            <p>The engine raised it, with the measurement behind it.</p></li>
+          <li><span className="mk-step mono">02</span><h3>Checked · clear</h3>
+            <p>Looked at, nothing found. Drawn as confidently as a flag.</p></li>
+          <li><span className="mk-step mono">03</span><h3>Informational</h3>
+            <p>True and worth knowing. Not a problem.</p></li>
+          <li><span className="mk-step mono">04</span><h3>Not assessed</h3>
+            <p>Three different reasons, kept apart. Silence is not safety.</p></li>
+        </ol>
+
+        <Asset id="productInvestigation" className="mk-plate-wide"
+               caption="Investigation workspace · what a professional checks next" />
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Then and now.
+ *
+ * The pair is only worth showing if the product could substantiate it, which
+ * is why the caption states the dates and the copy states the limit. A
+ * measured change is not a diagnosis, and saying so here rather than in the
+ * small print is the whole positioning.
+ */
+function ChangeSection() {
+  return (
+    <section className="mk-band">
+      <div className="mk-wrap">
+        <p className="mk-kicker">The change / 05</p>
+        <h2 className="mk-h2">Then, and now</h2>
+        <p className="mk-lede mk-lede-sm">
+          Fifteen years of observation for the same ground, on one axis. What
+          the record shows is a change in measurement — what caused it is the
+          question the record hands to you.
+        </p>
+        <div className="mk-plates mk-plates-2 mk-plates-ba">
+          <Asset id="changeThen" caption="Then" />
+          <Asset id="changeNow" caption="Now" />
+        </div>
+        <div className="mk-plates mk-plates-2 mk-plates-archive">
+          <Asset id="marketingMap" tilt={-1.6} halftone caption="Archival survey" />
+          <Asset id="marketingProperty" tilt={1.2} caption="Land under assessment" />
+        </div>
+        <AssetCredits />
       </div>
     </section>
   )
@@ -167,7 +293,7 @@ function FieldSection() {
   return (
     <section className="mk-band mk-band-field">
       <div className="mk-wrap">
-        <p className="mk-kicker">Field record / 02</p>
+        <p className="mk-kicker">The field record / 03</p>
         <h2 className="mk-h2">Built for people who go and look</h2>
         <p className="mk-lede mk-lede-sm">
           Site Scanner does not replace a survey. It decides what the survey
@@ -182,63 +308,6 @@ function FieldSection() {
         </div>
 
         <Asset id="fieldLandscape" className="mk-plate-wide" caption="The subject" />
-      </div>
-    </section>
-  )
-}
-
-/**
- * Before and after.
- *
- * Two frames of the same place, one plain and one carrying the analysis. It is
- * the single clearest statement of what the product does, which is why it gets
- * its own band and no competing furniture.
- */
-function BeforeAfterSection() {
-  return (
-    <section className="mk-band">
-      <div className="mk-wrap">
-        <p className="mk-kicker">Before / after</p>
-        <h2 className="mk-h2">The same site, read</h2>
-        <div className="mk-plates mk-plates-2 mk-plates-ba">
-          <Asset id="beforeAnalysis" caption="Before · imagery only" />
-          <Asset id="afterAnalysis" caption="After · constraints and findings" />
-        </div>
-        <div className="mk-plates mk-plates-2 mk-plates-archive">
-          <Asset id="marketingMap" tilt={-1.6} halftone caption="Archival survey" />
-          <Asset id="marketingProperty" tilt={1.2} caption="Land under assessment" />
-        </div>
-        <AssetCredits />
-      </div>
-    </section>
-  )
-}
-
-function ScannerTeasers() {
-  return (
-    <section className="mk-band">
-      <div className="mk-wrap">
-        <h2 className="mk-h2">Two scanners available</h2>
-        <div className="mk-cards">
-          <Link className="mk-card" to={PAGES.land.path}>
-            <span className="mk-card-idx mono">01</span>
-            <h3>Land</h3>
-            <p>Site constraints and land assessment — designations, flood,
-              ground and planning evidence.</p>
-            <span className="mk-card-go">Land Scanner →</span>
-          </Link>
-          <Link className="mk-card" to={PAGES.habitat.path}>
-            <span className="mk-card-idx mono">02</span>
-            <h3>Habitat</h3>
-            <p>Ecological condition and habitat investigation from fifteen
-              years of Sentinel-2 observation.</p>
-            <span className="mk-card-go">Habitat Scanner →</span>
-          </Link>
-        </div>
-        <p className="mk-note">
-          Coastal, Forestry, Water and Terrain are in development and are shown
-          in the <a href={APP_PATH}>scanner library</a> as unavailable.
-        </p>
       </div>
     </section>
   )

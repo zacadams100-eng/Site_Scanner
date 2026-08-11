@@ -3783,6 +3783,10 @@ td.cov-severe { color: var(--text-dim); }
 
 .plate {
   position: relative; margin: 0; overflow: hidden;
+  /* Queried by the awaiting frame below. What fits in a placeholder is decided
+     by the plate's own width — a 1:1 evidence square in a two-column phone
+     layout is ~170px wide whatever the viewport is doing. */
+  container-type: inline-size;
   background: var(--bone-200);
   border: 1px solid var(--rule-400);
   /* Photographs print on paper. The offset shadow is a physical print lying on
@@ -3859,8 +3863,9 @@ td.cov-severe { color: var(--text-dim); }
     var(--bone-050);
   border-style: dashed; border-color: var(--stone-500); box-shadow: none;
 }
+/* Bottom padding always, so a caption never lands on top of the spec line. */
 .plate-awaiting {
-  position: absolute; inset: 0; padding: 20px;
+  position: absolute; inset: 0; padding: 20px 20px 38px;
   display: flex; flex-direction: column; justify-content: center; gap: 7px;
   text-align: center;
 }
@@ -3877,6 +3882,19 @@ td.cov-severe { color: var(--text-dim); }
   max-width: 34ch; margin: 2px auto 0 !important;
 }
 .plate-spec { font-size: 9px; letter-spacing: .16em; color: var(--stone-600); }
+
+/* Small frames drop to the two things that are actionable — which slot, and
+   which file. The brief and the export spec are in the README and in
+   assets.ts; repeating them illegibly inside a 170px square helps nobody. */
+@container (max-width: 300px) {
+  .plate-brief { display: none; }
+  .plate-awaiting { padding: 12px 12px 30px; gap: 5px; }
+  .plate-path { font-size: 9.5px; }
+}
+@container (max-width: 210px) {
+  .plate-spec { display: none; }
+  .plate-slot { font-size: 8px; letter-spacing: .18em; }
+}
 
 /* Corner ticks, the way a print is marked up for trimming. */
 .plate-corner {
@@ -3983,4 +4001,124 @@ td.cov-severe { color: var(--text-dim); }
                                            rgb(250 248 243 / .8) 46%,
                                            rgb(250 248 243 / .35) 100%);
   }
+}
+
+/* ===========================================================================
+   MARKETING — the product story
+   ---------------------------------------------------------------------------
+   The homepage reads as an investigation unfolding: the platform, the
+   instrument, the field record, the assessment, the change. Each band is
+   numbered in its kicker, so the page has a sequence rather than a stack of
+   feature blocks.
+   ========================================================================= */
+
+.mk-group-label {
+  margin: 40px 0 16px; font-size: 10px; letter-spacing: .26em;
+  text-transform: uppercase; color: var(--stone-600);
+  padding-bottom: 9px; border-bottom: 1px solid var(--line);
+}
+
+/* ------------------------------------------------------- available scanners */
+
+/* Deep forest plates, the same treatment the application's library gives an
+   available scanner. Two of them, wide — this is the product, and the four
+   below are not. */
+.mk-scanner-plates { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.mk-scanner-plate {
+  position: relative; display: block; padding: 26px 26px 22px;
+  background: var(--forest-800); color: var(--bone-100);
+  text-decoration: none; overflow: hidden;
+  border: 1px solid var(--forest-700);
+  transition: background .16s ease, transform .16s ease;
+}
+.mk-scanner-plate:hover { background: var(--forest-700); transform: translateY(-2px); }
+.mk-scanner-plate h3 {
+  margin: 0 0 4px; font-family: var(--font-display); font-size: 30px;
+  font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+}
+.mk-scanner-sub {
+  margin: 0 0 14px; font-family: var(--font-display); font-size: 11px;
+  font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--forest-200);
+}
+.mk-scanner-plate p { margin: 0 0 16px; font-size: 14px; color: var(--forest-100); }
+.mk-scanner-idx {
+  position: absolute; top: 24px; right: 24px;
+  font-size: 11px; letter-spacing: .2em; color: var(--forest-200); opacity: .8;
+}
+/* The frog as a field mark: one per plate, low contrast, sized like a stamp
+   rather than a logo. Not a mascot — it marks the plate the way an expedition
+   emblem marks equipment. */
+.mk-scanner-mark {
+  width: 26px; height: 26px; display: block; margin-bottom: 14px;
+  color: var(--bone-100); opacity: .55;
+}
+.mk-scanner-go {
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--signal-500);
+}
+
+/* --------------------------------------------------------- roadmap scanners */
+
+/* A list, not cards. Four greyed-out tiles beside two live ones reads as four
+   broken things; a numbered list under "In development" reads as a roadmap. */
+.mk-roadmap-lg li {
+  display: grid; grid-template-columns: 34px 130px 1fr; align-items: baseline;
+  gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line);
+}
+.mk-roadmap-lg b {
+  font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim);
+}
+.mk-roadmap-lg span:last-child { font-size: 14px; color: var(--text-faint); }
+.mk-roadmap-idx { font-size: 11px; letter-spacing: .16em; color: var(--stone-500); }
+
+/* ------------------------------------------------------------- arrangements */
+
+.mk-plates-instrument {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 30px;
+}
+/* Five squares of evidence in a row: a contact sheet, which is what this
+   material actually is. */
+.mk-plates-evidence {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+}
+.mk-plates-assess {
+  margin-top: 28px; gap: 20px;
+}
+.mk-chain-tight { margin-top: 40px; }
+
+@media (max-width: 900px) {
+  .mk-plates-evidence { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 760px) {
+  /* Controlled rather than stacked. The scanner plates go full width and keep
+     their weight; the evidence contact sheet stays a grid at two columns
+     because five stacked squares is a scroll, not a section; the instrument
+     screenshots stay legible by getting the whole width each. */
+  .mk-scanner-plates { grid-template-columns: 1fr; }
+  .mk-scanner-plate h3 { font-size: 24px; }
+  .mk-plates-instrument, .mk-plates-assess { grid-template-columns: 1fr; gap: 18px; }
+  .mk-plates-evidence { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .mk-roadmap-lg li { grid-template-columns: 28px 1fr; gap: 4px 12px; }
+  .mk-roadmap-lg span:last-child { grid-column: 2; }
+  .mk-group-label { margin-top: 30px; }
+}
+
+/* The mid-page ask. A rule, a line of copy and the two calls to action — not a
+   third orange band. The page has one dominant conversion and it should not
+   feel like being asked four times. */
+.mk-inline-cta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 16px;
+  margin-top: 46px; padding-top: 24px; border-top: 1px solid var(--line);
+}
+.mk-inline-cta p {
+  margin: 0; flex: 1 1 240px;
+  font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ink-900);
+}
+@media (max-width: 760px) {
+  .mk-inline-cta { gap: 12px; }
+  .mk-inline-cta p { flex-basis: 100%; font-size: 14px; }
+  .mk-inline-cta .mk-cta { flex: 1 1 auto; text-align: center; }
 }

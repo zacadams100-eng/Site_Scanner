@@ -38,15 +38,58 @@ Until one of these exists the hero renders the generated field sheet — the
 topographic map of England and Wales. That is a finished design, not a
 placeholder, so there is no rush; supply a loop when you have one worth using.
 
-### `product/` — the instrument
+### `product/` — the application itself
+
+**These are the most important assets on the site, and they cannot be faked.**
 
 | File | Ratio | Min width | What it is |
 | --- | --- | --- | --- |
-| `interface-site-report.png` | 16:10 | 1600 | Screenshot of the real report panel. Take it at 1440×900 from `/app` with a site drawn. |
-| `interface-map-canvas.png` | 16:10 | 1600 | Screenshot of the map with a drawn area and cells shaded. |
-| `satellite-imagery.jpg` | 1:1 | 1200 | True-colour satellite over farmland or mixed land use. |
-| `terrain-contour-map.jpg` | 1:1 | 1200 | Topographic sheet — contour lines, ideally a real or archival survey. |
-| `land-analysis-overlay.jpg` | 1:1 | 1200 | Analysis over a real place: habitat polygons, parcels, a classification raster. |
+| `workspace-land.png` | 16:10 | 2880 | Land workspace at 1440×900. Real site drawn, map and report both visible, findings present, coverage above zero. |
+| `workspace-habitat.png` | 16:10 | 2880 | Habitat workspace, same requirements. The HABITAT badge must be legible — it is what shows this is a platform rather than one tool. |
+| `report-site-overview.png` | 4:5 | 1400 | The Overview tab, panel only. Real coverage, four finding states with non-zero counts. |
+| `report-radar.png` | 4:5 | 1400 | The Radar tab. Needs a mix of flagged, checked-and-clear and not-assessed, or it makes no point. |
+| `report-evidence.png` | 4:5 | 1400 | Evidence drawer open on a real finding: source, measurement, and the "does not establish" statement. |
+| `workspace-investigation.png` | 16:10 | 2880 | Investigation workspace, investigations traced back to the findings that raised them. |
+
+#### What is required to capture these
+
+The demo backend cannot produce them. It stamps every response
+`X-Contour-Mock: true`, the interface labels the result *"Demo data — generated
+on the server"*, and the findings are invented. A screenshot of that on a
+marketing page is either dishonest or an advertisement for the disclaimer.
+
+To take these screenshots you need, in order:
+
+1. **A Google Cloud project with Earth Engine enabled**, and a service-account
+   key. `app.py` reads `GOOGLE_APPLICATION_CREDENTIALS_JSON` and `EE_PROJECT`;
+   `DEPLOY.md` has the setup.
+2. **The real backend running** — `uvicorn app:app`, not `mock_ee_backend`.
+   Confirm with `curl -sD- localhost:8000/api/catalog -o /dev/null | grep -i
+   contour-mock`: it must be **absent or false**. If it says `true` you are
+   still on the mock.
+3. **A real site in England** drawn in the workspace, on ground where the
+   evidence is interesting enough to produce findings. A field with nothing on
+   it produces an honest and completely unpersuasive report.
+4. **Retina capture at 2×** — 2880×1800 for a 1440×900 window, so the interface
+   text stays sharp.
+
+Note that only 28 of Land's 271 factors are real today, and 11 of those are
+`verified` (actually run against the live service) rather than `written`. The
+report will be mostly "not assessed", and **that is the honest picture** — the
+radar exists to show exactly that. Do not select a factor set to hide it.
+
+### `evidence/` — what a scan reads
+
+Not product screenshots. These can be sourced independently — open imagery,
+archival sheets, your own captures. Square crops, shown as a contact sheet.
+
+| File | Ratio | Min width | What it is |
+| --- | --- | --- | --- |
+| `satellite-imagery.jpg` | 1:1 | 1200 | Sentinel-2 or equivalent over mixed land use. |
+| `terrain-elevation.jpg` | 1:1 | 1200 | Hillshade, DEM or a contour sheet. |
+| `vegetation-index.jpg` | 1:1 | 1200 | NDVI/EVI raster or a false-colour composite. |
+| `hydrology-water.jpg` | 1:1 | 1200 | Rivers, flood zones or surface water. |
+| `historical-imagery.jpg` | 1:1 | 1200 | Archival aerial or an old OS sheet — ideally somewhere you also have current imagery for. |
 
 ### `field/` — the fieldwork
 
@@ -64,10 +107,16 @@ better here than bright ones.
 
 | File | Ratio | Min width | What it is |
 | --- | --- | --- | --- |
-| `site-before-analysis.jpg` | 4:3 | 1400 | Plain aerial of a site, nothing drawn on it. |
-| `site-after-analysis.jpg` | 4:3 | 1400 | **The same frame, same angle**, with the analysis on it. The pair only works if they match. |
+| `change-then.jpg` | 4:3 | 1400 | The earlier observation. Note the real date. Sentinel-2 starts 2017; older than that needs aerial or archival. |
+| `change-now.jpg` | 4:3 | 1400 | **The same ground, same footprint, same angle**, most recent observation. If the two do not line up the comparison is worthless. |
 | `archival-map.jpg` | 3:2 | 1600 | Old paper map, plan or estate drawing. Texture matters more than legibility. |
 | `property-landscape.jpg` | 3:2 | 1600 | The commercial subject: a farm, an estate, a development site. |
+
+**Only a comparison the product could substantiate.** If the honest answer is
+that nothing much changed, that is the pair to use — a site where the evidence
+says "no material change" is a result. Manufacturing a dramatic collapse
+because it looks better on a homepage is the exact failure this product exists
+to prevent.
 
 ## Composition is yours
 

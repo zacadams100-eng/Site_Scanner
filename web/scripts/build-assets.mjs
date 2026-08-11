@@ -20,7 +20,7 @@ const ASSET_DIR = join(ROOT, 'public', 'assets')
 const SLOTS_SRC = join(ROOT, 'src', 'site', 'assets.ts')
 const OUT = join(ROOT, 'src', 'site', 'assets.generated.ts')
 
-const SECTIONS = ['hero', 'product', 'field', 'marketing', 'brand']
+const SECTIONS = ['hero', 'product', 'evidence', 'field', 'marketing', 'brand']
 
 /*
  * The slot table is TypeScript, and this is a plain Node script, so the

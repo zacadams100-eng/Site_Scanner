@@ -36,7 +36,7 @@ export interface AssetSlot {
   id: string
   kind: AssetKind
   /** Folder under `public/assets/`. */
-  section: 'hero' | 'product' | 'field' | 'marketing' | 'brand'
+  section: 'hero' | 'product' | 'evidence' | 'field' | 'marketing' | 'brand'
   /** Exact filename to drop in. Extension included — swap it here if you
    *  supply a different format. */
   file: string
@@ -82,43 +82,104 @@ export const ASSETS = {
 
   /* --------------------------------------------------------------- product */
 
-  productReport: {
-    id: 'productReport', kind: 'image', section: 'product',
-    file: 'interface-site-report.png',
-    alt: 'The Site Scanner report panel, showing evidence coverage and findings.',
-    brief: 'Screenshot of the real report panel. Take it at 1440x900 from '
-      + '/app with a site drawn.',
-    ratio: '16 / 10', maxWidth: 1600,
+  /*
+   * Six screenshots of the running application.
+   *
+   * **These must come from a deployment with real data.** The demo backend
+   * stamps every response `X-Contour-Mock: true` and the interface labels it
+   * "Demo data — generated on the server", so a screenshot taken against it
+   * shows invented findings with a badge saying so. Putting that on a
+   * marketing page is either a lie or an advert for the disclaimer. See the
+   * capture instructions in public/assets/README.md.
+   */
+  productLand: {
+    id: 'productLand', kind: 'image', section: 'product',
+    file: 'workspace-land.png',
+    alt: 'The Land scanner workspace: a drawn site on the map beside its report.',
+    brief: 'Land workspace at 1440x900. Real site drawn, map and report both '
+      + 'visible, findings present, evidence coverage above zero.',
+    ratio: '16 / 10', maxWidth: 2880,
   },
-  productMap: {
-    id: 'productMap', kind: 'image', section: 'product',
-    file: 'interface-map-canvas.png',
-    alt: 'The Site Scanner map with a drawn site and its value overlay.',
-    brief: 'Screenshot of the map half with a drawn area and cells shaded.',
-    ratio: '16 / 10', maxWidth: 1600,
+  productHabitat: {
+    id: 'productHabitat', kind: 'image', section: 'product',
+    file: 'workspace-habitat.png',
+    alt: 'The Habitat scanner workspace assessing ecological condition.',
+    brief: 'Habitat workspace at 1440x900, same requirements as Land. The '
+      + 'HABITAT badge must be legible — it is what shows this is a platform.',
+    ratio: '16 / 10', maxWidth: 2880,
   },
-  productSatellite: {
-    id: 'productSatellite', kind: 'image', section: 'product',
+  productOverview: {
+    id: 'productOverview', kind: 'image', section: 'product',
+    file: 'report-site-overview.png',
+    alt: 'The site overview: area, coordinates, evidence coverage and finding states.',
+    brief: 'The Overview tab, panel only. Must show real coverage and the four '
+      + 'finding states with non-zero counts.',
+    ratio: '4 / 5', maxWidth: 1400,
+  },
+  productRadar: {
+    id: 'productRadar', kind: 'image', section: 'product',
+    file: 'report-radar.png',
+    alt: 'The investigation radar, showing which topics were assessed and which were not.',
+    brief: 'The Radar tab. Needs a mix of states — flagged, checked and clear, '
+      + 'and not assessed — or it does not make the point.',
+    ratio: '4 / 5', maxWidth: 1400,
+  },
+  productEvidence: {
+    id: 'productEvidence', kind: 'image', section: 'product',
+    file: 'report-evidence.png',
+    alt: 'The evidence drawer: a finding traced to its source and its limits.',
+    brief: 'Evidence drawer open on a real finding, showing the source, the '
+      + 'measurement and the "does not establish" statement.',
+    ratio: '4 / 5', maxWidth: 1400,
+  },
+  productInvestigation: {
+    id: 'productInvestigation', kind: 'image', section: 'product',
+    file: 'workspace-investigation.png',
+    alt: 'The investigation workspace, listing what a professional should check next.',
+    brief: 'Investigation workspace with real investigations open, each traced '
+      + 'back to the findings that raised it.',
+    ratio: '16 / 10', maxWidth: 2880,
+  },
+
+  /* -------------------------------------------------------------- evidence */
+
+  /* The raw material a scan reads. These are not product screenshots and can
+     be sourced independently — open imagery, archival sheets, your own
+     photography. */
+  evidenceSatellite: {
+    id: 'evidenceSatellite', kind: 'image', section: 'evidence',
     file: 'satellite-imagery.jpg',
-    alt: 'Satellite imagery of a parcel of land.',
-    brief: 'True-colour satellite over farmland or mixed land use. This is the '
-      + 'raw material a scan reads.',
+    alt: 'True-colour satellite imagery of farmland.',
+    brief: 'Sentinel-2 or equivalent over mixed land use. Square crop.',
     ratio: '1 / 1', maxWidth: 1200,
   },
-  productTerrain: {
-    id: 'productTerrain', kind: 'image', section: 'product',
-    file: 'terrain-contour-map.jpg',
-    alt: 'A contour map of hill terrain.',
-    brief: 'Topographic sheet, contour lines, ideally a real OS-style or '
-      + 'archival survey sheet.',
+  evidenceTerrain: {
+    id: 'evidenceTerrain', kind: 'image', section: 'evidence',
+    file: 'terrain-elevation.jpg',
+    alt: 'Elevation and terrain across a river valley.',
+    brief: 'Hillshade, DEM or a contour sheet. Square crop.',
     ratio: '1 / 1', maxWidth: 1200,
   },
-  productAnalysis: {
-    id: 'productAnalysis', kind: 'image', section: 'product',
-    file: 'land-analysis-overlay.jpg',
-    alt: 'Land classification overlaid on aerial imagery.',
-    brief: 'Analysis output over a real place — habitat polygons, parcels or a '
-      + 'classification raster.',
+  evidenceVegetation: {
+    id: 'evidenceVegetation', kind: 'image', section: 'evidence',
+    file: 'vegetation-index.jpg',
+    alt: 'A vegetation index raster showing growth across a season.',
+    brief: 'NDVI/EVI raster, or a false-colour composite. Square crop.',
+    ratio: '1 / 1', maxWidth: 1200,
+  },
+  evidenceHydrology: {
+    id: 'evidenceHydrology', kind: 'image', section: 'evidence',
+    file: 'hydrology-water.jpg',
+    alt: 'Watercourses and flood extent across low ground.',
+    brief: 'Rivers, flood zones or surface water. Square crop.',
+    ratio: '1 / 1', maxWidth: 1200,
+  },
+  evidenceHistorical: {
+    id: 'evidenceHistorical', kind: 'image', section: 'evidence',
+    file: 'historical-imagery.jpg',
+    alt: 'A historical aerial photograph of the same ground.',
+    brief: 'Archival aerial or an old OS sheet of somewhere you also have '
+      + 'current imagery for. Square crop.',
     ratio: '1 / 1', maxWidth: 1200,
   },
 
@@ -158,20 +219,33 @@ export const ASSETS = {
 
   /* ------------------------------------------------------------- marketing */
 
-  beforeAnalysis: {
-    id: 'beforeAnalysis', kind: 'image', section: 'marketing',
-    file: 'site-before-analysis.jpg',
-    alt: 'A site as it appears before any analysis has been applied.',
-    brief: 'Left half of the before/after. Plain aerial of a site, nothing '
-      + 'drawn on it.',
+  /*
+   * Then and now.
+   *
+   * **Only a comparison the product can substantiate.** The pair has to be the
+   * same ground, the same footprint, and a change Site Scanner would actually
+   * report — not two dramatic photographs of different places. If the honest
+   * answer is that nothing much changed, that is the pair to use: a site where
+   * the evidence says "no material change" is a result, and faking a collapse
+   * because it looks better on a homepage is the exact failure this product
+   * exists to avoid.
+   *
+   * Set `changeCaption` on each to the real dates. They print on the plates.
+   */
+  changeThen: {
+    id: 'changeThen', kind: 'image', section: 'marketing',
+    file: 'change-then.jpg',
+    alt: 'The site as recorded in the earlier of the two observations.',
+    brief: 'Earlier observation. Note the real date — it prints on the plate. '
+      + 'Sentinel-2 starts 2017; older needs aerial or archival.',
     ratio: '4 / 3', maxWidth: 1400,
   },
-  afterAnalysis: {
-    id: 'afterAnalysis', kind: 'image', section: 'marketing',
-    file: 'site-after-analysis.jpg',
-    alt: 'The same site with constraints, boundaries and findings drawn over it.',
-    brief: 'Right half of the before/after. The same frame with the analysis '
-      + 'on it — must be the same place at the same angle.',
+  changeNow: {
+    id: 'changeNow', kind: 'image', section: 'marketing',
+    file: 'change-now.jpg',
+    alt: 'The same site in the most recent observation, at the same extent.',
+    brief: 'Same ground, same footprint, same angle. If the two do not line up '
+      + 'the comparison is worthless.',
     ratio: '4 / 3', maxWidth: 1400,
   },
   marketingMap: {
