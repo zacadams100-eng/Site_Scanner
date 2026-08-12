@@ -89,6 +89,8 @@ import hashlib
 import json
 from typing import Any, Dict, List, Optional, Sequence
 
+import review
+
 #: The shape of this document. Bumped when a field is added, removed or
 #: changes meaning — never for a change in the *values* a field carries.
 #:
@@ -303,18 +305,15 @@ def _review_block() -> Dict[str, Any]:
     machine assessment → professional review → co-signed evidence. The slot is
     the architecture; filling it is a workflow that does not exist yet.
 
+    Composed by `review.py` rather than written out here, so that there is one
+    definition of the unreviewed state and one wording of it. `review.apply`
+    replaces this block when a review actually arrives, and a second wording
+    living here would drift out of step with it invisibly — both would look
+    like a sentence somebody wrote on purpose.
+
     See `docs/SPECIALIST_REVIEW.md` for the model and what a real one requires.
     """
-    return {
-        # `unreviewed` is a state, not a missing value. The distinction is the
-        # same one the whole product rests on: nobody has checked this is not
-        # the same as this was checked and found sound.
-        "status": "unreviewed",
-        "statement": "No professional has reviewed these findings. Every "
-                     "finding here is a machine assessment against a stated "
-                     "threshold.",
-        "reviews": [],
-    }
+    return review.empty_block()
 
 
 def build(payload: Dict[str, Any], *, scanner: Optional[Any] = None,

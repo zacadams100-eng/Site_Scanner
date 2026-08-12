@@ -36,7 +36,7 @@ COPY app.py mock_ee_backend.py routes_catalog.py \
      ratelimit.py telemetry.py baselines.py licensing.py radar.py \
      comparison.py evidence.py brief.py claims.py investigation.py \
      scanners.py enquiry.py routes_enquiry.py site_record.py \
-     portfolio.py routes_portfolio.py demo_portfolio.py ./
+     portfolio.py routes_portfolio.py demo_portfolio.py review.py ./
 
 # The historical package, as a package. It needs its own COPY: a single COPY
 # with several sources sends all of them to one destination, so folding a
