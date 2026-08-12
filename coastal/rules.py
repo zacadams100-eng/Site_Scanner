@@ -134,6 +134,16 @@ LOW_LYING_META: Dict[str, Any] = {
     ),
     "measure": "lowest ground elevation within the drawn area",
     "direction": "low",
+    # Surfaced in the evidence drawer, not only in the specification. A
+    # threshold nobody qualified has checked is a fact about the finding, and
+    # a reader deciding whether to act on it needs it in front of them.
+    "validation_status": "unvalidated",
+    "validation_needed": (
+        "No coastal engineer has reviewed this screening height. Validating it "
+        "means replacing it with a site-specific extreme sea level from the "
+        "Environment Agency's coastal design levels, together with the defence "
+        "standard for this frontage."
+    ),
 }
 
 WATER_CHANGE_META: Dict[str, Any] = {
@@ -155,6 +165,12 @@ WATER_CHANGE_META: Dict[str, Any] = {
     ),
     "measure": "change in surface water occurrence over the JRC record",
     "direction": "either",
+    "validation_status": "unvalidated",
+    "validation_needed": (
+        "No coastal engineer has reviewed this reporting threshold. It was "
+        "chosen against the character of the JRC record rather than against a "
+        "study of how much change is material on an English frontage."
+    ),
 }
 
 

@@ -216,6 +216,19 @@ function Measurement({ finding, showThreshold }:
               This threshold is {String(meta.threshold_status)}.
             </p>
           )}
+          {/* A product-defined threshold nobody qualified has reviewed is a
+              different thing from one that has been, and the difference
+              belongs where someone is deciding whether to act on the finding —
+              not only in the specification. Presented as a capability note, in
+              the same language as an unread check: a limit of the instrument,
+              stated plainly. */}
+          {meta.validation_status === 'unvalidated' && (
+            <div className="ev-unvalidated">
+              <p className="ev-unvalidated-head mono">Not independently validated</p>
+              <p>{String(meta.validation_needed
+                  || 'This threshold has not been reviewed by a qualified professional.')}</p>
+            </div>
+          )}
         </>
       )}
     </section>

@@ -4396,3 +4396,18 @@ td.cov-severe { color: var(--text-dim); }
 .mk-notice-sub { color: var(--text-dim); font-size: 13px !important; }
 .mk-notice-fail { border-left-color: var(--clay-600); background: var(--clay-100); }
 .mk-notice-fail strong { color: var(--clay-600); }
+
+/* A threshold nobody qualified has reviewed.
+   Styled as a capability note rather than a warning: the finding is still
+   sound, the number behind it is still a judgement, and the reader is entitled
+   to know which. Dashed, like an unread check — this is a limit of the
+   instrument, not a problem with the site. */
+.ev-unvalidated {
+  margin: 10px 0 0; padding: 10px 12px;
+  border: 1px dashed var(--amber-500); background: var(--amber-100);
+}
+.ev-unvalidated p { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+.ev-unvalidated-head {
+  font-size: 8.5px !important; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--amber-600) !important; margin-bottom: 5px !important;
+}

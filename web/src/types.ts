@@ -727,6 +727,11 @@ export interface RaisedBy {
   threshold: string
   threshold_type: string
   threshold_status: string
+  /** `unvalidated` where no qualified professional has reviewed the number.
+   *  Absent means the question has not been recorded either way — it is not a
+   *  claim that the threshold *has* been validated. */
+  validation_status?: string
+  validation_needed?: string
   method: string
   factors: string[]
 }
