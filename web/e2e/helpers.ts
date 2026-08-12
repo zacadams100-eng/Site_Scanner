@@ -69,7 +69,7 @@ export async function openLibrary(page: Page): Promise<void> {
 }
 
 /** Launch a scanner from the library and wait for its workspace. */
-export async function launchScanner(page: Page, name: 'Land' | 'Habitat'): Promise<void> {
+export async function launchScanner(page: Page, name: 'Land' | 'Ecology' | 'Water' | 'Planning'): Promise<void> {
   await page.getByRole('button', { name: `Open the ${name} scanner` }).click()
   await expect(page.locator('.stage')).toBeVisible()
   await expect(page.locator('.brand-scanner')).toHaveText(name)

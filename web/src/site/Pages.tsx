@@ -107,14 +107,16 @@ function ScannerPlatform() {
     <section className="mk-band mk-band-paper">
       <div className="mk-wrap">
         <p className="mk-kicker">The platform / 01</p>
-        <h2 className="mk-h2">Six scanners. Three you can run today.</h2>
+        <h2 className="mk-h2">Eight scanners. Four you can run today.</h2>
         <p className="mk-lede mk-lede-sm">
           Each scanner asks a different professional question of the same
           place. They share one evidence engine, one set of finding states and
-          one rule about what may be claimed.
+          one rule about what may be claimed. Three of the four that run today
+          cover part of their subject and say which part — the product names
+          the gap rather than leaving a clear result to imply there is none.
         </p>
 
-        <p className="mk-group-label mono">Available</p>
+        <p className="mk-group-label mono">Foundation</p>
         <div className="mk-scanner-plates">
           <Link className="mk-scanner-plate" to={PAGES.land.path}>
             <span className="mk-scanner-idx mono">01</span>
@@ -125,39 +127,58 @@ function ScannerPlatform() {
               constrains what can be done here.</p>
             <span className="mk-scanner-go">Land Scanner →</span>
           </Link>
-          <Link className="mk-scanner-plate" to={PAGES.habitat.path}>
+          <Link className="mk-scanner-plate" to={PAGES.coastal.path}>
             <span className="mk-scanner-idx mono">02</span>
             <BrandMark className="mk-scanner-mark" />
-            <h3>Habitat</h3>
-            <p className="mk-scanner-sub">Ecological condition and habitat investigation</p>
+            <h3>Water</h3>
+            <p className="mk-scanner-sub">Water, flood and coastal assessment</p>
+            <p>Flood designations, surface water and low-lying coastal
+              exposure. It does not yet cover groundwater, drainage or
+              catchment, and it says so before you run it.</p>
+            <span className="mk-scanner-go">Water Scanner →</span>
+          </Link>
+          <Link className="mk-scanner-plate" to={PAGES.habitat.path}>
+            <span className="mk-scanner-idx mono">03</span>
+            <BrandMark className="mk-scanner-mark" />
+            <h3>Ecology</h3>
+            <p className="mk-scanner-sub">Ecological condition, habitat and biodiversity evidence</p>
             <p>Fifteen years of Sentinel-2 observation, with a stated
               reporting threshold and an explicit limit on what a spectral
               index can establish.</p>
-            <span className="mk-scanner-go">Habitat Scanner →</span>
-          </Link>
-          <Link className="mk-scanner-plate" to={PAGES.coastal.path}>
-            <span className="mk-scanner-idx mono">03</span>
-            <BrandMark className="mk-scanner-mark" />
-            <h3>Coastal</h3>
-            <p className="mk-scanner-sub">Coastal site and frontage assessment</p>
-            <p>Low-lying exposure and change in surface water extent. A site
-              assessment rather than a shoreline analysis — and it says which
-              it is.</p>
-            <span className="mk-scanner-go">Coastal Scanner →</span>
+            <span className="mk-scanner-go">Ecology Scanner →</span>
           </Link>
         </div>
 
-        <p className="mk-group-label mono">In development</p>
+        <p className="mk-group-label mono">Development</p>
+        <div className="mk-scanner-plates">
+          <Link className="mk-scanner-plate" to={PAGES.land.path}>
+            <span className="mk-scanner-idx mono">04</span>
+            <BrandMark className="mk-scanner-mark" />
+            <h3>Planning</h3>
+            <p className="mk-scanner-sub">Planning designations, policy and constraint</p>
+            <p>The designations that govern what may be done here. Not
+              application history and not policy — both need sources that do
+              not exist nationally, and the product names them as gaps.</p>
+            <span className="mk-scanner-go">What Planning covers →</span>
+          </Link>
+        </div>
+
+        <p className="mk-group-label mono">Registered, not built</p>
         <ul className="mk-roadmap mk-roadmap-lg">
-          <li><span className="mk-roadmap-idx mono">04</span><b>Forestry</b>
-            <span>Forest condition and management</span></li>
-          <li><span className="mk-roadmap-idx mono">05</span><b>Water</b>
-            <span>Water and catchment assessment</span></li>
-          <li><span className="mk-roadmap-idx mono">06</span><b>Terrain</b>
-            <span>Terrain and physical site conditions</span></li>
+          <li><span className="mk-roadmap-idx mono">05</span><b>Development</b>
+            <span>Built form, land-use change and development activity</span></li>
+          <li><span className="mk-roadmap-idx mono">06</span><b>Infrastructure</b>
+            <span>Utilities, transport and network capacity</span></li>
+          <li><span className="mk-roadmap-idx mono">07</span><b>Heritage</b>
+            <span>Designated assets, archaeology and historic landscape</span></li>
+          <li><span className="mk-roadmap-idx mono">08</span><b>Market</b>
+            <span>Transaction evidence and local economic context</span></li>
         </ul>
         <p className="mk-note">
-          Declared in the registry and built in none of it. The
+          Declared in the registry and built in none of it. Each names the
+          specific thing standing in its way — Heritage is waiting on
+          ingestion work, where Infrastructure is waiting on data that does not
+          exist nationally. The
           {' '}<a href={APP_PATH}>scanner library</a> says so in the product too.
         </p>
       </div>
@@ -353,7 +374,16 @@ export function Scanners() {
               left the two scanner cards as h3s directly under the h1 and put a
               gap in the document outline. It also read oddly: "In development"
               was labelled and the thing you can actually use was not. */}
-          <h2 className="mk-h2 mk-h2-sp">Available now</h2>
+          {/* Grouped by family, as the product is. The counts and the coverage
+              language here are written prose rather than a render of the
+              registry — a marketing page cannot keep itself true, so it says
+              less than the library does and nothing the library would
+              contradict. */}
+          <h2 className="mk-h2 mk-h2-sp">Foundation</h2>
+          <p className="mk-sub">
+            The physical ground truth of a place — what it is made of, how
+            water moves through it, and what lives on it.
+          </p>
           <div className="mk-cards">
             <Link className="mk-card" to={PAGES.land.path}>
               <span className="mk-card-idx mono">01</span>
@@ -361,30 +391,61 @@ export function Scanners() {
               <p>What constrains what can be done here.</p>
               <span className="mk-card-go">Land Scanner →</span>
             </Link>
-            <Link className="mk-card" to={PAGES.habitat.path}>
-              <span className="mk-card-idx mono">02</span>
-              <h3>Habitat</h3>
-              <p>What has changed in what is here.</p>
-              <span className="mk-card-go">Habitat Scanner →</span>
-            </Link>
             <Link className="mk-card" to={PAGES.coastal.path}>
+              <span className="mk-card-idx mono">02</span>
+              <h3>Water</h3>
+              <p>How water reaches this place — flood, surface water and
+                low-lying coastal exposure.</p>
+              <span className="mk-card-go">Water Scanner →</span>
+            </Link>
+            <Link className="mk-card" to={PAGES.habitat.path}>
               <span className="mk-card-idx mono">03</span>
-              <h3>Coastal</h3>
-              <p>How exposed this frontage is, and how the water has moved.</p>
-              <span className="mk-card-go">Coastal Scanner →</span>
+              <h3>Ecology</h3>
+              <p>What is alive here, and how it has changed.</p>
+              <span className="mk-card-go">Ecology Scanner →</span>
             </Link>
           </div>
 
-          <h2 className="mk-h2 mk-h2-sp">In development</h2>
+          <h2 className="mk-h2 mk-h2-sp">Development</h2>
+          <p className="mk-sub">
+            What may be built here, what has been built, and what serves it.
+          </p>
+          <div className="mk-cards">
+            <Link className="mk-card" to={PAGES.land.path}>
+              <span className="mk-card-idx mono">04</span>
+              <h3>Planning</h3>
+              <p>The designations that govern what may be done here. Not
+                application history — that needs a source which does not exist
+                nationally.</p>
+              <span className="mk-card-go">What Planning covers →</span>
+            </Link>
+          </div>
+
+          <h2 className="mk-h2 mk-h2-sp">Partial coverage is stated, not implied</h2>
+          <p className="mk-note">
+            Three of the four scanners above cover part of their subject. Water
+            reads flood, surface water and coastal exposure and does not yet
+            read groundwater, drainage or catchment; Ecology does not yet read
+            woodland, protected species or connectivity; Planning does not read
+            application history or policy. Each says so on its own card in the
+            product, before you run it — because a clear result from a scanner
+            that never asked the question is the one thing this product exists
+            to prevent.
+          </p>
+
+          <h2 className="mk-h2 mk-h2-sp">Registered, not built</h2>
           <ul className="mk-roadmap">
-            <li><b>Forestry</b><span>Forest condition and management</span></li>
-            <li><b>Water</b><span>Water and catchment assessment</span></li>
-            <li><b>Terrain</b><span>Terrain and physical site conditions</span></li>
+            <li><b>Development</b><span>Built form, land-use change and development activity</span></li>
+            <li><b>Infrastructure</b><span>Utilities, transport and network capacity</span></li>
+            <li><b>Heritage</b><span>Designated assets, archaeology and historic landscape</span></li>
+            <li><b>Market</b><span>Transaction evidence and local economic context</span></li>
           </ul>
           <p className="mk-note">
             These are declared, not built. Nothing can be assessed with them
             yet, and the application says so rather than returning an empty
-            report.
+            report. Each one names the specific thing standing in its way —
+            Heritage is waiting on ingestion work, where Infrastructure is
+            waiting on data that does not exist nationally.
           </p>
         </div>
       </section>

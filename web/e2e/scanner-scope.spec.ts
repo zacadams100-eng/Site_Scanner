@@ -36,24 +36,24 @@ test('every assessment request carries the active scanner', async ({ page }) => 
   })
 
   await openLibrary(page)
-  await launchScanner(page, 'Habitat')
+  await launchScanner(page, 'Ecology')
   await drawSite(page)
 
   // The journey must actually have issued scoped requests, or this test would
   // pass by having tested nothing.
   expect(seen.length, 'no assessment requests were observed').toBeGreaterThan(0)
 
-  const wrong = seen.filter((r) => r.scanner !== 'habitat')
-  expect(wrong, `requests that did not carry scanner=habitat: ${JSON.stringify(wrong)}`)
+  const wrong = seen.filter((r) => r.scanner !== 'ecology')
+  expect(wrong, `requests that did not carry scanner=ecology: ${JSON.stringify(wrong)}`)
     .toEqual([])
 })
 
-test('the Habitat report is scoped to Habitat factors', async ({ page, request }) => {
+test('the Ecology report is scoped to Ecology factors', async ({ page, request }) => {
   // Independent source of truth: ask the API directly what each scanner has.
   // Deriving the expectation from the same request path under test would make
   // the assertion circular.
   const counts: Record<string, number> = {}
-  for (const id of ['land', 'habitat']) {
+  for (const id of ['land', 'ecology']) {
     const res = await request.get(`/api/catalog?scanner=${id}`)
     expect(res.ok(), `catalogue for ${id} did not load`).toBe(true)
     counts[id] = ((await res.json()).factors as unknown[]).length
@@ -62,18 +62,18 @@ test('the Habitat report is scoped to Habitat factors', async ({ page, request }
   // If the two scanners ever have the same number of factors this test stops
   // being able to tell them apart, and should fail loudly rather than quietly
   // pass forever.
-  expect(counts.habitat, 'Land and Habitat have the same factor count — this '
+  expect(counts.ecology, 'Land and Ecology have the same factor count — this '
     + 'test can no longer distinguish them').not.toBe(counts.land)
 
   await openLibrary(page)
-  await launchScanner(page, 'Habitat')
+  await launchScanner(page, 'Ecology')
   await drawSite(page)
 
   // The denominator is the scanner's own factor list. Before the fix this read
-  // Land's count in Habitat's shell.
+  // Land's count in Ecology's shell.
   const coverage = await page.locator('.ovw-coverage').innerText()
   const denominator = Number(coverage.match(/of (\d+) factors/)?.[1])
-  expect(denominator, `coverage read "${coverage}"`).toBe(counts.habitat)
+  expect(denominator, `coverage read "${coverage}"`).toBe(counts.ecology)
 })
 
 test('switching scanners does not carry the previous report across', async ({ page }) => {
@@ -83,10 +83,10 @@ test('switching scanners does not carry the previous report across', async ({ pa
   await expect(page.locator('.ovw-coverage')).toBeVisible()
 
   await page.getByRole('button', { name: 'Back to all scanners' }).click()
-  await launchScanner(page, 'Habitat')
+  await launchScanner(page, 'Ecology')
 
   // A site assessed by one scanner is not a site assessed by the other, so the
   // drawn shape and its report are cleared rather than reinterpreted.
   await expect(page.locator('.ovw-coverage')).toHaveCount(0)
-  await expect(page.locator('.brand-scanner')).toHaveText('Habitat')
+  await expect(page.locator('.brand-scanner')).toHaveText('Ecology')
 })

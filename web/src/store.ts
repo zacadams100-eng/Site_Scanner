@@ -151,7 +151,12 @@ interface State {
    */
   scannerId: string
   library: boolean
+  /** Whether the portfolio screen is showing. A third top-level view beside
+   *  the library and the workspace, because "all of these sites" is a
+   *  different question from "this site" rather than a tab within it. */
+  portfolio: boolean
   setLibrary: (o: boolean) => void
+  setPortfolio: (o: boolean) => void
   chooseScanner: (id: string) => void
 
   /** Which factor the evidence explorer is open on, or null. A factor id
@@ -358,6 +363,7 @@ export const useStore = create<State>((set, get) => ({
   scannerId: 'land',
   // Opens on the library: the first decision is which scanner, not which site.
   library: true,
+  portfolio: false,
   investigationId: null,
   // Open on a desktop, closed on a phone: at 390px the panel covers most of
   // the map, and a first-time tap on the map is far more likely to be a drawn
@@ -398,6 +404,9 @@ export const useStore = create<State>((set, get) => ({
     get().hydrateFromUrl()
   },
   setLibrary: (o) => set({ library: o }),
+  // Entering the portfolio leaves the library rather than stacking on it:
+  // two full-screen views showing at once is a bug that renders as a mystery.
+  setPortfolio: (o) => set({ portfolio: o, library: !o }),
 
   /**
    * Enter a scanner.

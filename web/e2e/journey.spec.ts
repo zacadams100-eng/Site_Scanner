@@ -18,9 +18,13 @@ test('a visitor can reach the product from the public site', async ({ page }) =>
 
   await page.goto('/scanners')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-  // The scanners page lists the two built scanners by name.
+  // The scanners page names the built scanners. Checked by name rather than
+  // by count: the marketing page is written prose, not a render of the
+  // registry, so a count here would assert something the page cannot keep true
+  // on its own.
   await expect(page.getByRole('main')).toContainText('Land')
-  await expect(page.getByRole('main')).toContainText('Habitat')
+  await expect(page.getByRole('main')).toContainText('Ecology')
+  await expect(page.getByRole('main')).toContainText('Water')
 
   await page.goto('/scanners/land')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -36,13 +40,22 @@ test('a site can be drawn and its report read', async ({ page }) => {
   // Asserted against the API rather than a literal, because the literal was 2
   // and Coastal shipping made it 3 — a test that breaks when the product grows
   // is a test that gets edited rather than read.
-  const built = await page.evaluate(async () => {
+  const counts = await page.evaluate(async () => {
     const r = await fetch('/api/catalog?scanner=land')
     const j = await r.json()
-    return (j.scanners as { implemented: boolean }[]).filter((s) => s.implemented).length
+    const scanners = j.scanners as { implemented: boolean }[]
+    return { all: scanners.length,
+             built: scanners.filter((s) => s.implemented).length }
   })
-  expect(built).toBeGreaterThanOrEqual(3)
-  await expect(page.locator('.lib-plate')).toHaveCount(built)
+  expect(counts.built).toBeGreaterThanOrEqual(3)
+  // Every registered scanner gets a plate, built or not — the taxonomy pass
+  // made declared scanners visible so a reader can find the question this
+  // product cannot answer yet, and read why. Only the built ones are openable,
+  // which is the assertion that actually matters: a plate offering a scanner
+  // the API refuses is the failure this check exists to catch.
+  await expect(page.locator('.lib-plate')).toHaveCount(counts.all)
+  await expect(page.locator('.lib-plate-face:not(.lib-plate-static)'))
+    .toHaveCount(counts.built)
 
   await launchScanner(page, 'Land')
   await drawSite(page)

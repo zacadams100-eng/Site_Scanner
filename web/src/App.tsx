@@ -22,6 +22,7 @@ import Radar from './components/Radar'
 import SiteOverview from './components/SiteOverview'
 import EvidenceDrawer from './components/EvidenceDrawer'
 import ScannerLibrary from './components/ScannerLibrary'
+import PortfolioView from './components/PortfolioView'
 import InvestigationWorkspace from './components/InvestigationWorkspace'
 import CompareSites from './components/CompareSites'
 import PlaceSearch from './components/PlaceSearch'
@@ -64,6 +65,7 @@ export default function App() {
   const catalogError = useStore((s) => s.catalogError)
   const scannerId = useStore((s) => s.scannerId)
   const library = useStore((s) => s.library)
+  const portfolio = useStore((s) => s.portfolio)
   const setLibrary = useStore((s) => s.setLibrary)
   const setCatalog = useStore((s) => s.setCatalog)
   const setCatalogError = useStore((s) => s.setCatalogError)
@@ -159,6 +161,12 @@ export default function App() {
   // The library is the first screen and replaces the workspace: choosing a
   // scanner is a different activity from analysing a site, and overlaying the
   // two would leave a map running behind a decision that has not been made.
+  // The portfolio is checked first: it and the library are both full-screen
+  // views, and `setPortfolio` clears one when it sets the other, so the order
+  // only matters if that invariant is ever broken. Checking the more specific
+  // one first means the failure would be a visible wrong screen rather than
+  // two views fighting.
+  if (portfolio) return <PortfolioView />
   if (library) return <ScannerLibrary />
 
   return (

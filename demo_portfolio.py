@@ -58,6 +58,7 @@ build. The demo shows a portfolio at one moment.
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import portfolio as portfolio_mod
@@ -213,8 +214,20 @@ def _record(index: int) -> Dict[str, Any]:
         "evidence": [],
         "radar": {},
     }
-    record = site_record.build(payload, scanner=scanner, site_name=name,
-                               assessed_at="")
+    # The moment this record was assembled, which is the literal truth about it
+    # and the only date available that is not invented. Leaving it empty made
+    # every row in the portfolio read "Date not recorded", which looks like a
+    # rendering fault; spreading the dates over past months to look realistic
+    # would be fabricating a history, and a fabricated past is the one thing
+    # indistinguishable from the real longitudinal record this product intends
+    # to build. So the whole demonstration portfolio shares one timestamp — a
+    # batch assessed in one moment, because that is what happened.
+    #
+    # Excluded from `record_id` by construction, so this does not affect the
+    # determinism the portfolio's deduplication relies on.
+    record = site_record.build(
+        payload, scanner=scanner, site_name=name,
+        assessed_at=datetime.now(timezone.utc).isoformat())
     record["observations"] = observations
     record["findings"] = [
         _finding(r, scanner.rule_domains.get(r.id, "")) for r in picked]

@@ -46,9 +46,10 @@ export const PAGES: Record<string, PageMeta> = {
     path: '/scanners',
     title: 'Scanners | Site Scanner',
     description:
-      'Specialist scanners for land and habitat, each establishing evidence '
-      + 'about a place and the professional questions that remain. Four '
-      + 'further verticals are in development.',
+      'Eight specialist scanners in four families, four of which run today. '
+      + 'Each establishes evidence about a place, states what that evidence '
+      + 'does not settle, and names the parts of its subject it does not yet '
+      + 'cover.',
     crumbs: [{ label: 'Site Scanner', path: '/' }],
     indexable: true,
   },

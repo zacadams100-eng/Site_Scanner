@@ -93,7 +93,16 @@ def test_the_prerendered_pages_contain_their_actual_copy():
     assert "Know what to investigate" in home
     assert "<h1" in home
     scanners = (DIST / "scanners" / "index.html").read_text()
-    assert "Habitat" in scanners and "Coastal" in scanners
+    # The built scanners, by name. Checked against the marketing copy rather
+    # than the registry on purpose: this page is written prose, and asserting a
+    # count here would break every time a scanner is added, which is how a test
+    # gets edited rather than read.
+    assert "Ecology" in scanners and "Water" in scanners
+    # And the thing the page must never stop saying. Partial coverage stated
+    # rather than implied is the whole reason this page lists what each scanner
+    # does not do, and a redesign that dropped it would pass every other check
+    # here.
+    assert "Registered, not built" in scanners
 
 
 @needs_build

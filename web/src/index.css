@@ -4577,3 +4577,145 @@ td.cov-severe { color: var(--text-dim); }
             font-weight: 600; letter-spacing: .04em; }
 .rev-role { margin: 2px 0 0; font-size: 12.5px; color: var(--text-dim); }
 .rev-date { margin: 6px 0 0; font-size: 10.5px; color: var(--text-faint); }
+
+/* ============================================================== portfolio ==
+   The second question: many sites, one view. Shares the library's shell — the
+   same bone ground, the same display face, the same tally line — because it is
+   the same product answering a different question, not a second application. */
+
+.lib-portfolio-link {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 20px;
+  padding: 0; background: none; border: 0; cursor: pointer;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--signal-700);
+  border-bottom: 1px solid var(--signal-200); padding-bottom: 3px;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.lib-portfolio-link:hover { color: var(--signal-600); border-color: var(--signal-500); }
+.lib-portfolio-link:focus-visible { outline: 2px solid var(--signal-500); outline-offset: 3px; }
+
+.pf { min-height: 100vh; background: var(--bone-100); }
+.pf-inner { max-width: 1180px; margin: 0 auto; padding: 56px 32px 80px; }
+.pf-head { margin-bottom: 32px; }
+.pf-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+.pf-back {
+  margin-left: auto; padding: 7px 13px; cursor: pointer;
+  font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  background: none; color: var(--text-dim);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+}
+.pf-back:hover { color: var(--structure-dark); border-color: var(--structure); }
+.pf-back:focus-visible { outline: 2px solid var(--signal-500); outline-offset: 2px; }
+
+/* Above the radar, never below it. A reader who takes in the numbers before the
+   label has already read generated figures as measurements, and a label
+   arriving afterwards does not undo that. */
+.pf-demo {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px;
+  align-items: start; margin-bottom: 26px; padding: 15px 18px;
+  background: var(--signal-100); border: 1px solid var(--signal-200);
+  border-left: 3px solid var(--signal-600); border-radius: var(--radius-sm);
+}
+.pf-demo-tag {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--signal-700); white-space: nowrap; padding-top: 2px;
+}
+.pf-demo p {
+  margin: 0; font-family: var(--font-prose); font-size: 12.5px; line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* ---- The radar --------------------------------------------------------------
+   Gap tiles carry the same visual weight as finding tiles, never less. A view
+   that made "never scanned" quieter than "has findings" would be making the
+   argument this product exists to refuse. */
+.pf-radar {
+  display: grid; gap: 1px; margin-bottom: 44px;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  background: var(--line-strong); border: 1px solid var(--line-strong);
+}
+.pf-tile {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 18px 18px 16px; background: var(--bone-050);
+}
+.pf-tile-value {
+  font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--structure-dark);
+}
+.pf-tile-label {
+  font-family: var(--font-display); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-dim);
+}
+.pf-tile-note {
+  margin-top: 4px; font-family: var(--font-prose); font-size: 11px;
+  line-height: 1.5; color: var(--text-faint);
+}
+/* A gap is a limit of the reading, not a fault in the sites — dashed, the same
+   treatment the evidence drawer gives an unread check, never red. */
+.pf-tile-gap { background: var(--bone-000); }
+.pf-tile-gap .pf-tile-value {
+  border-bottom: 2px dashed var(--line-strong); padding-bottom: 3px;
+  align-self: flex-start;
+}
+.pf-tile-attention .pf-tile-value { color: var(--signal-700); }
+
+.pf-group { margin-bottom: 44px; }
+.pf-group-head {
+  margin-bottom: 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+/* Wide content scrolls inside its own container; the page body never scrolls
+   horizontally. */
+.pf-table-wrap { overflow-x: auto; }
+.pf-table {
+  width: 100%; border-collapse: collapse; font-family: var(--font-ui);
+  font-size: 13px;
+}
+.pf-table th, .pf-table td {
+  text-align: left; padding: 11px 14px 11px 0;
+  border-bottom: 1px solid var(--line); vertical-align: top;
+}
+.pf-table thead th {
+  font-family: var(--font-display); font-size: 9.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--text-faint);
+  border-bottom-color: var(--line-strong); white-space: nowrap;
+}
+.pf-num { text-align: right !important; font-variant-numeric: tabular-nums; }
+.pf-table tbody tr:hover { background: var(--bone-050); }
+
+.pf-site { min-width: 210px; font-weight: 400; }
+.pf-site-name {
+  display: block; font-family: var(--font-display); font-size: 14px;
+  font-weight: 600; letter-spacing: .03em; color: var(--structure-dark);
+}
+.pf-site-meta {
+  display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  font-size: 10.5px; color: var(--text-faint);
+}
+/* On the row, because a row gets copied out of the table and the legend does
+   not travel with it. */
+.pf-demo-chip {
+  padding: 1px 5px; border: 1px solid var(--signal-200); border-radius: 2px;
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--signal-700);
+}
+.pf-await { color: var(--signal-700); font-size: 12px; }
+.pf-none { color: var(--text-faint); }
+.pf-date { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; }
+
+.pf-empty, .pf-error {
+  margin: 0 0 32px; padding: 16px 18px; max-width: 66ch;
+  font-family: var(--font-prose); font-size: 13px; line-height: 1.65;
+  color: var(--text-dim);
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+}
+.pf-error { border-left-color: var(--clay-600); }
+
+@media (max-width: 760px) {
+  .pf-inner { padding: 36px 18px 60px; }
+  .pf-radar { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+  .pf-tile-value { font-size: 25px; }
+}

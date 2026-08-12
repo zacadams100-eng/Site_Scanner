@@ -56,6 +56,7 @@ import {
 export default function ScannerLibrary() {
   const catalog = useStore((s) => s.catalog)
   const choose = useStore((s) => s.chooseScanner)
+  const openPortfolio = useStore((s) => s.setPortfolio)
 
   const groups = sections(catalog)
   const counts = tally(catalog)
@@ -85,6 +86,18 @@ export default function ScannerLibrary() {
               {counts.openable} you can run today
             </p>
           )}
+          {/* The second question, reachable from the first screen. A portfolio
+              is not a scanner and does not belong among them, so it is a link
+              rather than a ninth plate. */}
+          <button className="lib-portfolio-link" type="button"
+                  onClick={() => openPortfolio(true)}>
+            Or view a portfolio of sites
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+                 stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                 strokeLinejoin="round" aria-hidden>
+              <path d="M5 12h13M13 6l6 6-6 6" />
+            </svg>
+          </button>
         </header>
 
         {groups.map((section) => (

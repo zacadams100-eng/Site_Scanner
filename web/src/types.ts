@@ -846,3 +846,63 @@ export interface InvestigationWorkspaceEntry {
   gaps: InvestigationGap[]
   assessed_at: string
 }
+
+/** A portfolio row — one site, and the state of what is known about it.
+ *
+ *  `is_demo` is on the row rather than only on the document because a row that
+ *  is copied, exported or screenshotted has to carry its own label. That
+ *  fragment is what a third person sees. */
+export interface PortfolioRow {
+  site_id: string
+  name: string
+  area_ha: number | null
+  /** Whether any scanner has produced a record. Not "whether it has findings":
+   *  a site assessed and clear and a site never assessed are the two things
+   *  this product exists to keep apart, and at portfolio scale an empty
+   *  findings column looks identical for both. */
+  assessed: boolean
+  scanners: string[]
+  findings: number
+  investigations: number
+  /** Checks that could not run, plus domains of the scanner with no checks at
+   *  all. Both, because an owner deciding where to spend attention does not
+   *  care which kind a given hole is. */
+  evidence_gaps: number
+  awaiting_review: boolean
+  last_assessed: string
+  is_demo: boolean
+  source: string
+}
+
+/** The counts a portfolio owner acts on. Every one is a count of something in
+ *  the records supplied — nothing modelled, estimated or extrapolated. */
+export interface PortfolioRadar {
+  sites: number
+  sites_assessed: number
+  /** The denominator of everything else. "87 investigations" without "310
+   *  never scanned" invites a reader to treat the remainder as clear. */
+  sites_unassessed: number
+  sites_with_findings: number
+  findings: number
+  investigations: number
+  factor_gaps: number
+  domain_gaps: number
+  evidence_gaps: number
+  awaiting_review: number
+  by_scanner: Record<string, number>
+  demo_sites: number
+  contains_demo_data: boolean
+}
+
+export interface PortfolioDocument {
+  portfolio_schema: string
+  id: string
+  name: string
+  radar: PortfolioRadar
+  sites: PortfolioRow[]
+  contains_demo_data: boolean
+  /** Non-empty exactly when the portfolio contains generated sites. Stated at
+   *  the document level as well as per row, because the consequence of missing
+   *  it is a professional reading generated numbers as measurements. */
+  demo_notice: string
+}
