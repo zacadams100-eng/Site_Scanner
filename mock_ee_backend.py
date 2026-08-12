@@ -362,6 +362,12 @@ from routes_catalog import router as catalog_router  # noqa: E402
 
 app.include_router(catalog_router)
 
+# The enquiry form's receiver. Mounted on both backends so the
+# contact form works on any deployment, and returns 503 rather than
+# a false success where no receiver is configured.
+from routes_enquiry import router as enquiry_router  # noqa: E402
+app.include_router(enquiry_router)
+
 # The mock has no Earth Engine, but open data needs none either: registering it
 # here means the credential-free backend — the one that runs locally and in the
 # serverless deployment — still returns real designations, prices and crime

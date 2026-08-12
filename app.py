@@ -175,6 +175,12 @@ from routes_catalog import router as catalog_router  # noqa: E402
 
 app.include_router(catalog_router)
 
+# The enquiry form's receiver. Mounted on both backends so the
+# contact form works on any deployment, and returns 503 rather than
+# a false success where no receiver is configured.
+from routes_enquiry import router as enquiry_router  # noqa: E402
+app.include_router(enquiry_router)
+
 # Swap the generator for real Earth Engine data where we have an implementation
 # (NDVI today). Anything not registered keeps returning demo data and says so,
 # so the catalogue can go real one factor at a time instead of in one jump.

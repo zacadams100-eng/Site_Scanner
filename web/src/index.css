@@ -4379,3 +4379,20 @@ td.cov-severe { color: var(--text-dim); }
 @media (max-width: 760px) {
   .lib-plate-question { font-size: 12px; }
 }
+
+/* A submission that did not arrive. Deliberately not styled as a soft warning:
+   the person has just written several hundred words and needs to know, before
+   they navigate away, that none of it was sent or stored. */
+.mk-notice {
+  margin: 0 0 22px; padding: 14px 16px;
+  border: 1px solid var(--line); border-left: 3px solid var(--line);
+  background: var(--surface);
+}
+.mk-notice strong {
+  display: block; font-family: var(--font-display); font-size: 13px;
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+}
+.mk-notice p { margin: 6px 0 0; font-size: 14px; }
+.mk-notice-sub { color: var(--text-dim); font-size: 13px !important; }
+.mk-notice-fail { border-left-color: var(--clay-600); background: var(--clay-100); }
+.mk-notice-fail strong { color: var(--clay-600); }

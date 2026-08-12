@@ -693,6 +693,44 @@ const FIELDS = [
 export function RequestScan() {
   const navigate = useNavigate()
   const [sending, setSending] = useState(false)
+  /**
+   * What happened to the submission. `unsent` is the important one: this
+   * deployment has no receiver configured, so the enquiry was refused and not
+   * stored. Showing a thank-you page for that would be the same failure as a
+   * scanner reporting "clear" for a check it could not run.
+   */
+  const [failure, setFailure] = useState<string | null>(null)
+
+  const send = async (form: HTMLFormElement) => {
+    setSending(true)
+    setFailure(null)
+    const data = new FormData(form)
+    try {
+      const res = await fetch('/api/enquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: String(data.get('name') ?? ''),
+          email: String(data.get('email') ?? ''),
+          organisation: String(data.get('organisation') ?? ''),
+          site: String(data.get('site') ?? ''),
+          detail: String(data.get('detail') ?? ''),
+          scanners: data.getAll('scanner').map(String),
+        }),
+      })
+      if (res.ok) {
+        navigate(PAGES.thanks.path)
+        return
+      }
+      const body = await res.json().catch(() => null)
+      setFailure(body?.detail
+        ?? 'The enquiry could not be sent. Nothing was stored.')
+    } catch {
+      setFailure('Could not reach the server, so the enquiry was not sent.')
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <Shell page={PAGES.request}>
@@ -704,14 +742,20 @@ export function RequestScan() {
             We will look at what the scanners can show and reply.
           </p>
 
+          {failure && (
+            <div className="mk-notice mk-notice-fail" role="alert">
+              <strong>Your message was not sent.</strong>
+              <p>{failure}</p>
+              <p className="mk-notice-sub">
+                Nothing you typed has been stored. Please copy it somewhere
+                before leaving this page.
+              </p>
+            </div>
+          )}
+
           <form className="mk-form" onSubmit={(e) => {
             e.preventDefault()
-            setSending(true)
-            // REQUIRES A BACKEND — no endpoint exists to receive this. The form
-            // does not silently discard a submission and pretend it arrived:
-            // the thank-you page says the enquiry was captured by the form and
-            // names what is still needed. See docs/WEBSITE_AUDIT.md.
-            navigate(PAGES.thanks.path)
+            void send(e.currentTarget)
           }}>
             {FIELDS.map((f) => (
               <label key={f.id} className="mk-field">
