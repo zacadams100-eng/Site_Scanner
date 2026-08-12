@@ -35,7 +35,7 @@ COPY app.py mock_ee_backend.py routes_catalog.py \
      open_data.py ea_hydrology.py ons_store.py insights.py nlq.py \
      ratelimit.py telemetry.py baselines.py licensing.py radar.py \
      comparison.py evidence.py brief.py claims.py investigation.py \
-     scanners.py ./
+     scanners.py enquiry.py routes_enquiry.py ./
 
 # The historical package, as a package. It needs its own COPY: a single COPY
 # with several sources sends all of them to one destination, so folding a
@@ -46,6 +46,12 @@ COPY historical/ ./historical/
 
 # The habitat scanner's domain content, as a package, for the same reason.
 COPY habitat/ ./habitat/
+
+# The coastal scanner, likewise. This was missing from the image for the whole
+# life of the coastal branch: `scanners.py` imports it at module scope, so the
+# container crashed on startup and nothing caught it — the context test only
+# scanned top-level modules. It now scans packages too.
+COPY coastal/ ./coastal/
 
 # Don't run as root. Cloud Run doesn't require it, but nothing here needs the
 # privileges and the container has network egress.

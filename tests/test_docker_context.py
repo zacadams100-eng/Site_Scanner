@@ -31,6 +31,58 @@ def _root_modules() -> set:
     return {p.stem for p in REPO_ROOT.glob("*.py")}
 
 
+def _root_packages() -> set:
+    """Local packages — a directory at the root with an `__init__.py`.
+
+    Kept apart from modules because the Dockerfile copies them differently: a
+    package needs its own `COPY dir/ ./dir/`, since a multi-source COPY sends
+    everything to one destination and would flatten it into /app.
+    """
+    return {p.parent.name for p in REPO_ROOT.glob("*/__init__.py")
+            if not p.parent.name.startswith((".", "_"))
+            and p.parent.name not in {"tests", "web", "api"}}
+
+
+def _imported_packages() -> set:
+    """Local packages imported by anything the image runs.
+
+    Scans every root module rather than walking the import graph: a package
+    reached only from a module that is itself missing would otherwise hide
+    behind the module's own failure.
+    """
+    packages = _root_packages()
+    found = set()
+    for path in REPO_ROOT.glob("*.py"):
+        try:
+            tree = ast.parse(path.read_text())
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    head = alias.name.split(".")[0]
+                    if head in packages:
+                        found.add(head)
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                head = node.module.split(".")[0]
+                if head in packages:
+                    found.add(head)
+    return found
+
+
+def _copied_packages() -> set:
+    """Directories the Dockerfile copies as packages."""
+    text = re.sub(r"\\\n\s*", " ", (REPO_ROOT / "Dockerfile").read_text())
+    copied = set()
+    for line in text.splitlines():
+        if not line.strip().startswith("COPY "):
+            continue
+        for token in line.split()[1:]:
+            if token.endswith("/") and not token.startswith("./"):
+                copied.add(token.rstrip("/"))
+    return copied
+
+
 def _local_imports(module: str, known: set) -> set:
     """Names imported by `module` that resolve to a module at the repo root.
 
@@ -216,3 +268,32 @@ def test_dockerfile_copies_nothing_that_is_not_imported():
         "Dockerfile copies modules nothing imports: "
         + ", ".join(sorted(f"{m}.py" for m in unused))
     )
+
+
+def test_dockerfile_copies_every_package_the_app_imports():
+    """Packages, not just modules.
+
+    This test did not exist and the image shipped without `coastal/` for the
+    whole life of that branch: `scanners.py` imports it at module scope, so the
+    container raised ModuleNotFoundError on startup. The module check could not
+    see it, because it only ever globbed `*.py` at the root.
+
+    A missing package is the more dangerous of the two failures. A missing
+    module usually breaks one route; a missing scanner package breaks the
+    registry, and the registry is imported before anything serves at all.
+    """
+    missing = _imported_packages() - _copied_packages()
+    assert not missing, (
+        "Dockerfile does not COPY: "
+        + ", ".join(sorted(f"{p}/" for p in missing))
+        + ". The container will crash on startup with ModuleNotFoundError. "
+        "Each package needs its own `COPY pkg/ ./pkg/` — folding it into a "
+        "multi-source COPY flattens its modules into /app."
+    )
+
+
+def test_every_local_package_is_actually_used():
+    """The inverse. A package copied into the image that nothing imports is
+    either dead code or a rename nobody finished."""
+    unused = _copied_packages() - _imported_packages() - {"web", "api"}
+    assert not unused, f"Dockerfile copies unused packages: {sorted(unused)}"
