@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 import time
+from datetime import datetime, timezone
 
 import redaction
 
@@ -30,6 +31,7 @@ import comparison
 import radar
 import brief as brief_mod
 import scanners
+import site_record
 import evidence as evidence_mod
 import investigation as investigation_mod
 from historical import view as historical_view
@@ -739,6 +741,32 @@ def get_brief(req: BriefRequest) -> Dict[str, Any]:
     """
     payload = get_series(req)
     return brief_mod.build(payload, site_name=req.site_name)
+
+
+@router.post("/api/record")
+def get_record(req: BriefRequest) -> Dict[str, Any]:
+    """The Site Evidence Record for one assessment.
+
+    The same assessment as `/api/brief`, in the form that is meant to be
+    *stored* rather than read. A brief is prose in a fixed order for a human
+    recipient; a record is an addressable document with stable identifiers,
+    three versions and an explicit statement of what was never asked.
+
+    Separate endpoints because they answer different questions, and collapsing
+    them would compromise both: the brief would grow identifiers and schema
+    versions nobody reading it needs, and the record would inherit an editorial
+    section order that means nothing to a machine.
+
+    This is the endpoint a portfolio calls. Everything a longitudinal view
+    needs — the site identity that survives redrawing, the scanner version the
+    findings were reached under, the domains that were never covered — is here
+    and nowhere else. See site_record.py.
+    """
+    payload = get_series(req)
+    payload.setdefault("geometry", req.geometry)
+    return site_record.build(
+        payload, scanner=_scanner_for(req), site_name=req.site_name,
+        assessed_at=datetime.now(timezone.utc).isoformat())
 
 
 class CompareSite(BaseModel):
