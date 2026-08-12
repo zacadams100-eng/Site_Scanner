@@ -33,6 +33,58 @@ const SAVED_KEY = 'site-scanner.saved-aois'
  * not have them; those load their geometry and leave the rest of the view
  * alone, which is exactly what they used to do.
  */
+/**
+ * What actually happened on a site, recorded afterwards by the person who
+ * found out.
+ *
+ * **Capture only.** Nothing aggregates these, nothing scores them, and nothing
+ * derived from them appears anywhere in the product. The reason to store them
+ * now is that the information is perishable — a planning decision or a survey
+ * result is known once, by one person, and if there is nowhere to put it that
+ * day it is gone. Whether it ever becomes a visible feature is a later
+ * decision that this does not pre-empt.
+ *
+ * Free text on purpose. A dropdown of outcomes would be this product deciding
+ * in advance what counts as a result, which is the same mistake as scoring a
+ * site.
+ */
+export interface SiteOutcome {
+  id: string
+  /** What happened, in the recorder's own words. */
+  note: string
+  /** When it happened — not when it was typed. A planning decision from March
+   *  recorded in August is a March fact. */
+  occurredOn: string
+  recordedAt: number
+  /** Which scanner produced the assessment this outcome is about. */
+  scanner: string
+  /** The findings that were on the report when this was recorded.
+   *
+   *  Without them an outcome is unattached to anything: the report will be
+   *  re-run against different data one day, and "the survey found nothing"
+   *  only means something beside what the scan said at the time. */
+  findingIds: string[]
+  /** How much of the assessment had evidence behind it, as it stood. An
+   *  outcome recorded against a report that could read almost nothing is a
+   *  weaker signal than one recorded against a full assessment, and that
+   *  context has to travel with it. */
+  coverage?: { assessed: number; relevant: number }
+}
+
+/**
+ * Who reviewed a report, if anyone has.
+ *
+ * **Absent by default and never populated by the product.** Scaffolding for a
+ * co-signed brief, not a claim: an unfilled field says no one has reviewed
+ * this, which is true of every report today.
+ */
+export interface SiteReview {
+  name: string
+  role: string
+  reviewedOn: string
+  recordedAt: number
+}
+
 export interface SavedAoi {
   id: string
   name: string
@@ -43,6 +95,9 @@ export interface SavedAoi {
   timeIndex?: number
   compareIndex?: number | null
   markers?: Marker[]
+  /** Optional and absent on every entry written before this existed. */
+  outcomes?: SiteOutcome[]
+  review?: SiteReview
 }
 
 /** What an exported sites file looks like. Versioned so a later format change
@@ -173,6 +228,12 @@ interface State {
   loadSaved: (id: string) => void
   deleteSaved: (id: string) => void
   renameSaved: (id: string, name: string) => void
+  /** Record what actually happened on a saved site. Capture only — nothing
+   *  aggregates or scores these. */
+  recordOutcome: (id: string, note: string, occurredOn: string) => void
+  removeOutcome: (siteId: string, outcomeId: string) => void
+  /** Attach or clear who reviewed a report. Never populated automatically. */
+  setReview: (id: string, review: Omit<SiteReview, 'recordedAt'> | null) => void
   updateSaved: (id: string) => void
   importSites: (sites: SavedAoi[]) => number
   addMarker: (lng: number, lat: number, name?: string) => void
@@ -425,6 +486,66 @@ export const useStore = create<State>((set, get) => ({
     set({ future: future.slice(1), past: [...past, aoi].slice(-40), aoi: next })
     if (next) void get().refresh()
     else set({ data: null, cells: [] })
+  },
+
+  /*
+   * Outcome and review capture.
+   *
+   * Both write to the same saved-sites list the rest of the workspace uses, so
+   * they travel with an export and survive a reload. Neither is read by
+   * anything that produces a finding — this is storage for a feature that does
+   * not exist yet, and keeping it inert is the point.
+   */
+  recordOutcome: (id, note, occurredOn) => {
+    const trimmed = note.trim()
+    if (!trimmed) return
+    const { data, scannerId } = get()
+    const coverage = data?.radar?.coverage
+    const outcome: SiteOutcome = {
+      id: String(Date.now()),
+      note: trimmed,
+      occurredOn,
+      recordedAt: Date.now(),
+      scanner: scannerId,
+      // Captured now, from the report on screen. Re-running the scan later
+      // against different data must not change what this outcome was recorded
+      // against.
+      findingIds: (data?.radar?.flags ?? []).map((f) => f.id),
+      ...(coverage ? { coverage: { assessed: coverage.assessed,
+                                   relevant: coverage.relevant } } : {}),
+    }
+    {
+      const next = get().saved.map((s) =>
+      s.id === id ? { ...s, outcomes: [...(s.outcomes ?? []), outcome] } : s)
+      persistSaved(next)
+      set({ saved: next })
+    }
+  },
+
+  removeOutcome: (siteId, outcomeId) => {
+    {
+      const next = get().saved.map((s) =>
+      s.id === siteId
+        ? { ...s, outcomes: (s.outcomes ?? []).filter((o) => o.id !== outcomeId) }
+        : s)
+      persistSaved(next)
+      set({ saved: next })
+    }
+  },
+
+  setReview: (id, review) => {
+    {
+      const next = get().saved.map((s) => {
+      if (s.id !== id) return s
+      if (!review) {
+        const { review: _dropped, ...rest } = s
+        return rest
+      }
+      return { ...s, review: { ...review, recordedAt: Date.now() } }
+    })
+      persistSaved(next)
+      set({ saved: next })
+    }
   },
 
   saveAoi: (name) => {

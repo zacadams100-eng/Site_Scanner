@@ -2,6 +2,7 @@ import { useStore } from '../store'
 import ScannerIdentity from './ScannerIdentity'
 import FieldChecks from './FieldChecks'
 import SignalGaps from './SignalGap'
+import SiteOutcomes from './SiteOutcomes'
 import {
   assessedText, attentionRows, coverageBar, evidenceRows, gapCauses,
   historicalRows, overlapNote, siteFacts,
@@ -212,6 +213,8 @@ export default function SiteOverview() {
           </button>
         </section>
       )}
+
+      <SiteOutcomes />
 
       {/* Every check that could not run, as a capability note rather than a
           greyed-out row. See SignalGap.tsx — this is the component the
