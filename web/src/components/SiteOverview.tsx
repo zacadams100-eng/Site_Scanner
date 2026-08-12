@@ -3,6 +3,7 @@ import ScannerIdentity from './ScannerIdentity'
 import FieldChecks from './FieldChecks'
 import SignalGaps from './SignalGap'
 import SiteOutcomes from './SiteOutcomes'
+import SiteReview from './SiteReview'
 import {
   assessedText, attentionRows, coverageBar, evidenceRows, gapCauses,
   historicalRows, overlapNote, siteFacts,
@@ -214,6 +215,7 @@ export default function SiteOverview() {
         </section>
       )}
 
+      <SiteReview />
       <SiteOutcomes />
 
       {/* Every check that could not run, as a capability note rather than a
