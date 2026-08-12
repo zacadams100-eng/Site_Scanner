@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/prerender.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/build-hero-field.mjs && node scripts/build-assets.mjs && node scripts/build-sitemap.mjs",

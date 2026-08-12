@@ -215,8 +215,8 @@ read off the source. Four classifications:
 | # | Item | | Finding |
 | --- | --- | --- | --- |
 | 1 | Deployment URL | **D** | `vercel.json` is complete: SPA rewrite, CSP, security headers, immutable asset caching, `must-revalidate` on the document. The *domain* is a business decision, and everything that depends on it is gated on `VITE_SITE_ORIGIN` rather than guessed. |
-| 2 | view-source / initial HTML | **D** | A 2,099-byte SPA shell carrying the homepage's real title, description and Open Graph tags. Fine for the application; a limit for the marketing pages, whose copy is invisible to a crawler that does not execute JavaScript. See "The one open SEO question" below. |
-| 3 | 404 page | **B / D** | The page exists, is `noindex, follow`, offers a way back, and is now covered by an e2e test. **But it answers HTTP 200**, because the SPA rewrite serves `index.html` for everything — a soft 404. Fixing it properly needs a serverless catch-all or prerendering; both are deployment decisions, so this is recorded rather than guessed at. |
+| 2 | view-source / initial HTML | **A** | **Fixed.** `scripts/prerender.mjs` renders each public route to static HTML at build time, so the copy is in the source. The application keeps a bare shell (`app.html`) — it has nothing to prerender. |
+| 3 | 404 page | **A** | **Fixed.** The eleven public routes are prerendered to real files, so the filesystem answers them and the catch-all rewrite was narrowed to `/app`. Anything else falls through to `404.html` with a real 404 status. |
 | 4 | Vite + React production behaviour | **A** | Builds clean with no warnings. Verified by serving the built output, not the dev server. |
 | 5 | Unique page titles | **A** | 10 of 10 unique, from one route table. Asserted by unit test and re-verified in a browser. |
 | 6 | Meta descriptions | **A** | 10 of 10 unique and specific. |
@@ -252,7 +252,11 @@ Nothing was added to the application to satisfy a checklist. No structured data
 describes a report, no headings were invented to fill an outline, and no
 rendering strategy changed to make the HTML source look busier.
 
-## The one open SEO question
+## The one open SEO question — resolved
+
+> **Resolved by prerendering.** What follows is the reasoning that led there,
+> kept because the SSR question will be asked again.
+
 
 The marketing pages render client-side, so their copy is invisible to a crawler
 that does not execute JavaScript. Google generally does execute it; most other
