@@ -3,6 +3,12 @@ uvicorn[standard]==0.30.6
 earthengine-api==1.1.2
 pydantic==2.9.2
 
+# Required by routes_enquiry.py's `EmailStr`. Pydantic defers email syntax
+# checking to this package and raises when the model class is *built*, which is
+# at import time — so without it both backends fail to start, not just the
+# enquiry route. tests/test_dependency_manifests.py holds the line.
+email-validator==2.2.0
+
 # Used by app.py's /api/stats/price (HM Land Registry lookup) — this was
 # imported but never declared.
 requests==2.33.1

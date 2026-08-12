@@ -6,3 +6,9 @@
 fastapi==0.115.6
 pydantic==2.10.4
 requests==2.32.3
+
+# routes_enquiry.py's `EmailStr` needs this, and the function imports that
+# module through mock_ee_backend at module scope. Missing here, every route of
+# the deployed function returns 500 — including /api/catalog, which has nothing
+# to do with the form.
+email-validator==2.2.0
