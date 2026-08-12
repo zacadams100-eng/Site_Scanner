@@ -118,6 +118,45 @@ says "no material change" is a result. Manufacturing a dramatic collapse
 because it looks better on a homepage is the exact failure this product exists
 to prevent.
 
+## Supply order
+
+All 21 slots are unsupplied. Ranked by what a visitor sees first and what the
+site cannot argue without — supply top to bottom and each one earns its place
+before the next.
+
+| # | Slot | Where | Why here |
+| --- | --- | --- | --- |
+| 1 | `product/workspace-land.png` | The instrument | The site claims a working instrument and currently shows a frame describing one. This is the single most valuable file on the list. **Blocked on Earth Engine — see below.** |
+| 2 | `product/workspace-habitat.png` | The instrument | Proves it is a platform rather than one tool. **Blocked.** |
+| 3 | `hero/hero-loop.mp4` + `hero-loop-poster.jpg` | Hero | First thing anyone sees. Until it exists the generated field sheet holds the space, and that is a finished design — so this is high value, not urgent. |
+| 4 | `evidence/satellite-imagery.jpg` | The instrument | First of the contact sheet beside the interface. Sourceable today. |
+| 5 | `evidence/terrain-elevation.jpg` | The instrument | Sourceable today. |
+| 6 | `evidence/vegetation-index.jpg` | The instrument | Sourceable today. |
+| 7 | `product/report-radar.png` | The assessment | Carries the coverage-before-findings argument. **Blocked.** |
+| 8 | `product/report-evidence.png` | The assessment | Shows a finding traced to its source. **Blocked.** |
+| 9 | `marketing/change-then.jpg` | The change | Half of the before/after. Useless without its pair. |
+| 10 | `marketing/change-now.jpg` | The change | The other half. Same ground, same footprint. |
+| 11 | `field/fieldwork-survey.jpg` | Field record | Anchors the inverted spread. Sourceable today. |
+| 12 | `field/landscape-wide.jpg` | Field record | Wide plate, sets the section's tone. |
+| 13 | `product/report-site-overview.png` | The assessment | **Blocked.** |
+| 14 | `product/workspace-investigation.png` | The assessment | **Blocked.** |
+| 15 | `evidence/hydrology-water.jpg` | The instrument | Completes the contact sheet. |
+| 16 | `evidence/historical-imagery.jpg` | The instrument | Completes the contact sheet. |
+| 17 | `field/field-notebook.jpg` | Field record | Character rather than argument. |
+| 18 | `field/gps-equipment.jpg` | Field record | Character rather than argument. |
+| 19 | `marketing/archival-map.jpg` | The change | Texture. |
+| 20 | `marketing/property-landscape.jpg` | The change | Texture. |
+| 21 | `hero/hero-aerial.jpg` | Hero | Only needed if there is no loop. |
+
+**Six of the top fourteen are blocked on Earth Engine credentials** (see
+`docs/EE_SETUP.md`). A screenshot taken against the demo backend shows invented
+findings with a badge admitting it, so those slots stay empty until real data
+exists.
+
+**Nine can be supplied today** without any dependency: the five evidence
+squares, the four field photographs. Those are the fastest way to make the site
+stop reading as a shot list.
+
 ## Composition is yours
 
 Each plate takes props in `Pages.tsx` controlling how it sits on the page:
