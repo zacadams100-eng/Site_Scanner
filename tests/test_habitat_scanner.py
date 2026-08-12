@@ -49,10 +49,15 @@ def test_habitat_assesses_through_the_same_api_as_land(mock_client, live_ndvi):
     live_ndvi(declining(0.61, 0.47))
     body = fetch(mock_client)
 
-    # Habitat's own vocabulary, not land's.
-    assert {t["id"] for t in body["radar"]["topics"]} == {
-        "condition", "moisture", "cover", "water", "structure"}
-    assert "flood" not in {t["id"] for t in body["radar"]["topics"]}
+    # The habitat domain's own vocabulary, carried intact into Ecology. The
+    # scanner adds vegetation and designations from the core rule set, which is
+    # what makes it an ecology scanner rather than a habitat one — but nothing
+    # the habitat package contributed may go missing in the move.
+    topics = {t["id"] for t in body["radar"]["topics"]}
+    assert {"condition", "moisture", "cover", "water", "structure"} <= topics
+    # Still not land's flood vocabulary. Ecology is not the sweep.
+    assert "flood" not in topics
+    assert "terrain" not in topics and "ground" not in topics
 
 
 def test_a_habitat_decline_raises_an_ecological_appraisal(mock_client, live_ndvi):
@@ -242,7 +247,10 @@ def test_habitat_cannot_request_a_land_factor(mock_client):
         "geometry": GEOMETRY, "factor_ids": ["flood_zone3_pct"],
         "scanner": "habitat"})
     assert r.status_code == 422
-    assert "Habitat scanner does not cover" in r.json()["detail"]
+    # Named by the scanner that actually served the request. `habitat` is an
+    # alias for Ecology now, and a message naming the alias would send someone
+    # looking for a scanner the catalogue does not list.
+    assert "Ecology scanner does not cover" in r.json()["detail"]
 
 
 def test_a_flagging_rule_declares_its_threshold_where_radar_reads_it():

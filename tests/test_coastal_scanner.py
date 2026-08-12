@@ -152,7 +152,11 @@ def test_a_reading_with_no_observation_stays_silent():
 # ---------------------------------------------------------------------------
 
 def test_both_flags_state_what_they_do_not_establish():
-    for rule in scanners.COASTAL.rules:
+    # Scoped to the coastal domain. Coastal became a domain of Water, which
+    # also carries the flood and surface-water rules Land has always run —
+    # those are a different provenance with their own conventions, and sweeping
+    # them here would test the wrong thing under this name.
+    for rule in scanners.WATER.rules_in("coastal"):
         if rule.kind != "flag":
             continue
         limit = (rule.meta or {}).get("not_evidence_of", "")
@@ -170,7 +174,11 @@ def test_the_scanner_does_not_claim_to_verify_a_site_is_coastal():
 
 
 def test_coastal_thresholds_are_labelled_product_defined():
-    for rule in scanners.COASTAL.rules:
+    # Scoped to the coastal domain. Coastal became a domain of Water, which
+    # also carries the flood and surface-water rules Land has always run —
+    # those are a different provenance with their own conventions, and sweeping
+    # them here would test the wrong thing under this name.
+    for rule in scanners.WATER.rules_in("coastal"):
         if rule.kind != "flag":
             continue
         status = (rule.meta or {}).get("threshold_status", "").lower()

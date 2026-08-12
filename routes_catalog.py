@@ -137,21 +137,24 @@ def get_catalog(scanner: str = scanners.DEFAULT_SCANNER) -> Dict[str, Any]:
         # Which scanner served this, and which exist. The shell shows the
         # active one rather than inferring it, so the scanner is a product
         # concept the user can see instead of hidden backend state.
-        "scanner": {
-            "id": scanner.id, "name": scanner.name, "subject": scanner.subject,
-            "implemented": scanner.implemented,
-        },
+        "scanner": _scanner_payload(scanner),
         # The counts are the registry's own, not a description of it. A
         # declared-but-unbuilt scanner reports zeroes because it has nothing,
         # which is the honest thing for a library card to show — the
         # alternative is a frontend inventing plausible numbers for a product
         # that does not exist yet.
         "scanners": [
-            {"id": s.id, "name": s.name, "subject": s.subject,
-             "implemented": s.implemented,
-             "topic_count": len(s.topics), "factor_count": len(s.factors),
-             "coverage_name": s.coverage_name}
+            _scanner_payload(s)
             for s in (scanners.resolve(i) for i in scanners.ids())
+        ],
+        # The library's sections. Sent from the registry rather than grouped in
+        # the frontend, for the same reason availability is: a second
+        # description of the product's shape drifts, and the frontend's copy is
+        # the one nobody remembers to update.
+        "families": [
+            {"id": f.id, "name": f.name, "subject": f.subject,
+             "scanners": [s.id for s in ss]}
+            for f, ss in scanners.families()
         ],
         "coverage": {"name": scanner.coverage_name or "not established",
                      "bbox": scanner.coverage},
@@ -164,6 +167,39 @@ def get_catalog(scanner: str = scanners.DEFAULT_SCANNER) -> Dict[str, Any]:
             "end": catalog.TIME_END,
             "steps": series_mod.month_steps(),
         },
+    }
+
+
+def _scanner_payload(s: scanners.Scanner) -> Dict[str, Any]:
+    """One scanner, as the library and the shell read it.
+
+    `status` and the domain list are the part that matters. A scanner card
+    saying "Water · available" and nothing else invites a user to read a clear
+    result as "no water issues", when what it means is "no flood, surface water
+    or coastal issues — groundwater, drainage and catchment were never asked".
+    The coverage gap travels with the scanner so the interface cannot show one
+    without the other.
+
+    `blocked_by` is sent for unbuilt domains and is deliberately specific. It
+    is the difference between a roadmap a professional can plan around and a
+    promise they cannot.
+    """
+    return {
+        "id": s.id, "name": s.name, "subject": s.subject,
+        "family": s.family,
+        "implemented": s.implemented,
+        "status": s.status,
+        "version": s.version,
+        "methodology_version": s.methodology_version,
+        "specialist": s.specialist,
+        "topic_count": len(s.topics), "factor_count": len(s.factors),
+        "rule_count": len(s.rules),
+        "coverage_name": s.coverage_name,
+        "domains": [
+            {"id": d.id, "name": d.name, "subject": d.subject,
+             "implemented": d.implemented, "blocked_by": d.blocked_by}
+            for d in s.domains
+        ],
     }
 
 

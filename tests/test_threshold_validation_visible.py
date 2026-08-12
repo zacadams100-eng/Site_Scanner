@@ -23,7 +23,7 @@ UNVALIDATED = ("coastal_low_lying", "coastal_water_extent_change")
 
 @pytest.mark.parametrize("rule_id", UNVALIDATED)
 def test_the_coastal_thresholds_declare_themselves_unvalidated(rule_id):
-    rule = next(r for r in scanners.COASTAL.rules if r.id == rule_id)
+    rule = next(r for r in scanners.WATER.rules if r.id == rule_id)
     meta = rule.meta or {}
     assert meta.get("validation_status") == "unvalidated"
     needed = meta.get("validation_needed", "")
@@ -37,7 +37,7 @@ def test_the_coastal_thresholds_declare_themselves_unvalidated(rule_id):
 def test_unvalidated_is_not_a_substitute_for_product_defined(rule_id):
     """Two different statements, both required. "Product-defined" says we chose
     it; "unvalidated" says nobody qualified has checked it."""
-    meta = next(r for r in scanners.COASTAL.rules if r.id == rule_id).meta or {}
+    meta = next(r for r in scanners.WATER.rules if r.id == rule_id).meta or {}
     assert "product-defined" in meta.get("threshold_status", "").lower()
     assert meta.get("validation_status") == "unvalidated"
 
@@ -69,7 +69,7 @@ def test_the_drawer_has_no_affirmative_validated_state():
 def test_land_and_habitat_are_not_silently_marked_validated():
     """Only claims that can be defended. Nothing here asserts that any other
     scanner's thresholds have been reviewed."""
-    for scanner in (scanners.LAND, scanners.HABITAT):
+    for scanner in (scanners.LAND, scanners.ECOLOGY):
         for rule in scanner.rules:
             status = (rule.meta or {}).get("validation_status")
             assert status in (None, "unvalidated"), \

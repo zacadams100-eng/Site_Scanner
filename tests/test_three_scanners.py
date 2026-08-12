@@ -1,13 +1,30 @@
 """
-The three launch scanners, and the isolation between them.
+The built scanners, and the isolation between them.
 
 `test_scanner_registry.py` covers the registry's shape. This covers the
-product claim: that land, habitat and coastal are three different assessments
-of the same ground, sharing one engine and leaking nothing into each other.
+product claim: that land, water, ecology and planning are four different
+assessments of the same ground, sharing one engine and leaking nothing into
+each other.
 
 The isolation tests here matter more than any abstraction. Cross-scanner
 leakage is the failure mode a shared engine actually has, and it is silent —
-a habitat report carrying a land finding looks like a habitat finding.
+an ecology report carrying a planning finding looks like an ecology finding.
+
+## What changed when the taxonomy landed, and why one test inverted
+
+This file used to assert that **no two scanners share a rule id**. That was
+true of land/habitat/coastal, where each scanner owned a disjoint rule set, and
+it is deliberately false now: Land is the foundation scanner and keeps the
+flood, vegetation, ecology and planning rules that Water, Ecology and Planning
+also present.
+
+Deleting the test would have thrown away the guarantee it was protecting, which
+was never really "disjoint ids" — it was **two scanners must not be able to
+disagree**. So it inverted into something stricter: where two scanners carry
+one rule, they must carry *the same object*, and the specialists must still be
+disjoint from each other. A copied rule is two thresholds waiting to drift, and
+the first symptom would be Land and Water reporting different flood answers for
+one site.
 """
 
 from __future__ import annotations
@@ -18,8 +35,11 @@ from fastapi.testclient import TestClient
 import mock_ee_backend
 import scanners
 
-BUILT = ("land", "habitat", "coastal")
-DECLARED = ("forestry", "water", "terrain")
+BUILT = ("land", "water", "ecology", "planning")
+#: The specialists. Land is excluded because it deliberately overlaps all of
+#: them — it is the sweep, and they are the lenses.
+SPECIALISTS = ("water", "ecology", "planning")
+DECLARED = ("development", "infrastructure", "heritage", "market")
 
 #: One site, used for every assessment below. The whole point is that the
 #: ground does not change while the lens does.
@@ -79,27 +99,56 @@ def test_the_roadmap_scanners_stay_unbuilt(scanner):
     assert s.coverage is None
 
 
-def test_the_three_scanners_ask_different_questions():
+def test_the_specialist_scanners_ask_different_questions():
     """Three names on one rule set would be the failure this whole
-    architecture exists to avoid. No two scanners may share a rule id."""
-    by_scanner = {s: {r.id for r in scanners.resolve(s).rules} for s in BUILT}
-    for a in BUILT:
-        for b in BUILT:
+    architecture exists to avoid. No two specialists may share a rule id.
+
+    Land is excluded and overlaps all of them on purpose — see the module note.
+    """
+    by_scanner = {s: {r.id for r in scanners.resolve(s).rules}
+                  for s in SPECIALISTS}
+    for a in SPECIALISTS:
+        for b in SPECIALISTS:
             if a >= b:
                 continue
             shared = by_scanner[a] & by_scanner[b]
             assert not shared, f"{a} and {b} share rule ids: {sorted(shared)}"
 
 
-def test_coastal_does_not_restate_a_land_check():
-    """Coastal's flagged checks act on factors no land rule uses.
+def test_where_land_overlaps_a_specialist_it_is_the_same_rule_not_a_copy():
+    """The guarantee the disjointness test was really protecting.
+
+    Two scanners may present one check. They may never hold two definitions of
+    it: a copied rule is a second threshold, and it drifts silently — Land and
+    Water would report different flood answers for one site and nothing would
+    say which was right.
+    """
+    land = {r.id: r for r in scanners.LAND.rules}
+    overlaps = 0
+    for sid in SPECIALISTS:
+        for rule in scanners.resolve(sid).rules:
+            if rule.id in land:
+                overlaps += 1
+                assert rule is land[rule.id], (
+                    f"{sid} holds a copy of land's {rule.id!r} rather than the "
+                    f"rule itself — two thresholds waiting to disagree")
+    assert overlaps > 0, (
+        "no overlap found at all, so this test is asserting nothing. Land is "
+        "supposed to be the sweep that includes the specialists' checks.")
+
+
+def test_the_coastal_domain_does_not_restate_a_land_flag():
+    """The coastal domain's flagged checks act on factors no land flag uses.
 
     Land already owns Flood Zone 2 and 3, standing water and seasonal water.
-    A coastal scanner that flagged those again would be one check wearing two
-    hats — more findings, no more information."""
+    A coastal check that flagged those again would be one check wearing two
+    hats — more findings, no more information. This is about *duplicating a
+    judgement*, which stays wrong, and is a different thing from Water
+    presenting Land's own flood rule, which is the same judgement shown once.
+    """
     land_flag_needs = {n for r in scanners.LAND.rules
                        if r.kind == "flag" for n in r.needs}
-    coastal_flag_needs = {n for r in scanners.COASTAL.rules
+    coastal_flag_needs = {n for r in scanners.WATER.rules_in("coastal")
                           if r.kind == "flag" for n in r.needs}
     assert coastal_flag_needs
     overlap = coastal_flag_needs & land_flag_needs
@@ -132,8 +181,13 @@ def test_every_flagged_rule_states_its_threshold_and_its_limits():
     """A flag without a stated threshold is an opinion, and one without
     `not_evidence_of` is a claim with no boundary. Both are the specific
     failure this product is built to prevent."""
-    for scanner in ("habitat", "coastal"):
-        for rule in scanners.resolve(scanner).rules:
+    # The package-contributed domains. The core rule set predates this
+    # convention and does not carry `not_evidence_of` on every flag — that gap
+    # is real, recorded in docs/AUTONOMOUS_CHANGELOG.md, and sweeping it in
+    # here under this name would turn a known gap into a red suite rather than
+    # into work.
+    for scanner, domain in (("ecology", "habitat"), ("water", "coastal")):
+        for rule in scanners.resolve(scanner).rules_in(domain):
             if rule.kind != "flag":
                 continue
             meta = getattr(rule, "meta", None) or {}
@@ -180,18 +234,23 @@ def test_land_is_identical_before_and_after_another_scanner(client, middle):
     assert before["radar"]["coverage"] == after["radar"]["coverage"]
 
 
-def test_the_same_site_gives_three_different_assessments(client):
-    """One geometry, three scanners, three genuinely different reports.
+def test_the_same_site_gives_a_different_assessment_per_scanner(client):
+    """One geometry, four scanners, four genuinely different reports.
 
     If two of these came back with the same topics the scanners would be
-    branding rather than product."""
+    branding rather than product. Land overlaps each specialist's *rules* on
+    purpose; its topic set is still its own, because it is the union of all
+    seven and no specialist carries all seven."""
     reports = {s: _assess(client, s) for s in BUILT}
     topic_sets = {s: {t["id"] for t in r["radar"]["topics"]}
                   for s, r in reports.items()}
 
-    assert topic_sets["land"] != topic_sets["habitat"]
-    assert topic_sets["land"] != topic_sets["coastal"]
-    assert topic_sets["habitat"] != topic_sets["coastal"]
+    for a in BUILT:
+        for b in BUILT:
+            if a < b:
+                assert topic_sets[a] != topic_sets[b], (
+                    f"{a} and {b} report the same topics — they are branding, "
+                    f"not two assessments")
 
     # And each reports only its own scanner's topics.
     for scanner, topics in topic_sets.items():
@@ -247,7 +306,7 @@ def test_the_api_returns_the_scanner_it_was_asked_for(client, scanner):
     assert {f["id"] for f in cat["factors"]} <= declared
 
 
-def test_the_library_shows_three_available_and_three_coming(client):
+def test_the_library_shows_four_available_and_four_coming(client):
     cat = _catalog(client, "land")
     built = [s for s in cat["scanners"] if s["implemented"]]
     coming = [s for s in cat["scanners"] if not s["implemented"]]
@@ -256,3 +315,23 @@ def test_the_library_shows_three_available_and_three_coming(client):
     # A declared scanner reports zeroes rather than an invented count.
     for s in coming:
         assert s["topic_count"] == 0 and s["factor_count"] == 0
+        assert s["rule_count"] == 0
+        assert s["status"] == "planned"
+
+
+def test_a_partial_scanner_is_not_offered_as_complete(client):
+    """`implemented` alone would let Water present as finished. Three of the
+    four built scanners cover part of their subject, and the card has to carry
+    which part — a user reading "Water · available" and getting a clear result
+    has been told something untrue about what was asked."""
+    cat = _catalog(client, "land")
+    by_id = {s["id"]: s for s in cat["scanners"]}
+    for sid in ("water", "ecology", "planning"):
+        s = by_id[sid]
+        assert s["implemented"] is True
+        assert s["status"] == "partial"
+        gaps = [d for d in s["domains"] if not d["implemented"]]
+        assert gaps, f"{sid} is partial but names no gap"
+        for d in gaps:
+            assert d["blocked_by"], f"{sid}.{d['id']} is a gap with no reason"
+    assert by_id["land"]["status"] == "live"

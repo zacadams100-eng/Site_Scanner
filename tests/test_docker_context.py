@@ -67,7 +67,31 @@ def _imported_packages() -> set:
                 head = node.module.split(".")[0]
                 if head in packages:
                     found.add(head)
-    return found
+    return found | _registry_packages()
+
+
+def _registry_packages() -> set:
+    """Packages the scanner registry loads by name rather than by import.
+
+    `Domain(package="coastal.rules")` is a string, so no amount of AST walking
+    finds it — and `radar.rules_from` deliberately swallows an ImportError, so
+    a package missing from the image produces a scanner with an empty rule set
+    instead of a crash. That combination would put this check's most important
+    guarantee out of reach exactly where it matters most: the packages carrying
+    a scanner's checks.
+
+    Read from the registry itself rather than by pattern-matching `scanners.py`
+    — a regex over source would be a second description of the registry, and
+    the point of this file is that second descriptions drift.
+    """
+    import scanners
+
+    return {
+        d.package.split(".")[0]
+        for s in scanners.SCANNERS.values()
+        for d in s.domains
+        if d.package
+    } & _root_packages()
 
 
 def _copied_packages() -> set:
