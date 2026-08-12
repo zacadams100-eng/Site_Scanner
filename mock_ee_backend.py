@@ -368,6 +368,12 @@ app.include_router(catalog_router)
 from routes_enquiry import router as enquiry_router  # noqa: E402
 app.include_router(enquiry_router)
 
+# The portfolio: many sites, one view. Mounted on both backends for the same
+# reason the enquiry route is — a feature that exists on one deployment and not
+# the other is a support problem nobody can reproduce.
+from routes_portfolio import router as portfolio_router  # noqa: E402
+app.include_router(portfolio_router)
+
 # The mock has no Earth Engine, but open data needs none either: registering it
 # here means the credential-free backend — the one that runs locally and in the
 # serverless deployment — still returns real designations, prices and crime

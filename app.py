@@ -181,6 +181,12 @@ app.include_router(catalog_router)
 from routes_enquiry import router as enquiry_router  # noqa: E402
 app.include_router(enquiry_router)
 
+# The portfolio: many sites, one view. Mounted on both backends for the same
+# reason the enquiry route is — a feature that exists on one deployment and not
+# the other is a support problem nobody can reproduce.
+from routes_portfolio import router as portfolio_router  # noqa: E402
+app.include_router(portfolio_router)
+
 # Swap the generator for real Earth Engine data where we have an implementation
 # (NDVI today). Anything not registered keeps returning demo data and says so,
 # so the catalogue can go real one factor at a time instead of in one jump.
