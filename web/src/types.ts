@@ -69,6 +69,30 @@ export interface ScannerInfo {
   name: string
   subject: string
   implemented: boolean
+  /** Which family this scanner belongs to — foundation, development, culture,
+   *  economics. Organisational only; nothing about an assessment depends on
+   *  it. The library renders its sections from `Catalog.families` rather than
+   *  grouping on this, so the two cannot disagree. */
+  family?: string
+  /** `live` — every declared domain is built.
+   *  `partial` — it assesses some of its subject and names the rest.
+   *  `planned` — it cannot assess anything.
+   *
+   *  Derived on the backend from the domains, so it cannot go stale. `partial`
+   *  is the one that matters: a card reading "Water · available" invites a
+   *  user to read a clear result as "no water issues", when it means "no
+   *  flood, surface water or coastal issues — groundwater was never asked". */
+  status?: 'live' | 'partial' | 'planned'
+  /** The named parts of this scanner's subject, built and unbuilt. The
+   *  coverage gap travels with the scanner so the interface cannot show one
+   *  without the other. */
+  domains?: ScannerDomain[]
+  /** The profession that would own this scanner's findings, where one clearly
+   *  would. Empty where no single discipline does — Land spans several, and
+   *  naming one would be an invented claim about who signs. */
+  specialist?: string
+  version?: string
+  methodology_version?: string
   /** What the registry actually holds for this scanner. A declared-but-unbuilt
    *  scanner reports zeroes and an empty coverage name, which is what the
    *  library shows — the alternative is the frontend inventing plausible
@@ -76,7 +100,34 @@ export interface ScannerInfo {
    *  predating them still parses. */
   topic_count?: number
   factor_count?: number
+  rule_count?: number
   coverage_name?: string
+}
+
+/** One named part of a scanner's subject.
+ *
+ *  `blocked_by` is the whole value of declaring an unbuilt one. "Groundwater:
+ *  coming soon" is not something a professional can plan around; "no
+ *  groundwater source is integrated, the EA publishes aquifer designations and
+ *  neither is ingested" tells them to look elsewhere for that question today. */
+export interface ScannerDomain {
+  id: string
+  name: string
+  subject: string
+  implemented: boolean
+  blocked_by: string
+}
+
+/** A group of scanners that answer the same kind of question.
+ *
+ *  Sent by the backend rather than grouped in the frontend, for the same
+ *  reason availability is: a second description of the product's shape drifts,
+ *  and the frontend's copy is the one nobody remembers to update. */
+export interface ScannerFamily {
+  id: string
+  name: string
+  subject: string
+  scanners: string[]
 }
 
 export interface Catalog {
@@ -87,6 +138,10 @@ export interface Catalog {
    *  scanner identity still parses. */
   scanner?: ScannerInfo
   scanners?: ScannerInfo[]
+  /** The library's sections, in render order. Optional so a backend predating
+   *  the taxonomy still parses — the library falls back to one ungrouped list
+   *  rather than inventing families. */
+  families?: ScannerFamily[]
   real_factor_ids?: string[]
   verified_factor_ids?: string[]
   class_values: Record<string, string[]>

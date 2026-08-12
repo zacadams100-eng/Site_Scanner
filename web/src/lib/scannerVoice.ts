@@ -1,7 +1,7 @@
 /**
  * How each scanner presents itself.
  *
- * Three instruments from one expedition company: the same case, the same
+ * Four instruments from one expedition company: the same case, the same
  * engineering, different dials. This module is the whole of the difference —
  * a lookup table of vocabulary and identity, read by generic components.
  *
@@ -67,9 +67,28 @@ const LAND: ScannerVoice = {
   margin: 'Terrestrial survey · England',
 }
 
-const HABITAT: ScannerVoice = {
+/** Water absorbed the coastal scanner, and inherited its mark.
+ *
+ *  The waterline signature was drawn for coastal and is if anything more apt
+ *  here: it is the line between land and water, which is what every one of
+ *  this scanner's domains is about — flood, surface water, coast. */
+const WATER: ScannerVoice = {
   instrument: '02',
-  title: 'Habitat intelligence',
+  title: 'Water intelligence',
+  question: 'How is this site interacting with water?',
+  strapline: 'Read the relationship between land and water.',
+  checkLabel: 'Sounding',
+  checkLabelPlural: 'Soundings',
+  findingLabel: 'Chart note',
+  signature: 'waterline',
+  margin: 'Flood · surface water · coast',
+}
+
+/** Ecology absorbed habitat, and inherited its mark. The spectral signature
+ *  refers to the Sentinel-2 record every one of its live checks reads. */
+const ECOLOGY: ScannerVoice = {
+  instrument: '03',
+  title: 'Ecological intelligence',
   question: 'What is alive here, and how is it changing?',
   strapline: 'Fifteen years of observation, read for one parcel.',
   checkLabel: 'Observation',
@@ -79,16 +98,22 @@ const HABITAT: ScannerVoice = {
   margin: 'Spectral record · Sentinel-2',
 }
 
-const COASTAL: ScannerVoice = {
-  instrument: '03',
-  title: 'Coastal intelligence',
-  question: 'How is this site interacting with water?',
-  strapline: 'Read the relationship between land and water.',
-  checkLabel: 'Sounding',
-  checkLabelPlural: 'Soundings',
-  findingLabel: 'Chart note',
-  signature: 'waterline',
-  margin: 'Site assessment · not a corridor',
+/** Planning was promoted from a topic inside Land, and its voice has to be
+ *  careful about that: it reads designations, which are matters of record, and
+ *  it does not read applications, history or policy. "What is on the record
+ *  here" is precise about which half it has — and the margin says the other
+ *  half out loud, because a planning consultant's first assumption would
+ *  otherwise be that history is included. */
+const PLANNING: ScannerVoice = {
+  instrument: '04',
+  title: 'Planning constraint',
+  question: 'What is on the record for this land?',
+  strapline: 'Designations that govern what may be done here.',
+  checkLabel: 'Search',
+  checkLabelPlural: 'Searches',
+  findingLabel: 'Constraint',
+  signature: 'contour',
+  margin: 'Designations only · no application history',
 }
 
 /** The neutral instrument. Deliberately dull: a scanner that reaches this has
@@ -108,8 +133,16 @@ const UNSPECIFIED: ScannerVoice = {
 
 const VOICES: Record<string, ScannerVoice> = {
   land: LAND,
-  habitat: HABITAT,
-  coastal: COASTAL,
+  water: WATER,
+  ecology: ECOLOGY,
+  planning: PLANNING,
+  // The retired ids, so a saved link or a stored report that still names one
+  // gets the right instrument rather than the neutral fallback. They resolve
+  // to the same scanner on the backend; this keeps the front matching.
+  coastal: WATER,
+  habitat: ECOLOGY,
+  forestry: ECOLOGY,
+  terrain: LAND,
 }
 
 export function voiceFor(scannerId: string | undefined): ScannerVoice {

@@ -3165,37 +3165,121 @@ td.cov-severe { color: var(--text-dim); }
   .lib-plate-open { grid-column: 1 / -1; justify-self: start; }
 }
 
-/* ---- In development: a roster ----------------------------------------------
-   Not cards. Six identical tiles with four greyed out reads as "four things
-   are broken"; an index under "In development" reads as a roadmap, which is
-   what it is. There is no call to action here because there is nothing to
-   call. */
-.lib-roster { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.lib-roster-row {
-  display: grid; align-items: baseline; gap: 18px;
-  grid-template-columns: 34px 150px minmax(0, 1fr) auto;
-  padding: 13px 4px; border-bottom: 1px solid var(--line);
+/* ---- Families ---------------------------------------------------------------
+   Eight scanners in a flat grid is a list of tools. Grouped, it is a company
+   with a direction — and the grouping earns its space because it tells a
+   reader where to look for a question this product cannot answer yet. */
+.lib-family { margin-bottom: 52px; }
+.lib-family-head {
+  margin-bottom: 18px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
 }
-.lib-roster-index { font-size: 11px; color: var(--line-strong); letter-spacing: .1em; }
-.lib-roster-name {
-  font-family: var(--font-display); font-size: 17px; font-weight: 600;
-  letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim);
+.lib-family-name {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  letter-spacing: .22em; text-transform: uppercase; color: var(--text-dim);
 }
-.lib-roster-subject {
-  font-family: var(--font-prose); font-size: 12.5px; color: var(--text-faint);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.lib-family-subject {
+  margin: 7px 0 0; max-width: 62ch;
+  font-family: var(--font-prose); font-size: 12.5px; line-height: 1.6;
+  color: var(--text-faint);
 }
-/* Stated in words, never by dimming alone — a greyed card is ambiguous
-   between "unavailable to you" and "does not exist". */
-.lib-roster-status {
-  font-family: var(--font-display); font-size: 10px; font-weight: 600;
-  letter-spacing: .16em; text-transform: uppercase; color: var(--text-faint);
-  padding: 2px 7px; border: 1px solid var(--line-strong); border-radius: 2px;
+
+/* ---- Status ----------------------------------------------------------------
+   Stated in words, never by dimming alone — a greyed card is ambiguous between
+   "unavailable to you" and "does not exist". The three states are three
+   different things a reader needs to know, and only one of them is about
+   whether the card can be clicked. */
+.lib-badge {
+  margin-left: 10px; padding: 2px 7px; border-radius: 2px;
+  font-family: var(--font-display); font-size: 9px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid currentColor;
 }
-.lib-roster-note {
-  margin: 14px 0 0; max-width: 62ch;
+.lib-badge-live { color: var(--bone-000); border-color: rgba(241, 238, 229, .5); }
+/* The one badge that carries a warning. Signal orange is rationed hard in this
+   system, and "this scanner does not cover its whole subject" is exactly the
+   kind of thing it is rationed for. */
+.lib-badge-partial { color: var(--signal-200); }
+.lib-badge-planned { color: var(--text-faint); }
+
+/* An unbuilt scanner is not a disabled button. A disabled control invites
+   clicking and then refuses, which reads as a fault; this is simply not a
+   control, and the words carry the reason. */
+.lib-plate-static {
+  cursor: default;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--line-strong);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+.lib-plate-static .lib-contours { display: none; }
+.lib-plate-static .lib-plate-name { color: var(--text-dim); font-size: clamp(22px, 2.4vw, 28px); }
+.lib-plate-static .lib-plate-subject { color: var(--text-faint); }
+.lib-plate-static .lib-plate-index { color: var(--line-strong); }
+
+/* ---- Coverage, on the card --------------------------------------------------
+   The honest half of a partial scanner's plate. A card reading "Water ·
+   available" invites a clear result to be read as "no water issues"; these two
+   rows say which questions were asked, before the scanner is chosen rather
+   than after. */
+.lib-coverage {
+  display: block; margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(241, 238, 229, .18);
+}
+.lib-plate-static .lib-coverage { border-top-color: var(--line); }
+.lib-coverage-row {
+  display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 12px;
+  align-items: baseline; padding: 3px 0;
+}
+.lib-coverage-key {
+  font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(241, 238, 229, .5);
+}
+.lib-coverage-val {
+  font-family: var(--font-prose); font-size: 12.5px; line-height: 1.5;
+  color: rgba(241, 238, 229, .84);
+}
+.lib-coverage-gap .lib-coverage-val {
+  color: rgba(241, 238, 229, .58);
+  /* Dashed, not alarming: a gap is a limit of the instrument, not a fault in
+     the site. Same treatment the evidence drawer gives an unread check. */
+  border-bottom: 1px dashed rgba(241, 238, 229, .3);
+  display: inline-block; padding-bottom: 2px;
+}
+
+.lib-plate-note {
+  display: block; margin-top: 12px; max-width: 62ch;
+  font-family: var(--font-prose); font-size: 11.5px; line-height: 1.6;
+  color: rgba(241, 238, 229, .6);
+}
+.lib-plate-static .lib-plate-note { color: var(--text-faint); }
+
+/* ---- Blockers ---------------------------------------------------------------
+   For an unbuilt scanner these *are* the content. They are what makes a
+   declared scanner worth reading: a professional learns that this question is
+   not answerable here today, and exactly why — which is more useful than not
+   finding the scanner at all and assuming it is never coming. */
+.lib-blockers {
+  list-style: none; margin: 14px 0 0; padding: 0;
+  border-top: 1px solid var(--line);
+}
+.lib-blocker {
+  display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 16px;
+  align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line);
+}
+.lib-blocker-name {
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.lib-blocker-why {
   font-family: var(--font-prose); font-size: 12px; line-height: 1.6;
   color: var(--text-faint);
+}
+
+@media (max-width: 760px) {
+  .lib-blocker { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .lib-coverage-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 
 @media (max-width: 760px) {
@@ -4163,8 +4247,9 @@ td.cov-severe { color: var(--text-dim); }
   --inst-mark: #8a6520;
 }
 
-/* Habitat — a herbarium sheet. Moss and chlorophyll against cream, with the
+/* Ecology — a herbarium sheet. Moss and chlorophyll against cream, with the
    muted red of a specimen label rather than an alert. */
+.app[data-scanner="ecology"],
 .app[data-scanner="habitat"] {
   --inst-ink: #24402c;
   --inst-accent: #8a4038;
@@ -4174,8 +4259,9 @@ td.cov-severe { color: var(--text-dim); }
   --inst-mark: #6b7f3f;
 }
 
-/* Coastal — an Admiralty chart. Ink on off-white, faded chart blue, and the
+/* Water — an Admiralty chart. Ink on off-white, faded chart blue, and the
    one orange kept for a warning because that is what orange means at sea. */
+.app[data-scanner="water"],
 .app[data-scanner="coastal"] {
   --inst-ink: #1c3040;
   --inst-accent: #b4531a;
@@ -4183,6 +4269,17 @@ td.cov-severe { color: var(--text-dim); }
   --inst-rule: #b6c2c4;
   --inst-sig: #4b7387;
   --inst-mark: #2f6076;
+}
+
+/* Planning — a title plan. Drawing-office ink on tracing paper, and the red a
+   planning drawing reserves for a boundary line. */
+.app[data-scanner="planning"] {
+  --inst-ink: #33323a;
+  --inst-accent: #9c3226;
+  --inst-wash: #f3f1ec;
+  --inst-rule: #c4c0b6;
+  --inst-sig: #7a7486;
+  --inst-mark: #9c3226;
 }
 
 /* --------------------------------------------------------------- nameplate */
@@ -4357,10 +4454,27 @@ td.cov-severe { color: var(--text-dim); }
    uses. A scanner looks the same in the library as it does in the hand, which
    is what makes the library a case of instruments rather than a menu. */
 .lib-plate[data-scanner="land"] .lib-plate-face { --case: #2f4033; --case-sig: #7b8468; }
+.lib-plate[data-scanner="ecology"] .lib-plate-face,
 .lib-plate[data-scanner="habitat"] .lib-plate-face { --case: #24402c; --case-sig: #5f7c42; }
+.lib-plate[data-scanner="water"] .lib-plate-face,
 .lib-plate[data-scanner="coastal"] .lib-plate-face { --case: #1c3040; --case-sig: #4b7387; }
+.lib-plate[data-scanner="planning"] .lib-plate-face { --case: #33323a; --case-sig: #7a7486; }
 .lib-plate[data-scanner] .lib-plate-face { background: var(--case, var(--forest-800)); }
 .lib-plate[data-scanner] .lib-contours { color: var(--case-sig, currentColor); }
+
+/* An unbuilt scanner takes no case colour, and this rule has to outrank the
+   one above it — `.lib-plate[data-scanner]` is (0,2,0) and `.lib-plate-static`
+   alone is (0,1,0), so the plain class lost and every declared scanner
+   rendered as a heavy dark block with grey text on it. Found by driving the
+   page, not by reading it: the unit tests and the type checker were both green.
+
+   The distinction is the point. A drawer in the case is an instrument you can
+   pick up; a declared scanner is a label on an empty drawer, and it should
+   read as paper rather than as equipment. */
+.lib-plate[data-scanner] .lib-plate-face.lib-plate-static {
+  background: var(--bone-050);
+  color: var(--text-dim);
+}
 
 .lib-plate-inst {
   display: block; font-size: 8.5px; letter-spacing: .24em;
@@ -4379,6 +4493,15 @@ td.cov-severe { color: var(--text-dim); }
 @media (max-width: 760px) {
   .lib-plate-question { font-size: 12px; }
 }
+
+/* The status badge sits on the instrument line, so that line has to lay out
+   rather than stack. Declared here rather than in the block above because the
+   canonical `.lib-plate-inst` is this one — two rules for one element is the
+   drift this file warns about everywhere else. */
+.lib-plate-inst { display: flex; align-items: center; gap: 0; }
+.lib-plate-static .lib-plate-inst { color: var(--text-faint); opacity: 1; }
+.lib-plate-static .lib-plate-title,
+.lib-plate-static .lib-plate-question { color: var(--text-dim); }
 
 /* A submission that did not arrive. Deliberately not styled as a soft warning:
    the person has just written several hundred words and needs to know, before

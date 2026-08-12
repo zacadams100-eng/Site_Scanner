@@ -2,6 +2,10 @@ import { useStore } from '../store'
 import BrandMark from './BrandMark'
 import type { ScannerInfo } from '../types'
 import { voiceFor } from '../lib/scannerVoice'
+import {
+  STATUS_LABEL, STATUS_NOTE, domainGaps, builtDomains, isOpenable, sections,
+  statusOf, tally,
+} from '../lib/library'
 
 /**
  * The scanner library — the application's front door.
@@ -13,41 +17,48 @@ import { voiceFor } from '../lib/scannerVoice'
  *
  * ## One source of truth
  *
- * Every scanner here comes from `/api/catalog`'s `scanners` list, which is the
- * backend registry. There is no frontend roadmap array — a second list would
- * drift, and the first symptom would be a card offering a scanner the API
- * refuses. Availability is `implemented`, decided by whether the scanner has
- * any rules. The topic and factor counts are the registry's own, so a scanner
- * moving from declared to built changes this screen with no frontend edit.
+ * Every scanner, every family and every status here comes from `/api/catalog`,
+ * which is the backend registry. There is no frontend roadmap array and no
+ * grouping table — a second description of the product's shape drifts, and the
+ * frontend's copy is the one nobody remembers to update. `lib/library.ts`
+ * holds the rules and is tested without rendering; this file decides how a
+ * section looks and nothing about what is in it.
  *
- * ## Two compositions, because they are two different statements
+ * ## Why the taxonomy is on the screen
  *
- * The available scanners are **plates**: full-width, dark, indexed, with the
- * name set large in condensed caps and the registry's own counts beside it.
- * They are the decision, and they are sized like one.
+ * Eight scanners in a flat grid is a list of tools. Grouped into Foundation,
+ * Development, Culture and Economics, it is a company with a direction — and
+ * the grouping is not decoration, because it tells a reader where to look for
+ * a question this product does not answer yet. Someone who needs heritage
+ * finds Heritage under Culture, marked "not built", with the reason. That is
+ * more useful than not finding it at all and assuming it is not coming.
  *
- * The declared scanners are a **roster** — a compact technical index, not
- * cards. This is deliberate and it is the part that keeps the screen honest.
- * Six identical cards with four greyed out reads as "four things are broken".
- * A list under the heading "In development" reads as a roadmap, which is what
- * it is. What it must never do is pretend: an unavailable scanner has no call
- * to action, cannot be clicked, and says so in words rather than by being
- * dimmed.
+ * ## The part that keeps this honest: partial coverage
+ *
+ * The library previously drew two states, available and not. That is no longer
+ * enough and the gap was dangerous: three of the four built scanners cover
+ * *part* of their subject. A card reading "Water · available" invites a user
+ * to read a clear result as "no water issues", when it means "no flood,
+ * surface water or coastal issues — groundwater, drainage and catchment were
+ * never asked".
+ *
+ * So a partial scanner shows both lists on its plate — what it covers, and
+ * what it does not — before the user picks it. Finding that out after running
+ * an assessment is finding it out too late.
  *
  * ## Design
  *
- * Field equipment catalogue. The index number and the contour field are the
- * language of a technical catalogue; every colour comes from the shared token
- * system, so the library and the workspace are recognisably one product rather
- * than two designs.
+ * Field equipment catalogue. The index number, the contour field and the
+ * technical margin are the language of one; every colour comes from the shared
+ * token system, so the library and the workspace are recognisably one product
+ * rather than two designs.
  */
 export default function ScannerLibrary() {
   const catalog = useStore((s) => s.catalog)
   const choose = useStore((s) => s.chooseScanner)
-  const scanners = catalog?.scanners ?? []
 
-  const available = scanners.filter((s) => s.implemented)
-  const upcoming = scanners.filter((s) => !s.implemented)
+  const groups = sections(catalog)
+  const counts = tally(catalog)
 
   return (
     <div className="lib">
@@ -57,7 +68,7 @@ export default function ScannerLibrary() {
             <BrandMark className="lib-brand-mark" />
             <span className="lib-kicker">Site Scanner</span>
           </div>
-          <h1 className="lib-title">Choose your scanner</h1>
+          <h1 className="lib-title">Evidence infrastructure for land</h1>
           <p className="lib-sub">
             Specialist instruments for reading a real place. Each scanner
             establishes evidence about a site, states what that evidence does
@@ -65,55 +76,39 @@ export default function ScannerLibrary() {
           </p>
           {/* The shape of the platform, in one line of measurement. Counted
               from the registry, so it cannot claim more than exists. */}
-          {scanners.length > 0 && (
+          {counts.scanners > 0 && (
             <p className="lib-tally mono">
-              {scanners.length} scanners
+              {counts.scanners} scanners
               <span className="lib-tally-sep" aria-hidden>·</span>
-              {available.length} available
+              {counts.families} families
               <span className="lib-tally-sep" aria-hidden>·</span>
-              {upcoming.length} in development
+              {counts.openable} you can run today
             </p>
           )}
         </header>
 
-        {available.length > 0 && (
-          <section className="lib-section" aria-labelledby="lib-available">
-            <h2 className="lib-label" id="lib-available">
-              Available<span className="lib-count mono">{available.length}</span>
-            </h2>
+        {groups.map((section) => (
+          <section className="lib-family" key={section.family.id}
+                   aria-labelledby={`fam-${section.family.id}`}
+                   data-openable={section.openable ? 'yes' : 'no'}>
+            <div className="lib-family-head">
+              <h2 className="lib-family-name" id={`fam-${section.family.id}`}>
+                {section.family.name}
+                <span className="lib-count mono">{section.scanners.length}</span>
+              </h2>
+              {section.family.subject && (
+                <p className="lib-family-subject">{section.family.subject}</p>
+              )}
+            </div>
+
             <ul className="lib-plates">
-              {available.map((s, i) => (
+              {section.scanners.map((s, i) => (
                 <ScannerPlate key={s.id} scanner={s} index={i + 1}
                               onOpen={() => choose(s.id)} />
               ))}
             </ul>
           </section>
-        )}
-
-        {upcoming.length > 0 && (
-          <section className="lib-section" aria-labelledby="lib-upcoming">
-            <h2 className="lib-label" id="lib-upcoming">
-              In development<span className="lib-count mono">{upcoming.length}</span>
-            </h2>
-            {/* A roster, not a grid of disabled cards. See the module note. */}
-            <ul className="lib-roster">
-              {upcoming.map((s, i) => (
-                <li className="lib-roster-row" key={s.id}>
-                  <span className="lib-roster-index mono">
-                    {String(available.length + i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="lib-roster-name">{s.name}</span>
-                  <span className="lib-roster-subject">{s.subject}</span>
-                  <span className="lib-roster-status">Not built</span>
-                </li>
-              ))}
-            </ul>
-            <p className="lib-roster-note">
-              Declared in the registry so the platform's shape is honest. None
-              of them can assess anything yet, and none of them is offered.
-            </p>
-          </section>
-        )}
+        ))}
 
         <footer className="lib-foot">
           <p>
@@ -125,54 +120,107 @@ export default function ScannerLibrary() {
   )
 }
 
-/** One available scanner, as a plate. Dark ground, index, name, and the
- *  registry's own counts — a specialist instrument in a case, not a tile. */
+/**
+ * One scanner, as a plate in an instrument case.
+ *
+ * The same composition whether or not it can be opened, which is a change from
+ * the previous version and a deliberate one. Unbuilt scanners used to be a
+ * compact roster under a separate heading, on the reasoning that six identical
+ * cards with four greyed out reads as "four things are broken". With families
+ * that reasoning inverts: a family whose members are all unbuilt is a
+ * *direction*, and demoting its entries to a list would hide the platform's
+ * shape rather than clarify it.
+ *
+ * What must never happen is pretending. An unbuilt scanner has no call to
+ * action, is not a button, and says in words rather than by being dim that it
+ * cannot assess anything.
+ */
 function ScannerPlate({ scanner, index, onOpen }:
                       { scanner: ScannerInfo; index: number; onOpen: () => void }) {
+  const status = statusOf(scanner)
+  const open = isOpenable(scanner)
+  const gaps = domainGaps(scanner)
+  const covers = builtDomains(scanner)
+  const voice = voiceFor(scanner.id)
+
   // Only rendered when the registry supplied them. A zero is a fact; an absent
   // field is a backend that predates the count, and inventing one there would
   // be exactly the fabrication this screen is built to avoid.
-  const stats = [
-    scanner.topic_count != null ? { label: 'Topics', value: String(scanner.topic_count) } : null,
+  const stats = open ? [
+    scanner.rule_count != null ? { label: 'Checks', value: String(scanner.rule_count) } : null,
     scanner.factor_count != null ? { label: 'Factors', value: String(scanner.factor_count) } : null,
     scanner.coverage_name ? { label: 'Coverage', value: scanner.coverage_name } : null,
-  ].filter((x): x is { label: string; value: string } => x != null)
+  ].filter((x): x is { label: string; value: string } => x != null) : []
 
-  // The instrument case: each scanner is its own drawer, with its own
-  // vocabulary and its own mark. `data-scanner` drives the palette, exactly as
-  // it does in the workspace, so a scanner looks the same in the case as it
-  // does in the hand.
-  const voice = voiceFor(scanner.id)
+  const body = (
+    <>
+      <Contours />
+      <span className="lib-plate-index mono">{String(index).padStart(2, '0')}</span>
 
-  return (
-    <li className="lib-plate" data-scanner={scanner.id}>
-      <button className="lib-plate-face" type="button" onClick={onOpen}
-              aria-label={`Open the ${scanner.name} scanner`}>
-        <Contours />
-
-        <span className="lib-plate-index mono">{String(index).padStart(2, '0')}</span>
-
-        <span className="lib-plate-body">
-          <span className="lib-plate-inst mono">
-            Field instrument {voice.instrument}
+      <span className="lib-plate-body">
+        <span className="lib-plate-inst mono">
+          {open ? `Field instrument ${voice.instrument}` : 'Registered · not built'}
+          <span className={`lib-badge lib-badge-${status}`}>
+            {STATUS_LABEL[status]}
           </span>
-          <span className="lib-plate-name">{scanner.name}</span>
-          <span className="lib-plate-title">{voice.title}</span>
-          <span className="lib-plate-subject">{scanner.subject}</span>
-          <span className="lib-plate-question">{voice.question}</span>
         </span>
+        <span className="lib-plate-name">{scanner.name}</span>
+        {open && <span className="lib-plate-title">{voice.title}</span>}
+        <span className="lib-plate-subject">{scanner.subject}</span>
+        {open && <span className="lib-plate-question">{voice.question}</span>}
 
-        {stats.length > 0 && (
-          <span className="lib-plate-stats">
-            {stats.map((s) => (
-              <span className="lib-stat" key={s.label}>
-                <span className="lib-stat-label">{s.label}</span>
-                <span className="lib-stat-value mono">{s.value}</span>
+        {/* The honest half of the plate. A partial scanner names what it
+            covers and what it does not, here, before the scanner is chosen. */}
+        {status === 'partial' && (
+          <span className="lib-coverage">
+            {covers.length > 0 && (
+              <span className="lib-coverage-row">
+                <span className="lib-coverage-key mono">Covers</span>
+                <span className="lib-coverage-val">
+                  {covers.map((d) => d.name).join(' · ')}
+                </span>
               </span>
-            ))}
+            )}
+            {gaps.length > 0 && (
+              <span className="lib-coverage-row lib-coverage-gap">
+                <span className="lib-coverage-key mono">Not yet</span>
+                <span className="lib-coverage-val">
+                  {gaps.map((d) => d.name).join(' · ')}
+                </span>
+              </span>
+            )}
           </span>
         )}
 
+        <span className="lib-plate-note">{STATUS_NOTE[status]}</span>
+
+        {/* For an unbuilt scanner the blockers *are* the content. They are
+            what makes a declared scanner useful to read: a professional
+            learns this question is not answerable here today, and why. */}
+        {!open && gaps.length > 0 && (
+          <ul className="lib-blockers">
+            {gaps.map((d) => (
+              <li className="lib-blocker" key={d.id}>
+                <span className="lib-blocker-name mono">{d.name}</span>
+                <span className="lib-blocker-why">{d.blocked_by}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </span>
+
+      {stats.length > 0 && (
+        <span className="lib-plate-stats">
+          {stats.map((s) => (
+            <span className="lib-stat" key={s.label}>
+              <span className="lib-stat-label">{s.label}</span>
+              <span className="lib-stat-value mono">{s.value}</span>
+            </span>
+          ))}
+        </span>
+      )}
+
+      {open && (
         <span className="lib-plate-open">
           Open scanner
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
@@ -180,7 +228,23 @@ function ScannerPlate({ scanner, index, onOpen }:
             <path d="M5 12h13M13 6l6 6-6 6" />
           </svg>
         </span>
-      </button>
+      )}
+    </>
+  )
+
+  return (
+    <li className="lib-plate" data-scanner={scanner.id} data-status={status}>
+      {open ? (
+        <button className="lib-plate-face" type="button" onClick={onOpen}
+                aria-label={`Open the ${scanner.name} scanner`}>
+          {body}
+        </button>
+      ) : (
+        // Not a disabled button. A disabled control invites clicking and then
+        // refuses, which reads as a fault; this is simply not a control, and
+        // the words say why.
+        <div className="lib-plate-face lib-plate-static">{body}</div>
+      )}
     </li>
   )
 }
