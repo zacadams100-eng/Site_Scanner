@@ -9,7 +9,7 @@ risky. Where a decision could reasonably have gone the other way, the reasoning
 is here rather than only in a commit message.
 
 **Baseline at start:** 938 Python tests, 317 frontend, clean build.
-**At end:** 1053 Python, 329 frontend, clean build, 36 e2e unchanged.
+**At end:** 1053 Python, 343 frontend, 36 e2e (both viewports), clean build.
 
 ---
 
@@ -112,7 +112,26 @@ finding (reads as an alarm, not an instrument) and none was unassessed (hiding
 `sites_unassessed`, the radar's most important number). Now 6 of 24 are never
 scanned and most of the rest are quiet.
 
-### 9. The review model was built empty
+### 9. The portfolio got a screen; the public site was brought with it
+
+The portfolio had an API, a demonstration dataset and 36 tests and no way to
+look at it. It is now a third top-level view, because "all of these sites" is a
+different question from "this site" rather than a tab within it.
+
+The public marketing site had drifted badly — "Six scanners, three you can run
+today", Habitat and Coastal listed as products, Water and Terrain under "in
+development" when both were built or absorbed. Both scanner listings are now
+grouped by family and state partial coverage explicitly.
+
+**URLs were deliberately left alone.** `/scanners/habitat` still resolves and
+still describes habitat, which is still exactly what that domain does. Renaming
+public routes would break anything indexed or bookmarked for a gain that is
+purely cosmetic, and the backend already treats the old ids as aliases. If the
+founder wants canonical `/scanners/ecology` URLs, that is a redirect map plus a
+prerender change and should be done as one deliberate SEO decision rather than
+as a side effect of a refactor.
+
+### 10. The review model was built empty
 
 No reviewer accounts, authentication, signing or workflow — each depends on
 decisions the product cannot make alone. What *can* be decided now is what a
@@ -134,6 +153,9 @@ review status is unrepresentable can only ever be machine output.
 | 5 | **Every declared scanner rendered as a dark block with grey text.** `.lib-plate[data-scanner]` is (0,2,0); `.lib-plate-static` is (0,1,0), so the background it set never applied | Same. No test could have seen it |
 | 6 | **Three vacuous tests.** Assertions about findings that passed by being unreached, because the mock produces no findings by design | Checking my own new tests against real output before committing |
 | 7 | **A duplicate `.lib-plate-inst` rule** I had introduced, where a canonical one already existed further down | Reading the file after the specificity bug |
+| 8 | **Four e2e failures.** The library now renders a plate per registered scanner, so a count of `.lib-plate` was 8 where 4 was expected; three specs drove "Habitat", which is no longer a scanner | Running the e2e suite, which neither the unit suite nor the build could substitute for |
+| 9 | **A stale prerender assertion** requiring "Habitat" and "Coastal" in the built `/scanners` page | Same |
+| 10 | **Every demonstration row read "Date not recorded"**, which looks like a rendering fault | Looking at the finished screen |
 
 Defects 3–5 all shipped past a green unit suite *and* a clean `tsc --noEmit`
 *and* a clean production build. That is the third time this project has recorded
@@ -169,8 +191,6 @@ scanner.
 ## Deliberately not implemented
 
 - **Storage, accounts, authentication, tenancy.** See decision 7.
-- **A portfolio UI.** API and demo portfolio exist; no screen renders them. This
-  is the largest visible gap in the pass.
 - **A job queue.** Assessing a portfolio is N assessments.
 - **Change detection across records.** The record makes it possible.
 - **Third-party scanner isolation.** `rules_from` imports and calls arbitrary
@@ -194,8 +214,14 @@ but the alternative is a clear result being read as a clean site.
 and still the biggest constraint on the business. The taxonomy makes the
 *shape* honest; it does nothing about the *data*.
 
-**3. The record and portfolio are unused.** Well-tested code with no consumer is
-code that drifts. The first real use will find things these tests did not.
+**3. The record is unused.** The portfolio now consumes summaries of it, but
+nothing consumes two records, which is the capability it exists for. Well-tested
+code with no consumer is code that drifts.
+
+**7. The portfolio screen only ever shows the demonstration portfolio.** There
+is no store, so there is nothing else to show. The labelling is thorough and
+tested, but a screen whose only content is generated is a standing hazard —
+anyone screenshotting it for a deck must keep the banner in frame.
 
 **4. `site_id` stability across redrawing.** See decision 6.
 
@@ -213,9 +239,7 @@ Coastal one, which does not change who needs to sign them off.
 
 1. **Earth Engine credentials.** Everything else is downstream. It is a founder
    action, not an engineering one.
-2. **A portfolio screen.** The API is done and the demo portfolio exists; this is
-   the cheapest large visible gain available.
-3. **Heritage ingestion.** The National Heritage List is open under OGL. It
+2. **Heritage ingestion.** The National Heritage List is open under OGL. It
    would take Heritage from `planned` to `partial` and prove the taxonomy carries
    a genuinely new domain.
 4. **Storage**, once there is a view on accounts.

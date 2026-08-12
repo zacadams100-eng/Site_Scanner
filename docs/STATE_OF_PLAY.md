@@ -1,8 +1,13 @@
 # Where Site Scanner is
 
 **Read this first in a new session.** It is the state of the product as of the
-last commit on `claude/sitescanner-handoff-fx0yid`. Where this and the code
+last commit on `claude/site-scanner-status-iit6d2`. Where this and the code
 disagree, the code is right and this file is a bug — check it before trusting it.
+
+The autonomous transformation pass of 2026-08-12 changed the scanner taxonomy,
+added the evidence record, the portfolio and the review model, and rewrote the
+scanner library. `docs/AUTONOMOUS_CHANGELOG.md` is the decision log for it and
+is the file to read second.
 
 Everything below is a fact from the repository. Nothing here is aspiration.
 
@@ -46,10 +51,13 @@ rather than working around it.
 
 ```
 Python / FastAPI  ─ assessment engine, domain-agnostic
-  scanners.py     ─ the registry: a scanner is a CONFIG, not a subclass
+  scanners.py     ─ the registry: families → scanners → domains
   radar.py        ─ rules, findings, coverage. Knows no scanner's domain.
   catalog.py      ─ 271 factors
   habitat/, coastal/, historical/  ─ contributing rule packages
+  site_record.py  ─ the canonical form of one assessment
+  portfolio.py    ─ many sites, one view
+  review.py       ─ the professional co-sign model (defined, empty)
 
 React 19 + Vite + TypeScript
   web/src/            ─ the application (/app)
@@ -67,18 +75,37 @@ needed no engine change. Keep it that way.
 
 ---
 
-## The three scanners
+## The scanners
 
-| | Land | Habitat | Coastal |
-| --- | --- | --- | --- |
-| Rules | 25 (20 flag, 5 info) | 7 (1 flag, 6 info) | 7 (2 flag, 5 info) |
-| Topics | 7 | 5 | 4 |
-| Factors | 271 | 6 | 7 |
-| Coverage | England | England | England |
+Eight in four families. Four run today, and three of those four cover **part**
+of their subject and say which part.
 
-**Forestry, Water and Terrain** are registered, carry no content, and the API
-refuses them. Registering is not implementing. Do not build a fourth scanner
-without being asked.
+| Family | Scanner | Status | Rules | Factors |
+| --- | --- | --- | --- | --- |
+| Foundation | Land | live | 25 | 271 |
+| Foundation | Water | partial | 11 | 9 |
+| Foundation | Ecology | partial | 16 | 10 |
+| Development | Planning | partial | 7 | 7 |
+| Development | Development | planned | 0 | 0 |
+| Development | Infrastructure | planned | 0 | 0 |
+| Culture | Heritage | planned | 0 | 0 |
+| Economics | Market | planned | 0 | 0 |
+
+Coverage is England for every built scanner. `partial` means at least one
+declared domain has no checks — Water does not read groundwater, drainage or
+catchment; Ecology does not read woodland, protected species or connectivity;
+Planning does not read application history or policy. Each names its specific
+blocker, and the library shows both lists on the card **before** the scanner is
+chosen.
+
+**`habitat`, `coastal`, `terrain` and `forestry` are aliases**, resolving to
+the scanner that absorbed them. Saved links and stored reports keep working.
+They are absent from the catalogue: an alias is a door that still opens, not a
+product that still exists.
+
+Land deliberately overlaps the specialists — it is the sweep you run before you
+know which question matters. A rule has exactly one definition and is shared by
+object, never copied, so two scanners cannot disagree.
 
 Full detail — every rule, threshold, investigation and capability gap — is in
 `docs/SCANNER_SPECIFICATION.md`. That is the product truth.
@@ -179,10 +206,14 @@ and the preview button returns a blank page with no error.
 ## Tests
 
 ```
-906 Python      pytest tests/
-296 unit        cd web && npm run test
- 36 e2e         cd web && npx playwright test     (both viewports)
+1053 Python     pytest tests/
+ 343 unit       cd web && npm run test
+  36 e2e        cd web && npx playwright test     (both viewports)
 ```
+
+In this sandbox the pinned Playwright expects a Chromium build that is not
+installed. Run it with a config that sets
+`use.launchOptions.executablePath = '/opt/pw-browsers/chromium'`.
 
 Production build is authoritative — `npm run build`, not `tsc --noEmit`.
 
@@ -214,8 +245,8 @@ times per session. The remote branch is the only source of truth. On starting,
 and after anything unexpected:
 
 ```bash
-git fetch origin claude/sitescanner-handoff-fx0yid
-git reset --hard origin/claude/sitescanner-handoff-fx0yid
+git fetch origin claude/site-scanner-status-iit6d2
+git reset --hard origin/claude/site-scanner-status-iit6d2
 ```
 
 Commit and push early and often. Work that is not pushed will be lost.
@@ -224,11 +255,18 @@ Commit and push early and often. Work that is not pushed will be lost.
 
 ## The next opportunity
 
-The engine is already more generic than the product presents. Three scanners
-now share it with no engine branching, which is the expensive thing already
-paid for. The leverage is in **making scanners 4–6 cheap** — and in getting
-real data behind the three that exist, because a scanner with no live source is
-an architecture demonstration rather than a product.
+The engine is more generic than the product presents, and the taxonomy pass
+made that visible rather than changing it: four scanners now share it with no
+engine branching, and Planning was built entirely from rules that already
+existed.
 
-In order: credentials, then screenshots, then the form endpoint. Those three
-turn a well-built thing into a sellable one.
+What is new and unused is the **evidence record**. Every assessment can now be
+stored in a stable, addressable, versioned form with the site identified by its
+geometry — which is what makes monitoring, portfolios and a longitudinal dataset
+possible. Nothing consumes two records yet, and that is the largest piece of
+value sitting one feature away.
+
+In order: **credentials, then a screenshot, then the enquiry endpoint.** Those
+three turn a well-built thing into a sellable one, and none of them is
+engineering work. After that: Heritage ingestion, which would take a declared
+scanner to partial and prove the taxonomy carries a genuinely new domain.
