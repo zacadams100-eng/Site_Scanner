@@ -23,6 +23,7 @@ import os
 import json
 import ee
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -195,6 +196,31 @@ open_data.install(routes_catalog.REAL_SERIES, routes_catalog.REAL_SOURCES)
 def health():
     return {"status": "ok", "message": "Site Scanner Earth Engine API is running"}
 
+
+# ---------------------------------------------------------------------------
+# The page itself, served by the API that feeds it.
+# ---------------------------------------------------------------------------
+#
+# `site-scanner.html` resolves its backend to the page's own origin unless it
+# is on localhost. Served from anywhere else — Cloud Shell's Web Preview, a
+# tunnel, a laptop on the LAN — the API has to be on that same origin or the
+# page silently falls back to simulated figures, which is the one failure mode
+# this project cannot tolerate quietly.
+#
+# Serving it from here makes that true by construction: one port, one URL, no
+# CORS, no `?api=` to remember and get wrong. `/` stays a JSON health check
+# because deployment probes and the tests depend on it.
+
+
+@app.get("/app", include_in_schema=False)
+def page():
+    """The single-file prototype, on the same origin as its data."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "site-scanner.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="site-scanner.html is not "
+                                                    "next to app.py")
+    return FileResponse(path, media_type="text/html")
 
 @app.get("/api/cache")
 def cache_info():

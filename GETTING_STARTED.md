@@ -56,12 +56,36 @@ is instant after that.
     https://earthengine.googleapis.com/v1/projects/.../tiles/{z}/{x}/{y}
 ```
 
-The backend is now running on port 8000. Open `site-scanner.html` and the
-badge in the corner should read **Live Earth Engine**.
+The backend is now running on port 8000, and it serves the page as well as the
+data:
+
+    http://localhost:8000/app
+
+In Cloud Shell there is no localhost to open, so use **Web Preview** (the `<>`
+icon, top right of the terminal) → *Change port* → **8000** → *Preview*. It
+gives you an authenticated HTTPS URL; append `/app` to it.
+
+One port on purpose. The page works out its backend from its own origin, so
+serving it separately from the API means it quietly falls back to simulated
+figures — the one failure this project must never make silently.
+
+The badge in the corner should read **Live Earth Engine**.
 
 If it reads **Simulated — backend unreachable**, the page is working but the
 backend is not; the badge exists so that a screenshot can never quietly show
-made-up data as though it were real.
+made-up data as though it were real. **Never demo anything that does not say
+Live.**
+
+### The React app
+
+`web/` is the fuller frontend — same backend, on port 5173:
+
+```bash
+cd web && npm install && npm run dev
+```
+
+It needs an `npm install` first, and Cloud Shell's preview domain trips Vite's
+host check, so `/app` is the quicker route to something on screen today.
 
 ## Never having to think about it again
 

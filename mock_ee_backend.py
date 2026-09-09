@@ -277,6 +277,20 @@ def health():
     }
 
 
+@app.get("/app", include_in_schema=False)
+def page():
+    """The page, on the same origin as its data — see app.py for why.
+
+    The mock carries it too, so "open the page and look" works before anyone
+    has a service account key.
+    """
+    import os
+    from fastapi.responses import FileResponse
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "site-scanner.html")
+    return FileResponse(path, media_type="text/html")
+
+
 @app.post("/api/tile/ndvi")
 def tile_ndvi(req: TileRequest):
     try:
