@@ -23,14 +23,6 @@ if [ -z "$EE_KEY_FILE" ]; then
   done
 fi
 
-# The Google Cloud project the key belongs to, which must also be the one
-# registered with Earth Engine. Cloud Shell already knows this, so ask gcloud
-# rather than storing it.
-if [ -z "$EE_PROJECT" ] && command -v gcloud >/dev/null 2>&1; then
-  EE_PROJECT="$(gcloud config get-value project 2>/dev/null)"
-  [ "$EE_PROJECT" = "(unset)" ] && EE_PROJECT=""
-fi
-
 _repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- Python environment ----------------------------------------------------
@@ -65,10 +57,24 @@ if [ ! -f "$EE_KEY_FILE" ]; then
   return 1
 fi
 
+# The project the key belongs to, read out of the key itself.
+#
+# This used to ask `gcloud config get-value project`, which is the wrong
+# source: it returns whichever project the Cloud Shell tab happens to be
+# pointed at, not the one the service account can actually use. When those
+# differ — and they did — Earth Engine refuses with "Caller does not have
+# required permission to use project X", which reads like a broken key rather
+# than a mismatched pair.
+#
+# The key file states its own project. Nothing else needs to be consulted, and
+# nothing that can drift is.
 if [ -z "$EE_PROJECT" ]; then
-  echo "✗ Could not work out your Google Cloud project ID."
-  echo "  In Cloud Shell:  gcloud config set project YOUR-PROJECT-ID"
-  echo "  Or set it here:  EE_PROJECT=your-project-id source ./setup.sh"
+  EE_PROJECT="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("project_id",""))' "$EE_KEY_FILE" 2>/dev/null)"
+fi
+
+if [ -z "$EE_PROJECT" ]; then
+  echo "✗ The key file does not state a project_id, and none was given."
+  echo "  Set it explicitly:  EE_PROJECT=your-project-id source ./setup.sh"
   return 1
 fi
 
@@ -76,7 +82,7 @@ export GOOGLE_APPLICATION_CREDENTIALS_JSON="$(cat "$EE_KEY_FILE")"
 export EE_PROJECT
 
 echo "✓ Environment ready"
-echo "  project:  $EE_PROJECT"
+echo "  project:  $EE_PROJECT   (from the key file)"
 echo "  key file: $EE_KEY_FILE"
 echo "  python:   $(which python3)"
 echo
