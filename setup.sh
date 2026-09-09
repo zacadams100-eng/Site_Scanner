@@ -80,4 +80,7 @@ echo "  project:  $EE_PROJECT"
 echo "  key file: $EE_KEY_FILE"
 echo "  python:   $(which python3)"
 echo
-echo "Next:  python3 scripts/check_real_ndvi.py 2024"
+echo "Next:  ./scripts/live_tile_check.sh          # the endpoint the page calls"
+echo "       python3 scripts/check_real_ndvi.py 2024  # Earth Engine on its own"
+echo
+echo "Tired of typing 'source setup.sh'?  ./scripts/install_shell_hook.sh"
