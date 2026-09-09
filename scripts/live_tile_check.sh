@@ -25,7 +25,24 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${PORT:-8000}"
+
+# Cloud Shell's Web Preview button opens port 8080 and nothing else without
+# being told. A backend on 8000 there is not broken — it is unreachable from
+# the one button anybody presses, and the error it gives ("Couldn't connect to
+# a server on port 8080") describes the preview rather than the backend, so it
+# reads like a dead server.
+#
+# So default to 8080 where that is the port that can actually be looked at, and
+# say so rather than silently moving it. PORT= still wins everywhere.
+if [ -n "${PORT:-}" ]; then
+  IN_CLOUD_SHELL=""
+elif [ "${CLOUD_SHELL:-}" = "true" ] || [ -n "${DEVSHELL_PROJECT_ID:-}" ]; then
+  PORT=8080
+  IN_CLOUD_SHELL=1
+else
+  PORT=8000
+  IN_CLOUD_SHELL=""
+fi
 MOCK=0
 KEEP=0
 YEAR="$(( $(date +%Y) - 1 ))"
@@ -72,10 +89,37 @@ else
 fi
 
 # --- start it --------------------------------------------------------------
+if [ -n "$IN_CLOUD_SHELL" ]; then
+  say "Port:     8080 — Cloud Shell's Web Preview opens this one by default."
+  say "          Override with:  PORT=8000 $0"
+  say
+fi
 say "Backend:  $APP"
 say "Serving:  $WHAT"
 say "Asking:   POST http://127.0.0.1:${PORT}/api/tile/ndvi  {\"year\": ${YEAR}}"
 say
+
+# Refuse to run against somebody else's server.
+#
+# Found by testing this script rather than by reading it. If the port is
+# already taken — most likely by an earlier `--keep` — uvicorn fails to bind,
+# but the readiness check below still gets an answer, because *something* is
+# listening. It then POSTs to that stranger, gets a 404, and reports exit 4:
+# "the server and the route are fine, the detail came from Earth Engine".
+# Every part of that is false, and it is the most misleading thing this script
+# could possibly say.
+if curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${PORT}/" 2>/dev/null; then
+  say "✗ Something is already listening on port ${PORT}."
+  say
+  say "  Most likely an earlier run started with --keep. This will not run"
+  say "  against a server it did not start — it has no way to know what that"
+  say "  server is, and answering from the wrong one is worse than not"
+  say "  answering."
+  say
+  say "  Stop it:      kill \$(lsof -ti :${PORT})"
+  say "  Or move:      PORT=$((PORT + 1)) $0 $*"
+  exit 3
+fi
 
 LOG="$(mktemp)"
 ( cd "$REPO" && "$PY" -m uvicorn "$APP" --port "$PORT" --log-level warning ) \
@@ -97,10 +141,13 @@ trap cleanup EXIT
 # Engine's first import is slow, and a fixed sleep is either a flaky failure or
 # wasted time on every run.
 for _ in $(seq 1 60); do
+  # The process first: a dead child means the answer, if any, is not ours.
+  if ! kill -0 "$SERVER" 2>/dev/null; then
+    break
+  fi
   if curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/" 2>/dev/null; then
     UP=1; break
   fi
-  kill -0 "$SERVER" 2>/dev/null || break
   sleep 1
 done
 
@@ -153,7 +200,13 @@ case "$URL" in
       say "Engine and nothing else."
     else
       say "That is a live Earth Engine tile URL for ${YEAR}."
-      say "Open site-scanner.html and the badge should read 'Live Earth Engine'."
+      if [ -n "$IN_CLOUD_SHELL" ]; then
+        say "Now open the page: Web Preview (the <> icon, top right) → Preview"
+        say "on port ${PORT}, then add /app to the URL."
+      else
+        say "Open http://localhost:${PORT}/app — the badge should read"
+        say "'Live Earth Engine'."
+      fi
     fi
     exit 0
     ;;

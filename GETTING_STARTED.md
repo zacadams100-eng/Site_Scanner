@@ -61,9 +61,13 @@ data:
 
     http://localhost:8000/app
 
-In Cloud Shell there is no localhost to open, so use **Web Preview** (the `<>`
-icon, top right of the terminal) → *Change port* → **8000** → *Preview*. It
-gives you an authenticated HTTPS URL; append `/app` to it.
+In Cloud Shell there is no localhost to open. Use **Web Preview** — the `<>`
+icon at the top right of the terminal — then *Preview on port 8080*, and add
+`/app` to the URL it gives you.
+
+8080 because that is the only port that button opens without being told, so in
+Cloud Shell the script defaults to it and says so. On any other machine it
+stays on 8000. `PORT=` overrides either.
 
 One port on purpose. The page works out its backend from its own origin, so
 serving it separately from the API means it quietly falls back to simulated
@@ -108,6 +112,11 @@ because the failure modes look identical from the browser.
 | `3` | Never got as far as asking | Credentials are not loaded, or the server did not start. The output says which. |
 | `4` | Asked, and the answer was not usable | The server and the route are fine. Read the detail — it came from Earth Engine. |
 | `0` | A real tile URL came back | Nothing. It works. |
+
+**"Something is already listening on port N."** An earlier run with `--keep`
+is still going. `kill $(lsof -ti :8080)`, or use `PORT=`. The script refuses to
+talk to a server it did not start, because it cannot tell what that server is
+and a confident answer from the wrong one is worse than no answer.
 
 Two specific ones worth knowing:
 
