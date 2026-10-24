@@ -96,10 +96,10 @@ def clean_name(raw: str) -> str:
     s = " ".join(raw.split())
     if re.search(r"\.(tab|shp|gpkg|geojson|kml|dbf|mif)$", s, re.I):
         return ""   # a council's file name ("Conservation_Area.TAB"), not a place name
-    s = re.sub(r"^\d+\s*=\s*", "", s)   # "46=Long Moor Coppice"
     parts = re.findall(r"\(\s*[^:()]+:\s*([^()]*?)\s*\)", s)
     if parts:
         s = next((p for p in parts if p), "")
+    s = re.sub(r"^\d+\s*=\s*", "", s)   # "46=Long Moor Coppice", often inside "(Epoch3:…)"
     if (" " in s or len(s) > 6) and s.isupper():   # leave acronyms like RSPB alone
         s = " ".join(_title(w, i == 0) for i, w in enumerate(s.split(" ")))
     return s

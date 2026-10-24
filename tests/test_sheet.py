@@ -296,6 +296,7 @@ def test_names_that_are_file_names_or_numbered_are_cleaned():
     from sheet.fetch import clean_name
     assert clean_name("Conservation_Area.TAB") == ""
     assert clean_name("46=Long Moor Coppice") == "Long Moor Coppice"
+    assert clean_name("(Epoch3:46=Long Moor Coppice)(Tithe:)") == "Long Moor Coppice"
 
 
 def test_unnamed_copy_of_a_named_place_is_dropped():
