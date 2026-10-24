@@ -47,7 +47,8 @@ class FakeSession(requests.Session):
 
 
 def test_network_failure_is_not_assessed():
-    f = Fetcher(FakeSession([requests.ConnectionError("down")]))
+    # Retried once, then reported: still down means not assessed.
+    f = Fetcher(FakeSession([requests.ConnectionError("down"), requests.ConnectionError("down")]))
     r = f.fetch(LAYER_BY_ID["sssi"], SITE)
     assert r.status == NOT_ASSESSED and "down" in r.error
 
@@ -88,7 +89,7 @@ def test_arcgis_dataset_empty_nationally_is_not_assessed():
 
 
 def test_failed_national_probe_is_not_assessed():
-    s = FakeSession([FakeResponse(EMPTY_FC), requests.ConnectionError("down")])
+    s = FakeSession([FakeResponse(EMPTY_FC), requests.ConnectionError("down"), requests.ConnectionError("down")])
     assert Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE).status == NOT_ASSESSED
 
 
@@ -266,10 +267,11 @@ def test_one_place_published_by_two_councils_is_one_finding():
 
 
 def test_risk_zones_say_the_red_line_is_in_them_with_criteria():
-    items = [Item("https://irz.geodata.org.uk/a", 0, "", count=2), Item("https://irz.geodata.org.uk/b", 0, "")]
+    url = "https://irz.geodata.org.uk/IRZ/step2.html?irzcode={}&notes=11401&location=1,2 %20(IRZ%20polygon%20centre)"
+    items = [Item(url.format("0111242322201"), 0, "", count=2), Item(url.format("3111241211101"), 0, "")]
     f = LayerFinding("sssi_irz", "SSSI Impact Risk Zone", "", PRESENT, 0, items=items, mode="zones")
-    assert f.summary() == ("The red line falls in 3 impact risk zones. "
-                           "Criteria: https://irz.geodata.org.uk/a; https://irz.geodata.org.uk/b.")
+    assert f.summary() == ("The red line falls in 3 impact risk zones (IRZ codes 0111242322201, 3111241211101). "
+                           "Check the consultation criteria for the proposal type at irz.geodata.org.uk.")
 
 
 def test_de_designated_sites_are_not_findings():
@@ -288,3 +290,36 @@ def test_layers_without_names_say_what_they_are():
     f = {x.layer_id: x for x in build_findings(fetch_all(SITE, FixtureFetcher(build(
         __import__("pathlib").Path(__import__("tempfile").mkdtemp())))), SITE)}
     assert f["main_river"].summary().startswith("Main river, ")
+
+
+def test_names_that_are_file_names_or_numbered_are_cleaned():
+    from sheet.fetch import clean_name
+    assert clean_name("Conservation_Area.TAB") == ""
+    assert clean_name("46=Long Moor Coppice") == "Long Moor Coppice"
+
+
+def test_unnamed_copy_of_a_named_place_is_dropped():
+    from shapely.geometry import box
+    from sheet.fetch import Feature, LayerResult
+    from sheet.findings import _items
+    g = box(SITE.bounds[2] + 600, SITE.bounds[1], SITE.bounds[2] + 900, SITE.bounds[3])
+    r = LayerResult(LAYER_BY_ID["conservation_area"], PRESENT,
+                    [Feature(g, "Little Bookham", {}), Feature(g, "", {})])
+    assert [i.label for i in _items(r, SITE)] == ["Little Bookham"]
+
+
+def test_woodland_asks_only_for_woodland():
+    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse({"count": 5})])
+    Fetcher(s).fetch(LAYER_BY_ID["woodland"], SITE)
+    assert s.calls[0][1]["where"] == "CATEGORY='Woodland'"
+
+
+def test_a_timeout_is_retried_once():
+    s = FakeSession([requests.Timeout("slow"), FakeResponse(EMPTY_FC), FakeResponse(SOMEWHERE)])
+    assert Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE).status == NONE_FOUND
+
+
+def test_an_unrecognised_probe_reply_is_not_called_empty():
+    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse({"detail": "oops"})])
+    r = Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE)
+    assert r.status == NOT_ASSESSED and "unexpected reply" in r.error

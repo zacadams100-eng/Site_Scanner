@@ -28,16 +28,16 @@ def show(props: dict) -> str:
 
 
 def arcgis(l):
-    meta = S.get(l.url, params={"f": "json"}, timeout=20).json()
+    meta = S.get(l.url, params={"f": "json"}, timeout=60).json()
     if "error" in meta:
         print(f"  ERROR {meta['error']}")
         return
     count = S.get(f"{l.url}/query", params={"where": "1=1", "returnCountOnly": "true", "f": "json"},
-                  timeout=20).json().get("count")
+                  timeout=60).json().get("count")
     print(f"  name={meta.get('name')!r} geometry={meta.get('geometryType')} records={count}")
     print(f"  fields: {[f['name'] for f in meta.get('fields', [])]}")
     ex = S.get(f"{l.url}/query", params={"where": "1=1", "outFields": "*", "returnGeometry": "false",
-                                          "resultRecordCount": 1, "f": "json"}, timeout=20).json()
+                                          "resultRecordCount": 1, "f": "json"}, timeout=60).json()
     for f in ex.get("features", [])[:1]:
         print(f"  example: {show(f.get('attributes', {}))}")
     print(f"  label_fields now: {l.label_fields}")
@@ -46,7 +46,7 @@ def arcgis(l):
 def planning(l):
     # Without geometry: a whole National Landscape outline timed out at 40 s.
     r = S.get(PLANNING_ENTITIES, params={"dataset": l.dataset, "limit": 1, "exclude_field": "geometry,point"},
-              timeout=20).json()
+              timeout=60).json()
     ents = r.get("entities", [])
     print(f"  records: {r.get('count', '?')}{'  — EMPTY DATASET' if not ents else ''}")
     for e in ents[:1]:
@@ -56,7 +56,7 @@ def planning(l):
 
 def find_nfi():
     print("\n== ArcGIS Online: National Forest Inventory services, newest first")
-    r = S.get("https://www.arcgis.com/sharing/rest/search", timeout=20, params={
+    r = S.get("https://www.arcgis.com/sharing/rest/search", timeout=60, params={
         "q": 'title:"National Forest Inventory" AND type:"Feature Service"',
         "sortField": "modified", "sortOrder": "desc", "num": 15, "f": "json"}).json()
     for it in r.get("results", []):

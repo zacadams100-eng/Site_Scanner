@@ -146,13 +146,17 @@ class LayerFinding:
     def _zone_summary(self) -> str:
         """Impact risk zones are not places; what matters is that the red line
         is in one, and where to read what it asks to be consulted on."""
-        links = [i.label for i in self.items if i.label]
+        codes = []
+        for i in self.items:
+            m = re.search(r"irzcode=(\d+)", i.label or "")
+            if m and m.group(1) not in codes:
+                codes.append(m.group(1))
         n = sum(i.count for i in self.items)
         head = f"The red line falls in {n} impact risk zone{'s' if n > 1 else ''}"
-        if not links:
-            return head + "."
-        shown = "; ".join(links[:3]) + (f"; +{len(links) - 3} more" if len(links) > 3 else "")
-        return f"{head}. Criteria: {shown}."
+        if codes:
+            head += f" (IRZ code{'s' if len(codes) > 1 else ''} {', '.join(codes[:4])}"
+            head += f", +{len(codes) - 4} more)" if len(codes) > 4 else ")"
+        return head + ". Check the consultation criteria for the proposal type at irz.geodata.org.uk."
 
     def _radius(self) -> str:
         m = self.search_m
@@ -188,6 +192,10 @@ def _items(result: LayerResult, site: BaseGeometry) -> List[Item]:
         else:
             by_label[key] = Item(f.label, d, bearing_word(site, f.geom), grade=f.grade)
     items = sorted(by_label.values(), key=lambda i: (i.distance_m, i.label))
+    # An unnamed copy of a named feature (one council published a file name
+    # where the other published the place) is the same finding, not another.
+    named = [i.distance_m for i in items if i.label]
+    items = [i for i in items if i.label or not any(abs(i.distance_m - d) < 5 for d in named)]
     # Unlabelled pieces of one dataset (e.g. surface-water extents) read as
     # one line: "Unnamed area (14 parcels), within the red line".
     return items

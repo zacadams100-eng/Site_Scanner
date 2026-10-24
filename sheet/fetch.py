@@ -28,7 +28,10 @@ from .geometry import query_wkt, search_area, to_bng, to_wgs
 from .layers import LAYERS, PLANNING_API, PLANNING_ENTITIES, Layer
 
 USER_AGENT = "Contour desk-study sheet (contact: set CONTOUR_CONTACT)"
-TIMEOUT_S = 40
+# planning.data answers most queries in under a second, but national-scale
+# datasets (National Parks, NNRs) took 32–40 s in CI. One retry on a timeout.
+TIMEOUT_S = 90
+RETRIES = 1
 MAX_PAGES = 25
 
 PRESENT, NONE_FOUND, NOT_ASSESSED = "present", "none_found", "not_assessed"
@@ -91,12 +94,19 @@ def clean_name(raw: str) -> str:
     the first name given is kept. Listed buildings arrive in block capitals.
     """
     s = " ".join(raw.split())
+    if re.search(r"\.(tab|shp|gpkg|geojson|kml|dbf|mif)$", s, re.I):
+        return ""   # a council's file name ("Conservation_Area.TAB"), not a place name
+    s = re.sub(r"^\d+\s*=\s*", "", s)   # "46=Long Moor Coppice"
     parts = re.findall(r"\(\s*[^:()]+:\s*([^()]*?)\s*\)", s)
     if parts:
         s = next((p for p in parts if p), "")
     if (" " in s or len(s) > 6) and s.isupper():   # leave acronyms like RSPB alone
         s = " ".join(_title(w, i == 0) for i, w in enumerate(s.split(" ")))
     return s
+
+
+def _where(layer: Layer) -> str:
+    return f"planning.data '{layer.dataset}'" if layer.source == "planning" else layer.url.split("/services/")[-1]
 
 
 def ended(props: Dict[str, Any]) -> bool:
@@ -138,9 +148,19 @@ class Fetcher:
     def __init__(self, session: Optional[requests.Session] = None, contact: str = ""):
         self.s = session or requests.Session()
         self._holds_data: Dict[str, bool] = {}
+        self._get = self._retrying_get
         self._lock = threading.Lock()
         ua = USER_AGENT if not contact else f"Contour desk-study sheet ({contact})"
         self.s.headers.update({"User-Agent": ua, "Accept": "application/geo+json, application/json"})
+
+    def _retrying_get(self, url, params=None):
+        for attempt in range(RETRIES + 1):
+            try:
+                return self.s.get(url, params=params, timeout=TIMEOUT_S)
+            except (requests.Timeout, requests.ConnectionError):
+                if attempt == RETRIES:
+                    raise
+                time.sleep(1)
 
     # --- planning.data.gov.uk --------------------------------------------------
     def _planning(self, layer: Layer, area: BaseGeometry) -> Dict[str, Any]:
@@ -153,7 +173,7 @@ class Fetcher:
             "limit": 500,
         }
         for _ in range(MAX_PAGES):
-            r = self.s.get(url, params=params, timeout=TIMEOUT_S)
+            r = self._get(url, params)
             r.raise_for_status()
             fc = r.json()
             if fc.get("type") != "FeatureCollection":
@@ -175,7 +195,7 @@ class Fetcher:
         offset = 0
         for _ in range(MAX_PAGES):
             params = {
-                "where": "1=1",
+                "where": layer.where,
                 "geometry": f"{minx},{miny},{maxx},{maxy}",
                 "geometryType": "esriGeometryEnvelope",
                 "inSR": 4326,
@@ -187,7 +207,7 @@ class Fetcher:
                 "resultRecordCount": 1000,
                 "f": "geojson",
             }
-            r = self.s.get(f"{layer.url}/query", params=params, timeout=TIMEOUT_S)
+            r = self._get(f"{layer.url}/query", params)
             r.raise_for_status()
             fc = r.json()
             if "error" in fc:
@@ -215,14 +235,17 @@ class Fetcher:
                 return self._holds_data[layer.id]
         if layer.source == "planning":
             # No geometry: one National Landscape outline is megabytes and timed out.
-            r = self.s.get(PLANNING_ENTITIES, timeout=TIMEOUT_S, params={
+            r = self._get(PLANNING_ENTITIES, {
                 "dataset": layer.dataset, "limit": 1, "exclude_field": "geometry,point"})
             r.raise_for_status()
             body = r.json()
+            if "entities" not in body and "count" not in body:
+                # Not an answer to the question, so it can't count as "empty".
+                raise ValueError(f"unexpected reply from planning.data: keys {sorted(body)[:6]}")
             found = bool(body.get("entities")) or int(body.get("count") or 0) > 0
         else:
-            r = self.s.get(f"{layer.url}/query", params={"where": "1=1", "returnCountOnly": "true",
-                                                         "f": "json"}, timeout=TIMEOUT_S)
+            r = self._get(f"{layer.url}/query", {"where": layer.where, "returnCountOnly": "true",
+                                                 "f": "json"})
             r.raise_for_status()
             body = r.json()
             if "error" in body:
@@ -240,7 +263,8 @@ class Fetcher:
             feats = _features_from_geojson(fc, layer, area)
             if not feats and not self.holds_data(layer):
                 return LayerResult(layer, NOT_ASSESSED, fetched_at=stamp,
-                                   error="the publisher's dataset is empty nationally, so nothing was checked")
+                                   error=f"the publisher's dataset is empty nationally ({_where(layer)} "
+                                         "returned 0 records anywhere in England), so nothing was checked")
         except Exception as e:  # any failure is NOT ASSESSED, never "clear"
             return LayerResult(layer, NOT_ASSESSED, error=f"{type(e).__name__}: {e}"[:300], fetched_at=stamp)
         return LayerResult(layer, PRESENT if feats else NONE_FOUND, feats, fetched_at=stamp)

@@ -69,6 +69,7 @@ class Layer:
     # "grades": counts by grade, naming only the highest grades (listed buildings).
     # "zones": how many zones the red line falls in, with their criteria links.
     summary: str = "list"
+    where: str = "1=1"                   # ArcGIS only: server-side filter
     on_map: bool = True                  # False = reported in findings only
     geom: str = "polygon"                # polygon | line | point
     licence: str = OGL
@@ -127,6 +128,8 @@ LAYERS: List[Layer] = [
           "Natural England", Style("#b8e186", "#7fbc41", None, 0.45, 0.4),
           url=f"{NE}/Priority_Habitats_Inventory_England/FeatureServer/0",
           label_fields=["MainHabs", "Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"],
+          label_map={"No main habitat but additional habitats present":
+                     "Additional habitats only (no main habitat)"},
           summary="area"),
     Layer("gcn_soa", "GCN strategic opportunity area", G_HAB, "arcgis", 2_000,
           "Natural England", Style("none", "#e6550d", "--", 0.0, 0.6),
@@ -146,7 +149,9 @@ LAYERS: List[Layer] = [
           "Forestry Commission", Style("#a1d99b", "#74c476", None, 0.35, 0.3),
           # Republished yearly under a new name; inspect_layers.py lists the newest.
           url=f"{FC}/National_Forest_Inventory_England_2025/FeatureServer/0",
-          label_fields=["IFT_IOA", "CATEGORY", "Category", "ift_ioa"], summary="area"),
+          # The inventory maps open ground inside forests too (CATEGORY "Non woodland":
+          # grassland, urban, bare area). Only woodland belongs in this finding.
+          label_fields=["IFT_IOA"], where="CATEGORY='Woodland'", summary="area"),
     Layer("common_land", "Common land and village green", G_HAB, "planning", 1_000,
           "Defra", Style("#fee391", "#cc9a06", None, 0.4),
           dataset="common-land-and-village-green"),
