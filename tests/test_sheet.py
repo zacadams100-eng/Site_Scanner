@@ -65,8 +65,7 @@ def test_arcgis_error_body_is_not_assessed():
 
 EMPTY_FC = {"type": "FeatureCollection", "features": []}
 # The national probe: one record somewhere in England, so the dataset is real.
-SOMEWHERE = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
-                                                         "geometry": None}]}
+SOMEWHERE = {"entities": [{"entity": 1}], "count": 1}
 
 
 def test_empty_answer_is_none_found():
@@ -76,10 +75,11 @@ def test_empty_answer_is_none_found():
 
 def test_dataset_empty_nationally_is_not_assessed():
     """planning.data's forest-inventory had 0 records and printed "none found"."""
-    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse(EMPTY_FC)])
+    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse({"entities": [], "count": 0})])
     r = Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE)
     assert r.status == NOT_ASSESSED and "empty nationally" in r.error
-    assert s.calls[1][1] == {"dataset": "site-of-special-scientific-interest", "limit": 1}
+    assert s.calls[1][1]["dataset"] == "site-of-special-scientific-interest"
+    assert s.calls[1][0].endswith("/entity.json")      # no geometry in the national probe
 
 
 def test_arcgis_dataset_empty_nationally_is_not_assessed():
@@ -270,3 +270,21 @@ def test_risk_zones_say_the_red_line_is_in_them_with_criteria():
     f = LayerFinding("sssi_irz", "SSSI Impact Risk Zone", "", PRESENT, 0, items=items, mode="zones")
     assert f.summary() == ("The red line falls in 3 impact risk zones. "
                            "Criteria: https://irz.geodata.org.uk/a; https://irz.geodata.org.uk/b.")
+
+
+def test_de_designated_sites_are_not_findings():
+    """planning.data keeps sites with an end-date; one LNR ended in 2025."""
+    from shapely.geometry import mapping
+    from sheet.geometry import to_wgs
+    g = mapping(to_wgs(SITE.centroid.buffer(10)))
+    s = FakeSession([FakeResponse({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": g, "properties": {"name": "Gone", "end-date": "2025-01-27"}},
+        {"type": "Feature", "geometry": g, "properties": {"name": "Here", "end-date": ""}}]})])
+    r = Fetcher(s).fetch(LAYER_BY_ID["lnr"], SITE)
+    assert [f.label for f in r.features] == ["Here"]
+
+
+def test_layers_without_names_say_what_they_are():
+    f = {x.layer_id: x for x in build_findings(fetch_all(SITE, FixtureFetcher(build(
+        __import__("pathlib").Path(__import__("tempfile").mkdtemp())))), SITE)}
+    assert f["main_river"].summary().startswith("Main river, ")

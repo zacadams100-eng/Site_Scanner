@@ -17,7 +17,7 @@ import sys
 import requests
 
 sys.path.insert(0, ".")
-from sheet.layers import LAYERS, PLANNING_API  # noqa: E402
+from sheet.layers import LAYERS, PLANNING_ENTITIES  # noqa: E402
 
 S = requests.Session()
 S.headers["User-Agent"] = "Contour desk-study sheet (layer inspection)"
@@ -44,11 +44,13 @@ def arcgis(l):
 
 
 def planning(l):
-    r = S.get(PLANNING_API, params={"dataset": l.dataset, "limit": 1}, timeout=20).json()
-    feats = r.get("features", [])
-    print(f"  records: {'none at all — EMPTY DATASET' if not feats else 'yes'}")
-    for f in feats[:1]:
-        print(f"  example: {show(f.get('properties', {}))}")
+    # Without geometry: a whole National Landscape outline timed out at 40 s.
+    r = S.get(PLANNING_ENTITIES, params={"dataset": l.dataset, "limit": 1, "exclude_field": "geometry,point"},
+              timeout=20).json()
+    ents = r.get("entities", [])
+    print(f"  records: {r.get('count', '?')}{'  — EMPTY DATASET' if not ents else ''}")
+    for e in ents[:1]:
+        print(f"  example: {show(e)}")
     print(f"  label_fields now: {l.label_fields}")
 
 

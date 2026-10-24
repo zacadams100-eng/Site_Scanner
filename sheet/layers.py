@@ -23,11 +23,16 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 PLANNING_API = "https://www.planning.data.gov.uk/entity.geojson"
+# The same search without geometry: used to ask "does this dataset hold any
+# record at all?" without downloading a whole National Landscape to find out.
+PLANNING_ENTITIES = "https://www.planning.data.gov.uk/entity.json"
 NE = "https://services.arcgis.com/JJzESW51TqeY9uat/arcgis/rest/services"
 DEFRA = "https://services1.arcgis.com/JZM7qJpmv7vJ0Hzx/arcgis/rest/services"
 # Forestry Commission open data. planning.data's forest-inventory dataset is an
 # empty placeholder (0 records nationally), so woodland comes from here.
 FC = "https://services2.arcgis.com/mHXjwgl3OARRqqD4/arcgis/rest/services"
+# Field names below were read off the live services with
+# scripts/inspect_layers.py (24 Oct 2026). Re-run it before changing them.
 
 OGL = "Open Government Licence v3.0"
 
@@ -126,7 +131,7 @@ LAYERS: List[Layer] = [
     Layer("gcn_soa", "GCN strategic opportunity area", G_HAB, "arcgis", 2_000,
           "Natural England", Style("none", "#e6550d", "--", 0.0, 0.6),
           url=f"{NE}/GCN_Strategic_Opportunity_Areas_England/FeatureServer/0",
-          label_fields=["Name", "NAME", "SOA_NAME"]),
+          label_fields=["SOA"], label_template="{} zone"),
     Layer("nia", "Nature improvement area", G_HAB, "planning", 2_000,
           "Natural England", Style("none", "#2ca25f", "\\\\", 0.0, 0.6),
           dataset="nature-improvement-area"),
@@ -139,7 +144,8 @@ LAYERS: List[Layer] = [
           on_map=False, note="Reported only where the red line falls inside one."),
     Layer("woodland", "Woodland (National Forest Inventory)", G_HAB, "arcgis", 1_000,
           "Forestry Commission", Style("#a1d99b", "#74c476", None, 0.35, 0.3),
-          url=f"{FC}/National_Forest_Inventory_Woodland_England_2018/FeatureServer/0",
+          # Republished yearly under a new name; inspect_layers.py lists the newest.
+          url=f"{FC}/National_Forest_Inventory_England_2025/FeatureServer/0",
           label_fields=["IFT_IOA", "CATEGORY", "Category", "ift_ioa"], summary="area"),
     Layer("common_land", "Common land and village green", G_HAB, "planning", 1_000,
           "Defra", Style("#fee391", "#cc9a06", None, 0.4),
@@ -171,14 +177,15 @@ LAYERS: List[Layer] = [
     Layer("main_river", "Statutory main river", G_WATER, "arcgis", 1_000,
           "Environment Agency", Style("none", "#08519c", None, 0.0, 1.6),
           url=f"{DEFRA}/Statutory_Main_River_Map/FeatureServer/0",
-          label_fields=["watercourse_name", "WATERCOURSE_NAME", "Name", "name"], geom="line"),
+          # The EA service carries no river names (only STATUS and LENGTH_KM).
+          label_fields=[], default_label="Main river", geom="line"),
     Layer("surface_water", "Surface water flooding (1% AEP)", G_WATER, "arcgis", 250,
           "Environment Agency", Style("#c6dbef", "#6baed6", None, 0.5, 0.2),
           url=f"{DEFRA}/Risk_of_Flooding_from_Surface_Water_Extents/FeatureServer/1",
           label_fields=[], summary="area"),
     Layer("flood_storage", "Flood storage area", G_WATER, "planning", 1_000,
           "Environment Agency", Style("none", "#2171b5", "..", 0.0, 0.6),
-          dataset="flood-storage-area"),
+          dataset="flood-storage-area", default_label="Flood storage area"),
 
     # --- Heritage and trees ---------------------------------------------------
     Layer("conservation_area", "Conservation area", G_HERITAGE, "planning", 1_000,
@@ -193,13 +200,16 @@ LAYERS: List[Layer] = [
           dataset="scheduled-monument"),
     Layer("park_garden", "Registered park and garden", G_HERITAGE, "planning", 1_000,
           "Historic England", Style("none", "#a50026", "..", 0.0, 0.8),
-          dataset="park-and-garden"),
+          dataset="park-and-garden", grade_field="park-and-garden-grade"),
     Layer("tpo_area", "Tree preservation order (area)", G_HERITAGE, "planning", 250,
           "Local planning authority", Style("#addd8e", "#31a354", "oo", 0.3),
-          dataset="tree-preservation-zone"),
+          dataset="tree-preservation-zone",
+          label_fields=["tree-preservation-order"], label_template="TPO {}"),
     Layer("tpo_tree", "Tree preservation order (tree)", G_HERITAGE, "planning", 250,
           "Local planning authority", Style("#31a354", "#005a32", None, 0.9, 0.4, "o"),
-          dataset="tree", geom="point"),
+          dataset="tree", geom="point",
+          # "name" holds council boilerplate; the order reference is what people cite.
+          label_fields=["tree-preservation-order"], label_template="TPO {}"),
 ]
 
 assert len(LAYERS) == 30, len(LAYERS)

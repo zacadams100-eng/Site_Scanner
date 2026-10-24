@@ -25,7 +25,7 @@ from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from .geometry import query_wkt, search_area, to_bng, to_wgs
-from .layers import LAYERS, PLANNING_API, Layer
+from .layers import LAYERS, PLANNING_API, PLANNING_ENTITIES, Layer
 
 USER_AGENT = "Contour desk-study sheet (contact: set CONTOUR_CONTACT)"
 TIMEOUT_S = 40
@@ -99,6 +99,13 @@ def clean_name(raw: str) -> str:
     return s
 
 
+def ended(props: Dict[str, Any]) -> bool:
+    """planning.data keeps historical records with an end-date, e.g. a Local
+    Nature Reserve de-designated in 2025. They must not read as current."""
+    end = str(props.get("end-date") or "").strip()
+    return bool(end) and end <= time.strftime("%Y-%m-%d")
+
+
 def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry) -> List[Feature]:
     out = []
     for f in fc.get("features", []):
@@ -113,6 +120,8 @@ def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry)
         if not g.intersects(area):
             continue   # bbox queries over-fetch; keep only what is truly in range
         props = f.get("properties") or {}
+        if ended(props):
+            continue   # de-designated or superseded: not a current constraint
         label = _label(props, layer.label_fields)
         label = layer.label_map.get(label, label)
         label = layer.label_template.format(label) if label else layer.default_label
@@ -205,9 +214,12 @@ class Fetcher:
             if layer.id in self._holds_data:
                 return self._holds_data[layer.id]
         if layer.source == "planning":
-            r = self.s.get(PLANNING_API, params={"dataset": layer.dataset, "limit": 1}, timeout=TIMEOUT_S)
+            # No geometry: one National Landscape outline is megabytes and timed out.
+            r = self.s.get(PLANNING_ENTITIES, timeout=TIMEOUT_S, params={
+                "dataset": layer.dataset, "limit": 1, "exclude_field": "geometry,point"})
             r.raise_for_status()
-            found = bool(r.json().get("features"))
+            body = r.json()
+            found = bool(body.get("entities")) or int(body.get("count") or 0) > 0
         else:
             r = self.s.get(f"{layer.url}/query", params={"where": "1=1", "returnCountOnly": "true",
                                                          "f": "json"}, timeout=TIMEOUT_S)
