@@ -255,9 +255,22 @@ class FixtureFetcher:
                            fetched_at="fixture")
 
 
-def fetch_all(site: BaseGeometry, fetcher=None, layers=None, workers: int = 6) -> List[LayerResult]:
-    """All layers, a few at a time. Order follows the layer list."""
+def fetch_all(site: BaseGeometry, fetcher=None, layers=None, workers: int = 6,
+              on_done=None) -> List[LayerResult]:
+    """All layers, a few at a time. Order follows the layer list.
+
+    `on_done(result, seconds)` is called as each layer finishes, so a slow
+    publisher shows up by name instead of as a silent wait.
+    """
     fetcher = fetcher or Fetcher()
     layers = layers or LAYERS
+
+    def one(l):
+        t = time.monotonic()
+        r = fetcher.fetch(l, site)
+        if on_done:
+            on_done(r, time.monotonic() - t)
+        return r
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(lambda l: fetcher.fetch(l, site), layers))
+        return list(pool.map(one, layers))

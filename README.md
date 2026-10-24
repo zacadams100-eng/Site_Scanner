@@ -105,7 +105,7 @@ website; you make the sheet.
 
 The tool was written where the publishers couldn't be reached. GitHub's
 runners can reach them, so the **Live sheet** job makes a real sheet for
-`examples/guildford.geojson` (Merrow) and `examples/crowthorne.geojson` on every push, after printing the field names each publisher actually sends (`scripts/inspect_layers.py`):
+`examples/bookham.geojson`, `examples/crowthorne.geojson` and `examples/guildford.geojson` (Merrow) on every push, after printing the field names each publisher actually sends (`scripts/inspect_layers.py`):
 
 - Download the PDF, GeoPackage and JSON from the run's **Artifacts**.
 - Any layer that came back not assessed appears as a warning with its reason.

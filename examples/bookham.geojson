@@ -1,0 +1,11 @@
+{
+  "type": "Feature",
+  "properties": {"name": "Example red line: single field near Great Bookham (test only)"},
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-0.3858, 51.2668], [-0.3818, 51.2671], [-0.3812, 51.2648],
+      [-0.3851, 51.2643], [-0.3858, 51.2668]
+    ]]
+  }
+}

@@ -63,15 +63,20 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: What the publishers actually send
-        # Field names and record counts, read off the live services.
-        run: python scripts/inspect_layers.py
+        # Field names and record counts, read off the live services. Never
+        # blocks the sheets below: a slow publisher only cuts this short.
+        timeout-minutes: 5
+        continue-on-error: true
+        run: python -u scripts/inspect_layers.py
 
       - name: Make real sheets for the example red lines
+        timeout-minutes: 10
         env:
+          PYTHONUNBUFFERED: '1'
           OS_API_KEY: ${{ secrets.OS_API_KEY }}
         run: |
           status=0
-          for site in merrow:guildford crowthorne:crowthorne; do
+          for site in bookham:bookham crowthorne:crowthorne merrow:guildford; do
             name=${site%%:*}; file=${site##*:}
             set +e
             python -m sheet make examples/$file.geojson \

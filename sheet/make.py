@@ -21,7 +21,7 @@ def slug(s: str) -> str:
 
 def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
                fetcher=None, display_m: float = 1000, os_key: Optional[str] = None,
-               results: Optional[List[LayerResult]] = None) -> Dict[str, Any]:
+               results: Optional[List[LayerResult]] = None, on_done=None) -> Dict[str, Any]:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     made_at = dt.datetime.now()
@@ -29,7 +29,7 @@ def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
 
     # The draw page fetches first so it can put the same features on its map.
     if results is None:
-        results = fetch_all(site, fetcher or Fetcher())
+        results = fetch_all(site, fetcher or Fetcher(), on_done=on_done)
     findings = build_findings(results, site)
 
     # When a layer's features come back without a label, keep one example of

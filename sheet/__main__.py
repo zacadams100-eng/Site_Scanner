@@ -47,7 +47,12 @@ def main(argv=None):
 
     site = site_from_file(a.red_line)
     fetcher = FixtureFetcher(a.fixtures) if a.fixtures else Fetcher(contact=os.environ.get("CONTOUR_CONTACT", ""))
-    rec = make_sheet(site, a.out, a.title, a.ref, fetcher, a.context)
+    def progress(r, secs):
+        # One write per line: layers finish on several threads at once.
+        sys.stdout.write(f"  {r.status:<13} {secs:5.1f}s  {r.layer.name}\n")
+        sys.stdout.flush()
+
+    rec = make_sheet(site, a.out, a.title, a.ref, fetcher, a.context, on_done=progress)
     c = rec["counts"]
     print(f"{rec['title']} · {rec['area_ha']} ha · 1:{rec['scale']:,}")
     print(f"present {c['present']} · none found {c['none_found']} · not assessed {c['not_assessed']}")
