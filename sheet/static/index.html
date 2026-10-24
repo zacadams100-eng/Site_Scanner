@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contour · Make a sheet</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<style>
+  :root { --bone:#f3f0e8; --ink:#1c1f1d; --muted:#6b6f69; --forest:#1f3d2b; --red:#e41a1c; --rule:#d8d4c8; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 Inter, system-ui, sans-serif; color:var(--ink); background:var(--bone);
+         display:grid; grid-template-columns: 1fr 380px; height:100vh; }
+  #map { height:100vh; }
+  aside { padding:20px; overflow:auto; border-left:1px solid var(--rule); }
+  .eyebrow { font:11px/1 ui-monospace, monospace; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; }
+  h1 { font-size:20px; margin:6px 0 16px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; }
+  input { width:100%; padding:8px 10px; border:1px solid var(--rule); border-radius:4px; background:#fff; font:inherit; }
+  button { margin-top:16px; width:100%; padding:10px; border:0; border-radius:4px; background:var(--forest);
+           color:#fff; font:600 14px Inter, system-ui, sans-serif; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .hint { font-size:12px; color:var(--muted); margin-top:8px; }
+  #out { margin-top:20px; }
+  .row { padding:6px 0; border-bottom:1px solid var(--rule); font-size:12.5px; }
+  .row b { display:block; font-weight:600; }
+  .present b { color:var(--ink); } .none_found { color:var(--muted); } .not_assessed { color:var(--red); }
+  .files a { display:inline-block; margin:8px 8px 0 0; color:var(--forest); font-weight:600; }
+  @media (max-width: 800px) { body { grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto; }
+    #map { height:55vh; } aside { border-left:0; } }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<aside>
+  <div class="eyebrow">Contour · internal</div>
+  <h1>Draw the red line</h1>
+  <p class="hint">Use the polygon tool on the map, or drop a GeoJSON file on the map.</p>
+  <label for="title">Site title</label>
+  <input id="title" placeholder="Land at Home Farm, Dorking">
+  <label for="ref">Order reference</label>
+  <input id="ref" placeholder="ORD-001">
+  <button id="go" disabled>Make the sheet</button>
+  <div class="hint" id="status"></div>
+  <div id="out"></div>
+</aside>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+const map = L.map('map').setView([51.236, -0.33], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+const drawn = new L.FeatureGroup().addTo(map);
+map.addControl(new L.Control.Draw({
+  draw: { polygon: { shapeOptions: { color: '#e41a1c', weight: 2 } }, rectangle: { shapeOptions: { color: '#e41a1c' } },
+          polyline: false, circle: false, marker: false, circlemarker: false },
+  edit: { featureGroup: drawn }
+}));
+const go = document.getElementById('go'), statusEl = document.getElementById('status'), out = document.getElementById('out');
+function refresh() { go.disabled = drawn.getLayers().length === 0; }
+map.on(L.Draw.Event.CREATED, e => { drawn.clearLayers(); drawn.addLayer(e.layer); refresh(); });
+map.on('draw:deleted', refresh);
+
+// drop a client's GeoJSON straight on the map
+map.getContainer().addEventListener('dragover', e => e.preventDefault());
+map.getContainer().addEventListener('drop', async e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  try {
+    const gj = JSON.parse(await f.text());
+    drawn.clearLayers();
+    L.geoJSON(gj, { style: { color: '#e41a1c', weight: 2 } }).eachLayer(l => drawn.addLayer(l));
+    map.fitBounds(drawn.getBounds()); refresh();
+  } catch { statusEl.textContent = 'That file is not GeoJSON — use the command line for KML or shapefiles.'; }
+});
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+go.onclick = async () => {
+  const title = document.getElementById('title').value.trim() || 'Untitled site';
+  go.disabled = true; out.innerHTML = '';
+  statusEl.textContent = 'Reading 30 layers from Natural England, the Environment Agency and planning.data…';
+  try {
+    const r = await fetch('/api/sheet', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ red_line: drawn.toGeoJSON(), title, client_ref: document.getElementById('ref').value.trim() }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'failed');
+    const c = d.counts;
+    statusEl.textContent = `${c.present} present · ${c.none_found} none found · ${c.not_assessed} not assessed · 1:${d.scale.toLocaleString()}`;
+    out.innerHTML = `<div class="files"><a href="${d.urls.pdf}" target="_blank">PDF sheet</a><a href="${d.urls.gpkg}">GeoPackage</a><a href="${d.urls.json}">Record</a></div>` +
+      d.findings.map(f => `<div class="row ${f.status}"><b>${esc(f.name)}</b>${esc(f.summary)}</div>`).join('');
+  } catch (err) { statusEl.textContent = 'Something went wrong: ' + err.message; }
+  refresh();
+};
+</script>
+</body>
+</html>

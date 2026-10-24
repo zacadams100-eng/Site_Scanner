@@ -1,12 +1,10 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-earthengine-api==1.1.2
-pydantic==2.9.2
-
-# Used by app.py's /api/stats/price (HM Land Registry lookup) — this was
-# imported but never declared.
-requests==2.33.1
-
-# Used by summary.py's /api/summary. Optional at runtime: with no
-# ANTHROPIC_API_KEY set, the deterministic summary is returned instead.
-anthropic==0.120.2
+requests>=2.31
+shapely>=2.0
+pyproj>=3.6
+geopandas>=0.14
+pyogrio>=0.7
+matplotlib>=3.8
+pillow>=10
+fastapi>=0.110
+uvicorn>=0.27
+pytest>=8

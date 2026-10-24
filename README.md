@@ -1,251 +1,125 @@
-# Site Scanner — Earth Engine Backend
+# Contour — desk study map
 
-This is the real data layer behind the Site Scanner demo. It talks to Google
-Earth Engine on the server side and hands your frontend either a **tile URL**
-(for the map) or a small **JSON of stats** (for the report panel) — never raw
-satellite files. Nothing is downloaded by the user's browser.
+Red line in, finished designations-and-constraints map out.
 
-I could not run or test this against live Earth Engine from within this
-sandbox (no network access to Google's servers here), so treat the code as
-correct-by-construction from the Earth Engine Python API docs, not
-guaranteed to run first try. Budget an afternoon for debugging auth and
-quota issues — that's normal for a first Earth Engine integration.
+This repo used to be Site Scanner, a satellite-statistics app (NDVI,
+temperature, price per m²). It is now the tool behind the one product on the
+website: a £150 designations and constraints map for UK ecology and planning
+consultancies. The satellite code is gone from `main`'s working tree; it is
+still in git history up to commit `5e4e012` if it is ever needed.
 
-## 1. One-time setup (do this once)
+It reads **30 official layers live** from Natural England, the Environment
+Agency, Historic England, the Forestry Commission, Defra and councils (via
+planning.data.gov.uk), all under the Open Government Licence. It then makes:
 
-1. **Sign up for Earth Engine** at https://code.earthengine.google.com if you
-   haven't already (free, but requires approval — usually near-instant for
-   .ac.uk student emails).
-2. **Create a Google Cloud project** at https://console.cloud.google.com
-   (or reuse one) and enable the **Earth Engine API** for it.
-3. **Create a service account**:
-   - Console → IAM & Admin → Service Accounts → Create Service Account.
-   - Grant it the "Earth Engine Resource Viewer" role (or Editor while testing).
-   - Create a JSON key for it and download it. Keep this file secret — never
-     commit it to a public repo.
-4. **Register the service account with Earth Engine**:
-   - Go to https://signup.earthengine.google.com/#!/service_accounts
-   - Add the service account's email (found in the JSON key as `client_email`).
+- **PDF**: A4 landscape. Page 1 is the map at a standard printed scale with
+  the red line, a key showing only what is on the map, and the headline
+  findings. The pages after it hold the full findings schedule with limitations.
+- **GeoPackage**: every layer in British National Grid, styled for QGIS. It
+  also opens in ArcGIS Pro, though without the styles.
+- **JSON record**: what was asked, what each publisher returned and when.
+  Keep it with the order.
 
-## 2. Running locally
+No Earth Engine, no satellite statistics, no scores.
 
-```bash
-cd ee-backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-export GOOGLE_APPLICATION_CREDENTIALS_JSON="$(cat /path/to/service-account-key.json)"
-export EE_PROJECT="your-gcp-project-id"
-
-uvicorn app:app --reload --port 8000
-```
-
-Visit http://localhost:8000 — you should see `{"status": "ok", ...}`.
-
-## Running without Earth Engine credentials (mock backend)
-
-`mock_ee_backend.py` is a stand-in for `app.py` that needs no service account,
-no GCP project and no network access to Google. Use it to build and verify the
-frontend while Earth Engine setup happens in parallel.
-
-```bash
-pip install -r requirements.txt      # no extra dependencies needed
-uvicorn mock_ee_backend:app --reload --port 8000
-```
-
-It serves the same routes, request bodies, response keys and error codes as
-`app.py`. The differences are deliberate and limited to two things:
-
-- **Tile URLs point at real public XYZ basemaps** (Esri World Imagery for
-  `/api/tile/ndvi`, OpenStreetMap for `/api/tile/landcover`) instead of
-  `earthengine.googleapis.com`, so `L.tileLayer(tile_url_template)` genuinely
-  renders something.
-- **Statistics are generated**, but deterministically per `(year, area)` and
-  within plausible UK ranges — the same drawn shape always returns the same
-  numbers, so the report panel doesn't flicker between reloads. `area_ha` is a
-  real geodesic area of the polygon you send, so it tracks what was drawn.
-
-`landcover_histogram` deliberately reproduces Earth Engine's actual shape:
-string class codes mapped to **float pixel counts**, with only the classes
-present on that site included. Do not assume all eleven keys exist.
-
-Every response carries an `X-Contour-Mock: true` header, so it is always
-obvious which backend answered.
-
-| Env var | Effect |
-| --- | --- |
-| `MOCK_TILE_URL_NDVI` | Override the XYZ template for `/api/tile/ndvi` |
-| `MOCK_TILE_URL_LANDCOVER` | Override the XYZ template for `/api/tile/landcover` |
-| `MOCK_STATS_ALL_CLASSES=1` | Force all 11 WorldCover classes into every histogram, for exercising legend rendering |
-| `MOCK_LATENCY_MS` | Artificial per-request delay, to make loading states visible |
-
-Switching to the real backend is a one-word change — `uvicorn app:app` instead
-of `uvicorn mock_ee_backend:app`. The frontend needs no edit.
-
-## The web app (`web/`)
-
-The React frontend that replaces `site-scanner.html`. Vite + TypeScript +
-MapLibre, talking to whichever backend is on port 8000.
-
-```bash
-# terminal 1 — the API
-uvicorn mock_ee_backend:app --reload --port 8000
-
-# terminal 2 — the frontend
-cd web
-npm install
-npm run dev          # http://localhost:5173
-```
-
-Vite proxies `/api` to `127.0.0.1:8000`, so the same build works against a
-deployed API without an edit.
-
-What it does today:
-
-- **Draw** a rectangle, circle or freehand shape. Freehand is simplified with
-  Douglas-Peucker on release and repaired if it self-intersects, so a scribble
-  does not become a 600-vertex polygon that slows every later call.
-- **Scrub** 180 monthly steps from 2011 to 2025. The timeline draws the area's
-  whole series inside its own track, with a data-availability strip beneath —
-  it is a chart you can already read before you touch it. Scrubbing repaints
-  the map from memory and issues no requests.
-- **Read** an attribute table of one row per year, each expandable into its
-  twelve months. Copy pastes as TSV straight into Excel; CSV downloads.
-- **See** up to four charts chosen automatically from the selected factors,
-  grouped so that two different units never share an axis.
-- **Check** every number's source, resolution and licence under Sources.
-
-Keyboard: `←`/`→` step a month, `PgUp`/`PgDn` a year, `Home`/`End` jump to the
-ends, `space` plays. The timeline is a real `<input type="range">` underneath
-the custom rendering, so screen readers and touch work without reimplementation.
-
-### The data layer
-
-`catalog.py` holds 118 factors resolving to 20 base datasets, only 7 of which
-need monthly storage. That split is the point: slope, aspect, ruggedness and
-height-above-drainage all come off one elevation raster, and NDVI, NDWI, EVI
-and SAVI off the same two Sentinel-2 bands. A factor marked `derived` is
-arithmetic applied at read time and costs nothing to store — which is what
-makes a 100+ factor catalogue affordable at England scale.
-
-`series.py` generates the monthly series. Optical factors return `null` in
-months with too few usable pixels rather than an interpolated guess, and every
-point carries a `valid_fraction` so the UI can grey out a number built from a
-handful of clear pixels.
-
-`routes_catalog.py` is mounted by **both** `app.py` and `mock_ee_backend.py`,
-so the two cannot drift. When the real data layer lands, one function changes:
-`_series_for` stops calling the generator and starts issuing the H3 aggregate
-query described in `TECHNICAL_PLAN.md` §3.4.
-
-See `TECHNICAL_PLAN.md` for the full architecture, the storage cost arithmetic
-and the challenges worth knowing about early.
-
-## Running the test suite
+## Run it
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+python -m pytest                       # 13 tests, fictional data, no network
+
+# list the 30 layers
+python -m sheet layers
+
+# make a sheet (GeoJSON, KML, GeoPackage or zipped shapefile)
+python -m sheet make red-line.geojson --title "Land at Home Farm, Dorking" --ref ORD-001 --out jobs/ORD-001
 ```
 
-No credentials, no network, no Earth Engine. `tests/conftest.py` installs a
-stand-in `ee` module into `sys.modules` before `app.py` is imported, and serves
-`mock_ee_backend`'s payloads through it — so the tests assert against the same
-response shapes the real backend produces. The Anthropic client is stubbed the
-same way, and `ANTHROPIC_API_KEY` is cleared for every test so a developer with
-one exported can't accidentally make live calls.
+`make` exits with code **3** if any layer was *not assessed*. Check those
+layers before you send anything to a client.
 
-What's covered: request/response shapes for every endpoint on both backends,
-parity between them (routes, request models), the error contract (422 for a
-malformed body, 500 with a `detail` for a bad geometry or an upstream
-failure), caching, and the summary branch selection.
+### The map app (internal)
 
-## Caching
-
-`/api/tile/*` and `/api/stats` are cached in-process, keyed by a hash of the
-request (`cache.py`) — the README's own recommendation, now implemented.
-Redrawing the same shape or stepping the year slider back and forth no longer
-re-runs `reduceRegion`.
-
-`GET /api/cache` reports hits, misses and entry counts. `CONTOUR_CACHE_TTL=0`
-disables it; the default TTL is 15 minutes.
-
-Worth being clear about the limit: this is **per-process**. Cloud Run runs
-several instances and recycles them, so a cold instance always misses and two
-users drawing the same field may not share an entry. It removes the obvious
-waste — one person re-examining one site — and nothing more. A shared cache is
-the thing that helps at scale.
-
-## 3. Testing the endpoints
+Draw the red line on a satellite map, make the sheet, see every finding on the
+map, download the PDF, GeoPackage and record.
 
 ```bash
-# Get an NDVI tile URL for 2024
-curl -X POST http://localhost:8000/api/tile/ndvi \
-  -H "Content-Type: application/json" \
-  -d '{"year": 2024}'
-
-# Get stats for a small area near Guildford
-curl -X POST http://localhost:8000/api/stats \
-  -H "Content-Type: application/json" \
-  -d '{
-    "year": 2024,
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [[[-0.58, 51.235], [-0.56, 51.235], [-0.56, 51.245], [-0.58, 51.245], [-0.58, 51.235]]]
-    }
-  }'
+cd web && npm install && npm run build && cd ..
+uvicorn sheet.api:app --port 8000      # then open http://localhost:8000
 ```
 
-The tile endpoint should return something like:
-```json
-{"tile_url_template": "https://earthengine.googleapis.com/v1/projects/.../maps/.../tiles/{z}/{x}/{y}"}
-```
+While working on the interface, run `cd web && npm run dev` as well and open
+http://localhost:5173. It proxies to the API on :8000.
 
-That URL template is what a Leaflet tile layer expects directly.
+Basemaps on screen: Esri satellite (the ArcGIS World Imagery tiles), satellite
+with labels, Esri topographic, OpenStreetMap and light grey. These are for
+drawing only. The PDF uses its own basemap (below).
 
-## 4. Wiring it into the existing frontend
+**Do not put the app on the internet.** It has no login. Customers order on the
+website; you make the sheet.
 
-Replace the fake `layerGroups['ndvi']` rectangles in the site-scanner demo
-with a real Leaflet tile layer:
+### Settings
 
-```javascript
-async function loadRealNDVI(year){
-  const res = await fetch('http://localhost:8000/api/tile/ndvi', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({year})
-  });
-  const {tile_url_template} = await res.json();
-  if (window.ndviLayer) map.removeLayer(window.ndviLayer);
-  window.ndviLayer = L.tileLayer(tile_url_template, {opacity: 0.6}).addTo(map);
-}
-```
+- `OS_API_KEY` adds an OS basemap to the PDF. A free OS Data Hub key works,
+  because only open zoom levels are requested. Without one, the PDF map
+  renders on a 1 km grid.
+- `CONTOUR_CONTACT` puts your email in the User-Agent so publishers can reach
+  you if something goes wrong.
+- `CONTOUR_FIXTURES=<folder>` reads fictional fixture layers instead of the
+  publishers, for working offline. Make the folder with
+  `python -m tests.fixtures_build demo-fixtures`. Everything made this way is
+  watermarked TEST DATA, and the app shows a TEST DATA badge.
 
-And for the report panel, call `/api/stats` with the drawn shape's GeoJSON
-(Leaflet layers can export this via `layer.toGeoJSON()`) instead of running
-the local `pointInAOI` loop over simulated fields.
+## The rules it keeps
 
-## 5. Important honesty notes
+1. **Not assessed is never clear.** If a query fails, the sheet says
+   "Not assessed" in red, with the reason. It never says "none found".
+2. **Council layers carry a caveat.** Not every council publishes conservation
+   areas, tree preservation orders, Green Belt or local green space to
+   planning.data yet. A nil return on those layers says "confirm locally".
+3. **Test data cannot pass as real.** Fixture runs are watermarked
+   *TEST DATA — NOT REAL* on every page.
+4. **No score, rating or suitability verdict.** The sheet only says what is
+   there and how far away it is.
+5. **Attribution stays on every sheet.** OGL and OS credits are printed on
+   the PDF. Don't remove them.
 
-- **Price and solar layers aren't in this backend.** Earth Engine has no UK
-  property price dataset — that needs HM Land Registry Price Paid Data or
-  the ONS house price index, joined by postcode/area, from a separate
-  source. Solar potential is better sourced from the EU's free PVGIS API
-  than approximated from Earth Engine.
-- **The flood layer here is an illustrative proxy** (surface water history +
-  low elevation), not the Environment Agency's actual flood risk maps. For
-  anything real, that data should come from the EA's published flood zone
-  layers, not be inferred.
-- **Free tier limits**: Earth Engine is free for this kind of use but has
-  compute quotas. `reduceRegion` on very large areas or many rapid requests
-  can hit rate limits — add caching (even a simple in-memory dict keyed by
-  year+geometry hash) before you put this in front of real users.
+## Files
 
-## 6. Deploying so it's not just "localhost"
+| File | What it does |
+|---|---|
+| `sheet/layers.py` | The 30 layers, their sources, search radii and styles. Edit this to add or drop one. |
+| `sheet/fetch.py` | Live queries (planning.data entity API, ArcGIS FeatureServer), plus present / none found / not assessed. |
+| `sheet/findings.py` | Distances, directions and the plain-English lines. |
+| `sheet/render.py` | The PDF. |
+| `sheet/gpkg.py` | GeoPackage plus QGIS styles. |
+| `sheet/basemap.py` | Optional OS Light basemap for the PDF. |
+| `sheet/api.py` | API for the map app; serves `web/dist` once built. |
+| `sheet/static/index.html` | Bare fallback draw page, used before `web/` is built. |
+| `web/` | The map app (React + MapLibre). |
+| `examples/guildford.geojson` | Example red line that CI makes a real sheet for. |
+| `tests/` | `python -m pytest`. Fictional fixtures, no network. |
 
-Google Cloud Run is the natural fit since you're already using Google Cloud
-for the service account: containerize this app, deploy to Cloud Run, and
-point your frontend's `fetch` calls at the Cloud Run URL instead of
-`localhost:8000`. That's the point at which "the site" genuinely never
-requires anyone to download anything — it's a live API behind your map.
+## CI makes a real sheet on every push
+
+The tool was written where the publishers couldn't be reached. GitHub's
+runners can reach them, so the **Live sheet** job makes a real sheet for
+`examples/guildford.geojson` on every push:
+
+- Download the PDF, GeoPackage and JSON from the run's **Artifacts**.
+- Any layer that came back not assessed appears as a warning with its reason.
+
+Add an `OS_API_KEY` repository secret to get the OS basemap on that sheet.
+
+## Still to check on the first real runs
+
+- The ArcGIS layers (priority habitat, SSSI impact risk zones, GCN areas, main
+  river, surface water) return `f=geojson`, and their label fields come
+  through. If a label shows as "Unnamed area", open the JSON record or the
+  GeoPackage and add the right field name to `label_fields` in `layers.py`.
+- The planning.data entity API answers WKT `intersects` queries for each dataset.
+- The OS basemap tiles line up with the red line on the PDF (the tile origin
+  is documented in `basemap.py`).
+- The search radii (10 km / 2 km / 1 km / 500 m / 250 m) are product
+  defaults, not regulatory thresholds. Ask the first clients whether they
+  match how they work.

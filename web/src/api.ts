@@ -1,9 +1,9 @@
-import type { Catalog, CellsResponse, SeriesResponse } from './types'
+import type { Info, Layer, SheetRecord } from './types'
 
 /**
  * The backend returns a plain-language `detail` for anything a user can fix
- * (area too big, drawn outside England). Surfacing that verbatim is better
- * than a generic failure message, so this preserves it.
+ * (red line too big, not an area). Surfacing that verbatim is better than a
+ * generic failure message, so this preserves it.
  */
 export class ApiError extends Error {
   readonly status: number
@@ -13,13 +13,8 @@ export class ApiError extends Error {
   }
 }
 
-async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init)
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`
     try {
@@ -34,40 +29,16 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
   return res.json()
 }
 
-export async function fetchCatalog(): Promise<Catalog> {
-  const res = await fetch('/api/catalog')
-  if (!res.ok) throw new ApiError(`Catalogue unavailable (${res.status})`, res.status)
-  return res.json()
-}
+export const fetchInfo = () => call<Info>('/api/info')
+export const fetchLayers = () => call<Layer[]>('/api/layers')
 
-export function fetchSeries(
-  geometry: GeoJSON.Polygon,
-  factorIds: string[],
-  signal?: AbortSignal,
-): Promise<SeriesResponse> {
-  return post<SeriesResponse>('/api/series', { geometry, factor_ids: factorIds }, signal)
-}
-
-export function fetchCells(
-  geometry: GeoJSON.Polygon,
-  signal?: AbortSignal,
-): Promise<CellsResponse> {
-  return post<CellsResponse>('/api/cells', { geometry, resolution: 14 }, signal)
-}
-
-/** True when the mock backend answered — surfaced in the UI so nobody mistakes
- *  generated numbers for real ones. */
-export async function detectMock(): Promise<boolean> {
-  try {
-    const res = await fetch('/api/catalog', { method: 'HEAD' })
-    if (res.headers.get('X-Contour-Mock') === 'true') return true
-  } catch {
-    /* fall through */
-  }
-  try {
-    const res = await fetch('/')
-    return res.headers.get('X-Contour-Mock') === 'true'
-  } catch {
-    return false
-  }
+export function makeSheet(
+  redLine: GeoJSON.Polygon, title: string, clientRef: string, signal?: AbortSignal,
+): Promise<SheetRecord> {
+  return call<SheetRecord>('/api/sheet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ red_line: redLine, title, client_ref: clientRef }),
+    signal,
+  })
 }

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// The backend runs on :8000 (mock_ee_backend or app). Proxying /api keeps the
+// The backend runs on :8000 (uvicorn sheet.api:app). Proxying /api and /files keeps the
 // frontend origin-agnostic, so the same build works against a deployed API
 // without a rebuild.
 export default defineConfig({
@@ -19,6 +19,9 @@ export default defineConfig({
   worker: { format: 'es' },
   server: {
     port: 5173,
-    proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/files': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    },
   },
 })

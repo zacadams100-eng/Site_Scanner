@@ -1,21 +1,17 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from './store'
-import { fetchCatalog } from './api'
 import MapCanvas from './components/MapCanvas'
-import Timeline from './components/Timeline'
-import AttributeTable from './components/AttributeTable'
-import ChartStack from './components/ChartStack'
-import FactorBrowser from './components/FactorBrowser'
-import Provenance from './components/Provenance'
-import Toolbar from './components/Toolbar'
-import Templates from './components/Templates'
-import Compare from './components/Compare'
+import Findings from './components/Findings'
+import LayerList from './components/LayerList'
+import { BASEMAPS } from './lib/basemaps'
 import { formatArea } from './lib/format'
+import { readRedLineFile } from './lib/readRedLine'
 import type { DrawMode } from './types'
+import * as turf from '@turf/turf'
 
 const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: ReactNode }[] = [
   {
-    id: 'rect', label: 'Rectangle', hint: 'Drag across the map to draw a rectangle',
+    id: 'rect', label: 'Rectangle', hint: 'Drag across the map to draw a rectangular red line',
     icon: <rect x="3" y="4.5" width="14" height="11" rx="1.5" />,
   },
   {
@@ -23,52 +19,53 @@ const TOOLS: { id: Exclude<DrawMode, null>; label: string; hint: string; icon: R
     icon: <circle cx="10" cy="10" r="6.5" />,
   },
   {
-    id: 'freehand', label: 'Freehand', hint: 'Drag to trace any shape',
+    id: 'freehand', label: 'Freehand', hint: 'Drag to trace the red line',
     icon: <path d="M4 13c1-5 4-7 6-5s-1 5 1 6 4-2 5-5" />,
   },
 ]
 
 export default function App() {
-  const catalog = useStore((s) => s.catalog)
-  const catalogError = useStore((s) => s.catalogError)
-  const setCatalog = useStore((s) => s.setCatalog)
-  const setCatalogError = useStore((s) => s.setCatalogError)
-  const setMock = useStore((s) => s.setMock)
-  const isMock = useStore((s) => s.isMock)
+  const info = useStore((s) => s.info)
+  const layers = useStore((s) => s.layers)
+  const apiError = useStore((s) => s.apiError)
+  const load = useStore((s) => s.load)
 
   const drawMode = useStore((s) => s.drawMode)
   const setDrawMode = useStore((s) => s.setDrawMode)
-  const aoi = useStore((s) => s.aoi)
-  const setAoi = useStore((s) => s.setAoi)
-  const data = useStore((s) => s.data)
-  const loading = useStore((s) => s.loading)
-  const error = useStore((s) => s.error)
-  const tab = useStore((s) => s.activeTab)
-  const setTab = useStore((s) => s.setTab)
+  const redLine = useStore((s) => s.redLine)
+  const setRedLine = useStore((s) => s.setRedLine)
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
-  const setAoiFromDrop = useStore((s) => s.setAoi)
 
-  useEffect(() => {
-    fetch('/api/catalog')
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Catalogue unavailable (${r.status})`)
-        // The backend stamps every response; surfacing it means nobody ever
-        // mistakes generated numbers for real ones.
-        setMock(r.headers.get('X-Contour-Mock') === 'true')
-        setCatalog(await r.json())
-      })
-      .catch(() => {
-        // Retry once through the typed client for a cleaner message.
-        fetchCatalog()
-          .then(setCatalog)
-          .catch((e) => setCatalogError(e?.message ?? 'Could not reach the API'))
-      })
-  }, [setCatalog, setCatalogError, setMock])
+  const title = useStore((s) => s.title)
+  const setTitle = useStore((s) => s.setTitle)
+  const clientRef = useStore((s) => s.clientRef)
+  const setClientRef = useStore((s) => s.setClientRef)
+  const sheet = useStore((s) => s.sheet)
+  const making = useStore((s) => s.making)
+  const error = useStore((s) => s.error)
+  const make = useStore((s) => s.make)
+  const basemap = useStore((s) => s.basemap)
+  const setBasemap = useStore((s) => s.setBasemap)
 
-  // Undo/redo, and drag-and-drop of a boundary file anywhere on the map.
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
+
+  useEffect(() => { void load() }, [load])
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return
+    setFileError(null)
+    try {
+      setRedLine(await readRedLineFile(file))
+    } catch (e: any) {
+      setFileError(e?.message ?? 'Could not read that file.')
+    }
+  }
+
+  // Undo/redo, and drag-and-drop of a red line file anywhere on the map.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
@@ -79,17 +76,9 @@ export default function App() {
       }
     }
     const stop = (e: DragEvent) => { e.preventDefault() }
-    const onDrop = async (e: DragEvent) => {
+    const onDrop = (e: DragEvent) => {
       e.preventDefault()
-      const file = e.dataTransfer?.files?.[0]
-      if (!file) return
-      const { readAoiFile } = await import('./lib/exports')
-      try {
-        setAoiFromDrop(await readAoiFile(file))
-      } catch {
-        /* Toolbar's picker surfaces the detailed message; a silent no-op is
-           right for a stray drag of an unrelated file. */
-      }
+      void onFile(e.dataTransfer?.files?.[0])
     }
     window.addEventListener('keydown', onKey)
     window.addEventListener('dragover', stop)
@@ -99,13 +88,16 @@ export default function App() {
       window.removeEventListener('dragover', stop)
       window.removeEventListener('drop', onDrop)
     }
-  }, [undo, redo, setAoiFromDrop])
+  })
+
+  const areaHa = redLine ? turf.area({ type: 'Feature', geometry: redLine, properties: {} }) / 10_000 : 0
+  const tooBig = !!info && areaHa > info.max_ha
 
   const hint = drawMode
     ? TOOLS.find((t) => t.id === drawMode)!.hint
-    : aoi
-      ? 'Scrub the timeline, or pick another tool to redraw'
-      : 'Pick a tool, then drag on the map'
+    : redLine
+      ? 'Click a feature for its name, or pick a tool to redraw'
+      : 'Pick a tool and draw the red line, or drop a GeoJSON or KML file'
 
   return (
     <div className="app">
@@ -142,8 +134,8 @@ export default function App() {
             <path d="M13 5l3.5 3.5L13 12" /><path d="M16.5 8.5H8a4.5 4.5 0 000 9h4" />
           </svg>
         </button>
-        {aoi && (
-          <button className="tool tool-clear" onClick={() => setAoi(null)} title="Remove the drawn shape">
+        {redLine && (
+          <button className="tool tool-clear" onClick={() => setRedLine(null)} title="Remove the red line" aria-label="Remove the red line">
             <svg viewBox="0 0 20 20" width="19" height="19" fill="none"
                  stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <path d="M5 5l10 10M15 5L5 15" />
@@ -153,6 +145,16 @@ export default function App() {
       </div>
 
       <div className="hint-bar">{hint}</div>
+
+      <div className="basemap-switch" role="radiogroup" aria-label="Basemap">
+        {BASEMAPS.map((b) => (
+          <button key={b.id} role="radio" aria-checked={basemap === b.id}
+                  className={`bm${basemap === b.id ? ' is-active' : ''}`}
+                  onClick={() => setBasemap(b.id)}>
+            {b.name}
+          </button>
+        ))}
+      </div>
 
       <header className="topbar">
         <div className="brand">
@@ -168,111 +170,99 @@ export default function App() {
             <circle cx="12" cy="12" r="3.4" fill="currentColor" />
           </svg>
           <span className="brand-name">
-            <b>Site</b> Scanner
+            <b>Contour</b> Desk study map
           </span>
-          {catalog && <span className="brand-scope">{catalog.coverage.name}</span>}
+          <span className="brand-scope">Internal · England</span>
         </div>
         <div className="topbar-right">
-          {isMock && (
-            <span className="badge badge-mock" title="Generated data — no Earth Engine connected">
-              mock data
+          {(info?.test_data || sheet?.test_data) && (
+            <span className="badge badge-test" title="Layers are read from fixture files. Nothing here is real.">
+              Test data — not real
             </span>
           )}
-          {data && data.real_factors && data.real_factors.length > 0 && (
-            <span className="badge badge-live"
-                  title={`Live Earth Engine data for: ${data.real_factors.join(', ')}. Everything else is demo data.`}>
-              {data.real_factors.length} live
-            </span>
-          )}
-          {data && (
-            <span className={`badge badge-${data.precision}`}
-                  title={data.precision === 'approx'
-                    ? 'Approximate — from pre-aggregated cells. The exact pass refines this.'
-                    : 'Exact — computed from source pixels'}>
-              {data.precision}
-            </span>
-          )}
-          <FactorBrowser />
         </div>
       </header>
 
-      {/* Data panel — the Excel half */}
       <aside className="data-panel">
         <div className="panel-head">
           <div className="panel-title">
-            {aoi ? 'Site report' : 'No area drawn'}
-            {data && <span className="panel-sub">{formatArea(data.area_ha)}</span>}
+            {sheet ? sheet.title : redLine ? 'Red line drawn' : 'No red line yet'}
+            {redLine && <span className="panel-sub">{formatArea(areaHa)}</span>}
           </div>
-          <div className="tabs">
-            {(['table', 'charts', 'sources'] as const).map((t) => (
-              <button key={t} className={`tab${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'table' ? 'Table' : t === 'charts' ? 'Charts' : 'Sources'}
-              </button>
-            ))}
+          <div className="toolbar">
+            <button className="tb" onClick={() => fileRef.current?.click()}
+                    title="Load a red line from GeoJSON or KML">Upload red line</button>
+            <input
+              ref={fileRef} type="file" accept=".geojson,.json,.kml,application/geo+json"
+              style={{ display: 'none' }}
+              onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = '' }}
+            />
+            {fileError && <span className="tb-error">{fileError}</span>}
           </div>
-          <Toolbar />
         </div>
 
         <div className="panel-body">
-          {catalogError && (
+          {apiError && (
             <div className="notice notice-error">
-              <strong>Can't reach the API.</strong>
-              <p>{catalogError}</p>
-              {/* The same failure means different things either side of a
-                  build. Locally it is nearly always a backend nobody started,
-                  and the command is the whole fix. On the deployed site the
-                  visitor cannot start anything, and telling them to run
-                  uvicorn reads as gibberish — so point them at the demo,
-                  which needs no backend at all. */}
-              {import.meta.env.DEV ? (
-                <p className="notice-fix">
-                  Start it with <code>uvicorn mock_ee_backend:app --port 8000</code>
-                </p>
-              ) : (
-                <p className="notice-fix">
-                  The live backend isn't deployed yet. <a href="/demo">Open the
-                  demo</a> to explore the interface with sample data.
-                </p>
-              )}
-            </div>
-          )}
-
-          {!catalogError && !aoi && (
-            <div className="placeholder">
-              <p>Draw a rectangle, circle or freehand shape on the map.</p>
-              <p className="placeholder-sub">
-                The attribute table and charts generate themselves — no extra steps.
+              <strong>Can't reach the sheet API.</strong>
+              <p>{apiError}</p>
+              <p className="notice-fix">
+                Start it from the repo root with <code>uvicorn sheet.api:app --port 8000</code>
               </p>
-              {catalog && (
-                <p className="placeholder-meta">
-                  {catalog.summary.factor_count} factors · {catalog.time.steps.length} monthly
-                  steps · {catalog.time.start.slice(0, 4)}–{catalog.time.end.slice(0, 4)}
-                </p>
+            </div>
+          )}
+
+          {redLine && (
+            <form className="sheet-form" onSubmit={(e) => { e.preventDefault(); void make() }}>
+              <label>
+                <span>Site title</span>
+                <input value={title} onChange={(e) => setTitle(e.target.value)}
+                       placeholder="Land at Home Farm, Dorking" />
+              </label>
+              <label className="sheet-form-ref">
+                <span>Order ref</span>
+                <input value={clientRef} onChange={(e) => setClientRef(e.target.value)} placeholder="ORD-001" />
+              </label>
+              <button className="make" type="submit" disabled={making || tooBig || !!apiError}>
+                {making ? 'Making…' : sheet ? 'Make it again' : 'Make the sheet'}
+              </button>
+              {tooBig && (
+                <p className="sheet-warn">Red line over {info!.max_ha.toLocaleString('en-GB')} ha — split it up.</p>
               )}
-            </div>
+            </form>
           )}
 
-          {error && (
-            <div className="notice notice-error">
-              <strong>That didn't work.</strong>
-              <p>{error}</p>
-            </div>
-          )}
+          <div className="panel-scroll">
+            {error && (
+              <div className="notice notice-error">
+                <strong>That didn't work.</strong>
+                <p>{error}</p>
+              </div>
+            )}
 
-          {loading && <div className="loading">Reading the site…</div>}
+            {making && (
+              <div className="loading">
+                Reading {layers.length} layers from Natural England, the Environment Agency,
+                Historic England and planning.data…
+              </div>
+            )}
 
-          {!loading && !error && data && (
-            <>
-              {tab === 'table' && <AttributeTable />}
-              {tab === 'charts' && <><Compare /><ChartStack /></>}
-              {tab === 'sources' && <Provenance />}
-            </>
-          )}
+            {!making && sheet && <Findings />}
+
+            {!making && !sheet && !apiError && (
+              <>
+                <div className="placeholder">
+                  <p>{redLine ? 'Name the site, then make the sheet.' : 'Draw the red line on the map.'}</p>
+                  <p className="placeholder-sub">
+                    Each sheet checks these {layers.length} official layers, out to the distance shown.
+                  </p>
+                </div>
+                <LayerList />
+              </>
+            )}
+          </div>
         </div>
       </aside>
-
-      <Timeline />
-      <Templates />
     </div>
   )
 }

@@ -1,114 +1,62 @@
-// Shapes returned by the backend. These mirror catalog.py and
-// routes_catalog.py exactly — if one moves, the other must.
+// Shapes returned by sheet/api.py. If one moves, the other must.
 
-export type Kind = 'continuous' | 'categorical'
-export type Cadence = 'monthly' | 'annual' | 'static' | '5 years' | 'periodic'
+export type Status = 'present' | 'none_found' | 'not_assessed'
 
-export interface Base {
-  id: string
-  name: string
-  source: string
-  licence: string
-  /** The exact notice this licence requires — not the licence name. Most of
-   *  these permit commercial use only on condition this text is displayed, so
-   *  it travels with the numbers into the UI and into every export. */
-  attribution: string
-  /** Triage flag from the catalogue: 'yes' or 'verify'. Not legal advice. */
-  commercial?: string
-  url: string
-  native_cadence: string
-  cadence: string
-  resolution_m: number | null
-  stored: boolean
+export interface LayerStyle {
+  fill: string          // hex, or "none"
+  edge: string
+  alpha: number
+  hatched: boolean
 }
 
-export interface Factor {
+export interface Layer {
   id: string
   name: string
-  base: string
   group: string
-  unit: string
-  kind: Kind
-  cadence: Cadence
-  lo: number | null
-  hi: number | null
-  derived: boolean
-  note: string
+  /** Search radius from the red line in metres. 0 = the red line only. */
+  search_m: number
+  publisher: string
+  /** False for layers reported in the findings but not drawn (risk zones, ALC). */
+  on_map: boolean
+  geom: 'polygon' | 'line' | 'point'
+  style: LayerStyle
 }
 
-export interface Catalog {
-  factors: Factor[]
-  bases: Base[]
+export interface Info {
+  /** True when the backend reads fixtures. Everything it returns is fiction. */
+  test_data: boolean
+  max_ha: number
   groups: string[]
-  class_values: Record<string, string[]>
-  summary: {
-    factor_count: number
-    base_count: number
-    stored_base_count: number
-    monthly_base_count: number
-    derived_factor_count: number
-    group_count: number
-  }
-  coverage: { name: string; bbox: { west: number; south: number; east: number; north: number } }
-  time: { start: string; end: string; steps: string[] }
 }
 
-/** A single observation. `value: null` is a real gap — never interpolate it. */
-export interface Point {
-  t: string
-  value: number | string | null
-  valid_fraction: number
-  interpolated: boolean
+export interface Finding {
+  layer: string
+  name: string
+  group: string
+  status: Status
+  search_m: number
+  on_site: boolean
+  /** The same sentence the PDF prints. */
+  summary: string
+  /** Why the layer was not assessed. Empty otherwise. */
+  error: string
 }
 
-/** One row per year — the attribute table's default view. */
-export interface AnnualRow {
-  year: number
-  value: number | string | null
-  min: number | null
-  max: number | null
-  months_observed: number
-  months_total: number
-  confidence: number
-}
-
-export interface Series {
-  factor_id: string
-  /** Where this column's numbers came from. A half-real catalogue is fine —
-   *  pretending it is uniformly one or the other is not. */
-  source?: 'earth-engine' | 'generated'
-  /** Round-trip cost of the real path, so the price of live queries is visible
-   *  rather than guessed at. */
-  elapsed_ms?: number
-  /** Set when the real path failed and the generator stood in. */
-  error?: string
-  kind: Kind
-  cadence: Cadence
-  unit: string
-  points: Point[]
-  annual: AnnualRow[]
-  meta: Factor & { base_meta: Base }
-}
-
-export interface SeriesResponse {
+export interface SheetRecord {
+  job: string
+  title: string
+  client_ref: string
+  made_at: string
   area_ha: number
-  centroid: { lng: number; lat: number }
-  precision: 'approx' | 'exact'
-  real_factors?: string[]
-  steps: string[]
-  series: Record<string, Series>
-}
-
-export interface Cell {
-  id: string
-  bbox: [number, number, number, number]
-  offset: number
-}
-
-export interface CellsResponse {
-  cells: Cell[]
-  area_ha: number
-  centroid: { lng: number; lat: number }
+  scale: number
+  /** True when the OS basemap loaded (needs OS_API_KEY). */
+  basemap: boolean
+  test_data: boolean
+  counts: Record<Status, number>
+  findings: Finding[]
+  urls: { pdf: string; gpkg: string; json: string }
+  /** Features each present layer returned, WGS84, keyed by layer id. */
+  map: Record<string, GeoJSON.FeatureCollection>
 }
 
 export type DrawMode = 'rect' | 'circle' | 'freehand' | null

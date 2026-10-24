@@ -1,0 +1,188 @@
+"""
+The 30 layers on a Contour desk-study sheet.
+
+This replaces Site Scanner's ~120-factor catalogue for this product. Those
+factors were satellite statistics (NDVI, air temperature, price per m2) —
+useful for land investment, but not what an ecologist puts on a desk-study
+map. Every layer here is an official vector dataset from a public body,
+under the Open Government Licence, queried live at the moment a sheet is made.
+
+Each layer has its own search radius, following common desk-study practice:
+international sites are searched further out than heritage features, because
+their consultation triggers reach further. Radii are product defaults, not
+regulatory thresholds — the sheet says so.
+
+Three source kinds:
+  planning  — planning.data.gov.uk entity API (one endpoint, many datasets)
+  arcgis    — ArcGIS REST FeatureServer query (Natural England / Defra / EA)
+
+To add or drop a layer, edit this list. Nothing else needs to change.
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+PLANNING_API = "https://www.planning.data.gov.uk/entity.geojson"
+NE = "https://services.arcgis.com/JJzESW51TqeY9uat/arcgis/rest/services"
+DEFRA = "https://services1.arcgis.com/JZM7qJpmv7vJ0Hzx/arcgis/rest/services"
+
+OGL = "Open Government Licence v3.0"
+
+
+@dataclass(frozen=True)
+class Style:
+    fill: str            # hex, or "none"
+    edge: str            # hex
+    hatch: Optional[str] = None   # matplotlib hatch pattern, e.g. "///"
+    alpha: float = 0.35  # fill opacity
+    width: float = 0.8   # line width (pt)
+    marker: str = "o"    # for points
+
+
+@dataclass(frozen=True)
+class Layer:
+    id: str
+    name: str            # as it appears in the key
+    group: str
+    source: str          # "planning" | "arcgis"
+    search_m: int        # search radius from the red line
+    publisher: str
+    style: Style
+    dataset: Optional[str] = None        # planning.data dataset slug
+    url: Optional[str] = None            # arcgis layer url (…/FeatureServer/N)
+    label_fields: List[str] = field(default_factory=lambda: ["name"])
+    label_template: str = "{}"           # e.g. "Flood Zone {}"
+    on_map: bool = True                  # False = reported in findings only
+    geom: str = "polygon"                # polygon | line | point
+    licence: str = OGL
+    note: str = ""
+
+
+G_INT = "International designations"
+G_NAT = "National designations"
+G_HAB = "Habitats and nature recovery"
+G_LAND = "Landscape and open land"
+G_WATER = "Water and flooding"
+G_HERITAGE = "Heritage and trees"
+
+LAYERS: List[Layer] = [
+    # --- International sites — searched to 10 km ---------------------------
+    Layer("sac", "Special Area of Conservation", G_INT, "planning", 10_000,
+          "Natural England", Style("#7b3294", "#7b3294", "\\\\\\", 0.18),
+          dataset="special-area-of-conservation"),
+    Layer("spa", "Special Protection Area", G_INT, "planning", 10_000,
+          "Natural England", Style("#c2a5cf", "#5e3c99", "///", 0.18),
+          dataset="special-protection-area"),
+    Layer("ramsar", "Ramsar site", G_INT, "planning", 10_000,
+          "Natural England", Style("#1f78b4", "#1f78b4", "xx", 0.15),
+          dataset="ramsar"),
+
+    # --- National ------------------------------------------------------------
+    Layer("sssi", "Site of Special Scientific Interest", G_NAT, "planning", 2_000,
+          "Natural England", Style("#33a02c", "#1b5e20", "///", 0.25),
+          dataset="site-of-special-scientific-interest"),
+    Layer("nnr", "National Nature Reserve", G_NAT, "planning", 2_000,
+          "Natural England", Style("#006d2c", "#006d2c", "..", 0.25),
+          dataset="national-nature-reserve"),
+    Layer("sssi_irz", "SSSI Impact Risk Zone", G_NAT, "arcgis", 0,
+          "Natural England", Style("none", "#999999"),
+          url=f"{NE}/SSSI_Impact_Risk_Zones_England/FeatureServer/0",
+          label_fields=["SSSI_NAME", "sssi_name", "NAME"], on_map=False,
+          note="Reported only where the red line falls inside a zone. "
+               "Check the zone's consultation criteria for the proposal type."),
+
+    # --- Habitats and nature recovery — 2 km --------------------------------
+    Layer("lnr", "Local Nature Reserve", G_HAB, "planning", 2_000,
+          "Natural England", Style("#66c2a4", "#238b45", None, 0.35),
+          dataset="local-nature-reserve"),
+    Layer("ancient_woodland", "Ancient woodland", G_HAB, "planning", 2_000,
+          "Natural England", Style("#4d7c0f", "#365314", None, 0.55),
+          dataset="ancient-woodland"),
+    Layer("priority_habitat", "Priority habitat inventory", G_HAB, "arcgis", 2_000,
+          "Natural England", Style("#b8e186", "#7fbc41", None, 0.45, 0.4),
+          url=f"{NE}/Priority_Habitats_Inventory_England/FeatureServer/0",
+          label_fields=["Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"]),
+    Layer("gcn_soa", "GCN strategic opportunity area", G_HAB, "arcgis", 2_000,
+          "Natural England", Style("none", "#e6550d", "--", 0.0, 0.6),
+          url=f"{NE}/GCN_Strategic_Opportunity_Areas_England/FeatureServer/0",
+          label_fields=["Name", "NAME", "SOA_NAME"]),
+    Layer("nia", "Nature improvement area", G_HAB, "planning", 2_000,
+          "Natural England", Style("none", "#2ca25f", "\\\\", 0.0, 0.6),
+          dataset="nature-improvement-area"),
+    Layer("lnrs", "Local nature recovery strategy area", G_HAB, "planning", 2_000,
+          "Responsible authority", Style("none", "#41ab5d", "..", 0.0, 0.6),
+          dataset="local-nature-recovery-strategy",
+          note="Only where the strategy has been published to planning.data."),
+    Layer("nutrient", "Nutrient neutrality catchment", G_HAB, "planning", 0,
+          "Natural England", Style("none", "#8c6d31"), dataset="nutrient-neutrality-catchment",
+          on_map=False, note="Reported only where the red line falls inside one."),
+    Layer("woodland", "Woodland (National Forest Inventory)", G_HAB, "planning", 1_000,
+          "Forestry Commission", Style("#a1d99b", "#74c476", None, 0.35, 0.3),
+          dataset="forest-inventory"),
+    Layer("common_land", "Common land and village green", G_HAB, "planning", 1_000,
+          "Defra", Style("#fee391", "#cc9a06", None, 0.4),
+          dataset="common-land-and-village-green"),
+
+    # --- Landscape and open land ----------------------------------------------
+    Layer("national_landscape", "National Landscape (AONB)", G_LAND, "planning", 2_000,
+          "Natural England", Style("none", "#b35806", "\\\\", 0.0, 1.0),
+          dataset="area-of-outstanding-natural-beauty"),
+    Layer("national_park", "National Park", G_LAND, "planning", 2_000,
+          "Natural England", Style("none", "#7f3b08", None, 0.0, 1.4),
+          dataset="national-park"),
+    Layer("green_belt", "Green Belt", G_LAND, "planning", 1_000,
+          "Local planning authority", Style("#d9f0d3", "#5aae61", None, 0.35, 0.3),
+          dataset="green-belt"),
+    Layer("local_green_space", "Local green space", G_LAND, "planning", 1_000,
+          "Local planning authority", Style("#c7e9c0", "#31a354", "++", 0.35),
+          dataset="local-green-space"),
+    Layer("alc", "Agricultural land classification", G_LAND, "planning", 0,
+          "Natural England", Style("none", "#a6611a"), dataset="agricultural-land-classification",
+          label_fields=["agricultural-land-classification-grade", "name"], on_map=False,
+          note="Provisional 1:250,000 grades — not field survey. Reported for the red line only."),
+
+    # --- Water and flooding — 1 km ---------------------------------------------
+    Layer("flood_zone", "Flood Zone 2 / 3", G_WATER, "planning", 1_000,
+          "Environment Agency", Style("#9ecae1", "#3182bd", None, 0.4, 0.3),
+          dataset="flood-risk-zone", label_fields=["flood-risk-level"],
+          label_template="Flood Zone {}"),
+    Layer("main_river", "Statutory main river", G_WATER, "arcgis", 1_000,
+          "Environment Agency", Style("none", "#08519c", None, 0.0, 1.6),
+          url=f"{DEFRA}/Statutory_Main_River_Map/FeatureServer/0",
+          label_fields=["watercourse_name", "WATERCOURSE_NAME", "Name", "name"], geom="line"),
+    Layer("surface_water", "Surface water flooding (1% AEP)", G_WATER, "arcgis", 250,
+          "Environment Agency", Style("#c6dbef", "#6baed6", None, 0.5, 0.2),
+          url=f"{DEFRA}/Risk_of_Flooding_from_Surface_Water_Extents/FeatureServer/1",
+          label_fields=[]),
+    Layer("flood_storage", "Flood storage area", G_WATER, "planning", 1_000,
+          "Environment Agency", Style("none", "#2171b5", "..", 0.0, 0.6),
+          dataset="flood-storage-area"),
+
+    # --- Heritage and trees ---------------------------------------------------
+    Layer("conservation_area", "Conservation area", G_HERITAGE, "planning", 1_000,
+          "Local planning authority", Style("none", "#d73027", "\\\\", 0.0, 0.8),
+          dataset="conservation-area"),
+    Layer("listed_building", "Listed building", G_HERITAGE, "planning", 500,
+          "Historic England", Style("#fc8d59", "#b30000", None, 0.9, 0.4, "^"),
+          dataset="listed-building", geom="point",
+          label_fields=["name", "listed-building-grade"]),
+    Layer("scheduled_monument", "Scheduled monument", G_HERITAGE, "planning", 1_000,
+          "Historic England", Style("#fdae61", "#a50026", "xx", 0.35),
+          dataset="scheduled-monument"),
+    Layer("park_garden", "Registered park and garden", G_HERITAGE, "planning", 1_000,
+          "Historic England", Style("none", "#a50026", "..", 0.0, 0.8),
+          dataset="park-and-garden"),
+    Layer("tpo_area", "Tree preservation order (area)", G_HERITAGE, "planning", 250,
+          "Local planning authority", Style("#addd8e", "#31a354", "oo", 0.3),
+          dataset="tree-preservation-zone"),
+    Layer("tpo_tree", "Tree preservation order (tree)", G_HERITAGE, "planning", 250,
+          "Local planning authority", Style("#31a354", "#005a32", None, 0.9, 0.4, "o"),
+          dataset="tree", geom="point"),
+]
+
+assert len(LAYERS) == 30, len(LAYERS)
+LAYER_BY_ID = {l.id: l for l in LAYERS}
+assert len(LAYER_BY_ID) == 30, "duplicate layer id"
+
+# Groups in the order they appear in the key and findings.
+GROUPS = [G_INT, G_NAT, G_HAB, G_LAND, G_WATER, G_HERITAGE]

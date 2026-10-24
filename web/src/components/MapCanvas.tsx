@@ -4,11 +4,13 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import * as turf from '@turf/turf'
 
 import { useStore } from '../store'
-import { rampColor, rampPosition } from '../lib/format'
+import type { Layer } from '../types'
+import { BASEMAPS } from '../lib/basemaps'
 
 /**
  * The map is the canvas, not a widget in a frame — full bleed, with panels
- * floating over it.
+ * floating over it. It shows the red line, the 1 km and 2 km rings, and every
+ * feature each publisher returned, styled as on the PDF sheet.
  *
  * The drawing interaction is ported from the original prototype because it was
  * the best part of it: press, drag, release, with a live dashed preview. Only
@@ -29,8 +31,7 @@ import { rampColor, rampPosition } from '../lib/format'
  *
  * So the style loads instantly with nothing external in it, our data layers go
  * on top, and the basemap is added afterwards as pure decoration. If it never
- * arrives, the map is plain — but the AOI, the cells and every number still
- * render.
+ * arrives, the map is plain — but the red line and every finding still render.
  */
 // MapLibre computes its worker URL at runtime, which Vite cannot see, so the
 // worker is never emitted and the app silently renders an empty map — see
@@ -45,25 +46,35 @@ const BASE_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b1220' } }],
 }
 
-const BASEMAP_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+// The same red as the PDF, so the screen and the sheet agree.
+const RED_LINE = '#e41a1c'
+const RINGS_M = [1000, 2000]
+
+/** Broad fills first, then outlines, lines and points, so nothing small is
+ *  buried under a Green Belt that covers the whole view. */
+function drawOrder(l: Layer): number {
+  if (l.geom === 'point') return 3
+  if (l.geom === 'line') return 2
+  return l.style.fill === 'none' || l.style.hatched ? 1 : 0
+}
 
 export default function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  // React state rather than a ref: when the style becomes ready the AOI and
-  // cell effects must re-run, and flipping a ref would not re-render.
+  // React state rather than a ref: when the style becomes ready the red line
+  // and findings effects must re-run, and flipping a ref would not re-render.
   const [ready, setReady] = useState(false)
 
   const drawMode = useStore((s) => s.drawMode)
-  const setAoi = useStore((s) => s.setAoi)
-  const aoi = useStore((s) => s.aoi)
-  const cells = useStore((s) => s.cells)
-  const data = useStore((s) => s.data)
-  const selected = useStore((s) => s.selected)
-  const timeIndex = useStore((s) => s.timeIndex)
-  const catalog = useStore((s) => s.catalog)
+  const setAoi = useStore((s) => s.setRedLine)
+  const aoi = useStore((s) => s.redLine)
+  const sheet = useStore((s) => s.sheet)
+  const layers = useStore((s) => s.layers)
+  const hidden = useStore((s) => s.hidden)
+  const basemap = useStore((s) => s.basemap)
 
   // Drawing state lives in refs, not React state: it changes on every
   // mousemove and re-rendering the tree at that rate would drop frames.
@@ -91,13 +102,22 @@ export default function MapCanvas() {
     // waits on the first tiles, so this hangs off `styledata` — which fires as
     // soon as the (inline) style is parsed — and guards against running twice.
     const install = () => {
-      if (!map.style || map.getSource('cells')) return
-      map.addSource('cells', { type: 'geojson', data: EMPTY })
+      if (!map.style || map.getSource('rings')) return
+      // Findings layers are inserted below this marker when a sheet arrives,
+      // so the rings and the red line always sit on top of them.
+      map.addSource('rings', { type: 'geojson', data: EMPTY })
       map.addLayer({
-        id: 'cells-fill',
-        type: 'fill',
-        source: 'cells',
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.72 },
+        id: 'rings',
+        type: 'line',
+        source: 'rings',
+        paint: { 'line-color': '#e9e5dc', 'line-width': 1, 'line-opacity': 0.55, 'line-dasharray': [3, 3] },
+      })
+      map.addLayer({
+        id: 'rings-label',
+        type: 'symbol',
+        source: 'rings',
+        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'label'], 'text-size': 10 },
+        paint: { 'text-color': '#e9e5dc', 'text-halo-color': '#121822', 'text-halo-width': 1.2 },
       })
 
       map.addSource('aoi', { type: 'geojson', data: EMPTY })
@@ -105,13 +125,13 @@ export default function MapCanvas() {
         id: 'aoi-fill',
         type: 'fill',
         source: 'aoi',
-        paint: { 'fill-color': '#ff7a5c', 'fill-opacity': 0.06 },
+        paint: { 'fill-color': RED_LINE, 'fill-opacity': 0.06 },
       })
       map.addLayer({
         id: 'aoi-line',
         type: 'line',
         source: 'aoi',
-        paint: { 'line-color': '#ff7a5c', 'line-width': 2.5 },
+        paint: { 'line-color': RED_LINE, 'line-width': 2.5 },
       })
 
       map.addSource('draft', { type: 'geojson', data: EMPTY })
@@ -119,33 +139,14 @@ export default function MapCanvas() {
         id: 'draft-fill',
         type: 'fill',
         source: 'draft',
-        paint: { 'fill-color': '#e05f42', 'fill-opacity': 0.1 },
+        paint: { 'fill-color': RED_LINE, 'fill-opacity': 0.1 },
       })
       map.addLayer({
         id: 'draft-line',
         type: 'line',
         source: 'draft',
-        paint: { 'line-color': '#e05f42', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+        paint: { 'line-color': RED_LINE, 'line-width': 2, 'line-dasharray': [2, 1.5] },
       })
-
-      // The basemap goes on last and sits beneath everything of ours, so a
-      // failure here costs context and nothing else.
-      if (!map.getSource('osm')) {
-        map.addSource('osm', {
-          type: 'raster',
-          tiles: [BASEMAP_TILES],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors',
-        })
-        map.addLayer({
-          id: 'osm',
-          type: 'raster',
-          source: 'osm',
-          // Desaturated and dimmed so data layers read as the foreground. The
-          // basemap is context, not content.
-          paint: { 'raster-opacity': 0.5, 'raster-saturation': -0.7, 'raster-brightness-max': 0.85 },
-        }, 'cells-fill')
-      }
 
       setReady(true)
     }
@@ -326,12 +327,21 @@ export default function MapCanvas() {
     if (!map || !ready) return
     const src = map.getSource('aoi') as maplibregl.GeoJSONSource | undefined
     if (!src) return
-    if (!aoi) { src.setData(EMPTY); return }
+    const rings = map.getSource('rings') as maplibregl.GeoJSONSource | undefined
+    if (!aoi) { src.setData(EMPTY); rings?.setData(EMPTY); return }
     src.setData({ type: 'Feature', geometry: aoi, properties: {} })
-    const [w, s, e, n] = turf.bbox({ type: 'Feature', geometry: aoi, properties: {} }) as
-      [number, number, number, number]
-    // The map spans the full window, but the data panel and timeline sit on top
-    // of it. Without asymmetric padding the drawn shape centres itself
+    const site: GeoJSON.Feature<GeoJSON.Polygon> = { type: 'Feature', geometry: aoi, properties: {} }
+    rings?.setData({
+      type: 'FeatureCollection',
+      features: RINGS_M.flatMap((m) => {
+        const b = turf.buffer(site, m, { units: 'meters' })
+        return b ? [{ ...b, properties: { label: `${m / 1000} km` } }] : []
+      }),
+    })
+    // Frame the 1 km ring, as the PDF does, so the nearest findings are in view.
+    const frame = turf.buffer(site, RINGS_M[0], { units: 'meters' }) ?? site
+    const [w, s, e, n] = turf.bbox(frame) as [number, number, number, number]
+    // The map spans the full window, but the findings panel sits on top of it. Without asymmetric padding the drawn shape centres itself
     // underneath the panel, which is exactly where the user cannot see it.
     const css = getComputedStyle(document.documentElement)
     const panel = parseInt(css.getPropertyValue('--panel-w')) || 0
@@ -343,50 +353,115 @@ export default function MapCanvas() {
     })
   }, [aoi, ready])
 
-  // ---- cell repaint on time change ---------------------------------------
-  // This is the piece that makes scrubbing feel instant: the cell geometry and
-  // each cell's offset were fetched once at draw time, so moving the slider is
-  // pure client-side arithmetic. No request is made while scrubbing.
+  // ---- basemap ------------------------------------------------------------
+  // Added after our own layers and slotted beneath all of them, so a slow or
+  // blocked tile host costs context and nothing else.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
-    const src = map.getSource('cells') as maplibregl.GeoJSONSource | undefined
-    if (!src) return
-
-    const primary = selected[0]
-    const series = data?.series[primary]
-    const factor = catalog?.factors.find((f) => f.id === primary)
-    if (!cells.length || !series || !factor || factor.kind === 'categorical') {
-      src.setData(EMPTY)
-      return
-    }
-
-    const point = series.points[timeIndex]
-    if (!point || point.value === null || typeof point.value !== 'number') {
-      src.setData(EMPTY)
-      return
-    }
-
-    const lo = factor.lo ?? 0
-    const hi = factor.hi ?? 1
-    const spread = (hi - lo) * 0.16
-
-    const features: GeoJSON.Feature[] = cells.map((c) => {
-      const v = (point.value as number) + c.offset * spread
-      return {
-        type: 'Feature',
-        properties: { color: rampColor(rampPosition(v, factor)) },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            [c.bbox[0], c.bbox[1]], [c.bbox[2], c.bbox[1]],
-            [c.bbox[2], c.bbox[3]], [c.bbox[0], c.bbox[3]], [c.bbox[0], c.bbox[1]],
-          ]],
-        },
-      }
+    const style = map.getStyle()
+    for (const l of style.layers ?? []) if (l.id.startsWith('base-')) map.removeLayer(l.id)
+    for (const id of Object.keys(style.sources ?? {})) if (id.startsWith('base-')) map.removeSource(id)
+    const bm = BASEMAPS.find((b) => b.id === basemap) ?? BASEMAPS[0]
+    // Beneath the first layer of ours, whatever it is (findings come and go).
+    const below = (map.getStyle().layers ?? []).find((l) => l.id !== 'bg')?.id
+    bm.tiles.forEach((url, i) => {
+      const id = `base-${bm.id}-${i}`
+      map.addSource(id, {
+        type: 'raster', tiles: [url], tileSize: 256, maxzoom: bm.maxzoom,
+        // One credit per basemap, not one per stacked layer.
+        attribution: i === 0 ? bm.attribution : undefined,
+      })
+      map.addLayer({
+        id, type: 'raster', source: id,
+        paint: bm.dim ? { 'raster-opacity': 0.5, 'raster-saturation': -0.7 } : {},
+      }, below)
     })
-    src.setData({ type: 'FeatureCollection', features })
-  }, [cells, data, selected, timeIndex, catalog, ready])
+  }, [basemap, ready])
+
+  // ---- what each publisher returned -------------------------------------
+  // Rebuilt whenever a sheet arrives or goes. Layers that returned nothing
+  // have no source at all, which is the honest picture of "none found".
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const style = map.getStyle()
+    for (const l of style.layers ?? []) if (l.id.startsWith('res-')) map.removeLayer(l.id)
+    for (const id of Object.keys(style.sources ?? {})) if (id.startsWith('res-')) map.removeSource(id)
+    if (!sheet) return
+
+    const shown = layers.filter((l) => sheet.map[l.id]).sort((a, b) => drawOrder(a) - drawOrder(b))
+    for (const l of shown) {
+      const src = `res-${l.id}`
+      map.addSource(src, { type: 'geojson', data: sheet.map[l.id] })
+      const { fill, edge, alpha, hatched } = l.style
+      if (l.geom === 'point') {
+        map.addLayer({
+          id: `${src}-pt`, type: 'circle', source: src,
+          paint: { 'circle-radius': 4.5, 'circle-color': fill === 'none' ? edge : fill,
+                   'circle-stroke-color': edge, 'circle-stroke-width': 1 },
+        }, 'rings')
+        continue
+      }
+      if (l.geom === 'polygon' && (fill !== 'none' || hatched)) {
+        // MapLibre has no hatching; a hatched layer shows as a faint wash of
+        // its edge colour instead, and the PDF keeps the real pattern.
+        map.addLayer({
+          id: `${src}-fill`, type: 'fill', source: src,
+          paint: { 'fill-color': fill === 'none' || hatched ? edge : fill,
+                   'fill-opacity': hatched ? 0.14 : Math.max(alpha, 0.25) },
+        }, 'rings')
+      }
+      map.addLayer({
+        id: `${src}-line`, type: 'line', source: src,
+        paint: { 'line-color': edge, 'line-width': l.geom === 'line' ? 2.5 : 1.3 },
+      }, 'rings')
+    }
+  }, [sheet, layers, ready])
+
+  // ---- show / hide from the panel ----------------------------------------
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || !sheet) return
+    for (const l of map.getStyle().layers ?? []) {
+      if (!l.id.startsWith('res-')) continue
+      const id = l.id.slice(4).replace(/-(fill|line|pt)$/, '')
+      map.setLayoutProperty(l.id, 'visibility', hidden.includes(id) ? 'none' : 'visible')
+    }
+  }, [hidden, sheet, ready])
+
+  // ---- click a feature for its name --------------------------------------
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const byId = new Map(layers.map((l) => [l.id, l]))
+    let popup: maplibregl.Popup | null = null
+    const onClick = (e: maplibregl.MapMouseEvent) => {
+      if (modeRef.current) return
+      const hits = map.queryRenderedFeatures(e.point)
+        .filter((f) => f.layer.id.startsWith('res-'))
+      popup?.remove()
+      if (!hits.length) return
+      const seen = new Set<string>()
+      const rows: string[] = []
+      for (const f of hits) {
+        const id = f.layer.id.slice(4).replace(/-(fill|line|pt)$/, '')
+        const label = String(f.properties?.label || 'Unnamed')
+        const key = `${id}|${label}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        rows.push(`<b>${esc(byId.get(id)?.name ?? id)}</b><br>${esc(label)}`)
+      }
+      popup = new maplibregl.Popup({ closeButton: false, maxWidth: '260px' })
+        .setLngLat(e.lngLat).setHTML(rows.join('<hr>')).addTo(map)
+    }
+    map.on('click', onClick)
+    return () => { map.off('click', onClick); popup?.remove() }
+  }, [layers, ready])
 
   return <div ref={containerRef} className="map-canvas" />
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }

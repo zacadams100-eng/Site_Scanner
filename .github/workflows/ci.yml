@@ -1,15 +1,16 @@
 name: CI
 
-# Two jobs with very different jobs to do.
+# Two jobs.
 #
-# `tests` needs no credentials and runs on every push, so a broken refactor is
-# caught in a minute rather than by a human remembering to run pytest.
+# `tests` runs against fictional fixtures with no network, on every push.
 #
-# `earth-engine` is the one that matters most here. Every Earth Engine query in
-# this repository was written without being able to reach Earth Engine, and the
-# gap between "the code looks right" and "the numbers are right" has already
-# produced one silent failure that passed its own check. This job closes that
-# gap automatically instead of waiting for someone to run a script.
+# `live-sheet` makes one real sheet from the publishers, for the example red
+# line in examples/. The tool was written in workspaces that could not reach
+# Natural England, the Environment Agency or planning.data — GitHub's runners
+# can. The PDF, GeoPackage and JSON record are uploaded as a build artifact,
+# and every layer that came back NOT ASSESSED is listed as a warning, with
+# its reason. It warns rather than fails: a publisher being down is not a bug
+# in this commit, but it must never pass silently either.
 
 on:
   push:
@@ -40,18 +41,16 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Frontend tests
+      - name: Frontend tests, typecheck and build
         working-directory: web
         run: |
           npm ci
           npm test
+          npx tsc --noEmit -p tsconfig.app.json
+          npm run build
 
-      - name: Typecheck
-        working-directory: web
-        run: npx tsc --noEmit -p tsconfig.app.json
-
-  earth-engine:
-    name: Real data
+  live-sheet:
+    name: Live sheet (real publishers)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,20 +62,31 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Verify every factor against Earth Engine
+      - name: Make a real sheet for the example red line
         env:
-          # These come from repository secrets, which are encrypted and are not
-          # readable from a session or a log. A pull request from a fork gets
-          # no secrets at all, which is why the step below skips rather than
-          # fails when they are missing.
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.EE_SERVICE_ACCOUNT_JSON }}
-          EE_PROJECT: ${{ secrets.EE_PROJECT_ID }}
+          OS_API_KEY: ${{ secrets.OS_API_KEY }}
         run: |
-          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
-            echo "::warning title=Earth Engine not verified::EE_SERVICE_ACCOUNT_JSON is not set, so the real-data check did not run. The factors in this commit are unverified."
-            exit 0
-          fi
-          # One year rather than the full range: enough to catch a wrong band,
-          # a missing scale factor or a broken season, without spending several
-          # minutes of Earth Engine time on every push.
-          python scripts/check_real_factors.py 2024
+          set +e
+          python -m sheet make examples/guildford.geojson \
+            --title "Example: farmland near Merrow, Guildford" --ref CI-LIVE --out live
+          code=$?
+          set -e
+          python - <<'PY'
+          import glob, json
+          rec = json.load(open(glob.glob("live/*.json")[0]))
+          c = rec["counts"]
+          print(f"present {c['present']} · none found {c['none_found']} · not assessed {c['not_assessed']}")
+          for f in rec["findings"]:
+              print(f"  {f['status']:<13} {f['name']}: {f['summary']}")
+              if f["status"] == "not_assessed":
+                  print(f"::warning title=Not assessed: {f['name']}::{f['error']}")
+          PY
+          # 3 = some layer not assessed (warned above). Anything else non-zero is a crash.
+          if [ "$code" != 0 ] && [ "$code" != 3 ]; then exit "$code"; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-sheet
+          path: live/
+          if-no-files-found: warn

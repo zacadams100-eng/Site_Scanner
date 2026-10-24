@@ -13,9 +13,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@observablehq/plot": "^0.6.17",
-    "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.14.9",
     "@turf/turf": "^7.3.5",
     "maplibre-gl": "^6.1.0",
     "playwright": "^1.62.1",
