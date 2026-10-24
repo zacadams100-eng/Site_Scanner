@@ -219,9 +219,7 @@ def test_label_codes_and_defaults_from_live_field_names():
     assert label("ancient_woodland", {"name": "", "ancient-woodland-status": "ASNW"}) == \
         "Ancient semi-natural woodland"
     assert label("priority_habitat", {"MainHabs": "Deciduous woodland"}) == "Deciduous woodland"
-    assert label("sssi_irz", {"IRZURL": "https://irz.geodata.org.uk/x"}) == \
-        "SSSI impact risk zone, criteria at https://irz.geodata.org.uk/x"
-    assert label("sssi_irz", {"OBJECTID": 1}) == "SSSI impact risk zone"
+    assert label("sssi_irz", {"IRZURL": "https://irz.geodata.org.uk/x"}) == "https://irz.geodata.org.uk/x"
     assert label("listed_building", {"name": "CHURCH OF ST JOHN THE EVANGELIST",
                                      "listed-building-grade": "II*"}) == \
         "Church of St John the Evangelist (Grade II*)"
@@ -237,3 +235,38 @@ def test_parcel_layers_report_area_not_counts(results):
     ph = f["priority_habitat"].summary()
     assert ph.startswith("Within the red line: Lowland meadows ")
     assert "Within 2 km: " in ph and "Deciduous woodland" in ph and " ha" in ph
+
+
+# --- findings that read like a professional's sheet ------------------------------
+from sheet.findings import Item, LayerFinding, same_name_key  # noqa: E402
+
+
+def test_many_listed_buildings_are_counted_by_grade():
+    items = ([Item("Church of St Peter (Grade I)", 120, "N", grade="I"),
+              Item("The Manor (Grade II*)", 300, "E", grade="II*"),
+              Item("Old Cottage (Grade II)", 0, "", grade="II")]
+             + [Item(f"House {n} (Grade II)", 200 + n, "S", grade="II") for n in range(175)])
+    f = LayerFinding("listed_building", "Listed building", "", PRESENT, 500, items=items, mode="grades")
+    s = f.summary(max_items=8)
+    assert s.startswith("178 within 500 m: 1 Grade I, 1 Grade II*, 176 Grade II.")
+    assert "Church of St Peter" in s and "The Manor" in s
+    assert "Old Cottage" in s          # on the red line: always named, whatever its grade
+    assert "House 3" not in s
+
+
+def test_a_few_listed_buildings_are_still_listed():
+    items = [Item("Barn (Grade II)", 40, "W", grade="II")]
+    f = LayerFinding("listed_building", "Listed building", "", PRESENT, 500, items=items, mode="grades")
+    assert f.summary() == "Barn (Grade II), 40 m W."
+
+
+def test_one_place_published_by_two_councils_is_one_finding():
+    assert same_name_key("RIVER WEY AND GODALMING NAVIGATIONS") == same_name_key("Wey and Godalming Navigations")
+    assert same_name_key("Godalming") != same_name_key("Farncombe")
+
+
+def test_risk_zones_say_the_red_line_is_in_them_with_criteria():
+    items = [Item("https://irz.geodata.org.uk/a", 0, "", count=2), Item("https://irz.geodata.org.uk/b", 0, "")]
+    f = LayerFinding("sssi_irz", "SSSI Impact Risk Zone", "", PRESENT, 0, items=items, mode="zones")
+    assert f.summary() == ("The red line falls in 3 impact risk zones. "
+                           "Criteria: https://irz.geodata.org.uk/a; https://irz.geodata.org.uk/b.")

@@ -44,6 +44,7 @@ class Feature:
     geom: BaseGeometry          # British National Grid
     label: str
     props: Dict[str, Any]
+    grade: str = ""             # listed building grade, when the layer has one
 
 
 @dataclass
@@ -118,7 +119,7 @@ def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry)
         grade = str(props.get(layer.grade_field) or "").strip() if layer.grade_field else ""
         if label and grade:
             label += f" (Grade {grade})"
-        out.append(Feature(g, label, props))
+        out.append(Feature(g, label, props, grade))
     return out
 
 

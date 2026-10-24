@@ -61,6 +61,8 @@ class Layer:
     # "list": named features with distance and direction ("Box Hill SSSI, 450 m NE").
     # "area": hectares by type and the share of the red line covered — for
     # layers made of thousands of small parcels, where a list says nothing.
+    # "grades": counts by grade, naming only the highest grades (listed buildings).
+    # "zones": how many zones the red line falls in, with their criteria links.
     summary: str = "list"
     on_map: bool = True                  # False = reported in findings only
     geom: str = "polygon"                # polygon | line | point
@@ -98,8 +100,7 @@ LAYERS: List[Layer] = [
           "Natural England", Style("none", "#999999"),
           url=f"{NE}/SSSI_Impact_Risk_Zones_England/FeatureServer/0",
           # The live service carries no SSSI name, only an IRZ link and code.
-          label_fields=["IRZURL"], label_template="SSSI impact risk zone, criteria at {}",
-          default_label="SSSI impact risk zone",
+          label_fields=["IRZURL"], summary="zones",
           on_map=False,
           note="Reported only where the red line falls inside a zone. "
                "Check the zone's consultation criteria for the proposal type."),
@@ -146,13 +147,13 @@ LAYERS: List[Layer] = [
 
     # --- Landscape and open land ----------------------------------------------
     Layer("national_landscape", "National Landscape (AONB)", G_LAND, "planning", 2_000,
-          "Natural England", Style("none", "#b35806", "\\\\", 0.0, 1.0),
+          "Natural England", Style("none", "#b35806", None, 0.0, 1.4),
           dataset="area-of-outstanding-natural-beauty"),
     Layer("national_park", "National Park", G_LAND, "planning", 2_000,
           "Natural England", Style("none", "#7f3b08", None, 0.0, 1.4),
           dataset="national-park"),
     Layer("green_belt", "Green Belt", G_LAND, "planning", 1_000,
-          "Local planning authority", Style("#d9f0d3", "#5aae61", None, 0.35, 0.3),
+          "Local planning authority", Style("none", "#5aae61", None, 0.0, 1.4),
           dataset="green-belt"),
     Layer("local_green_space", "Local green space", G_LAND, "planning", 1_000,
           "Local planning authority", Style("#c7e9c0", "#31a354", "++", 0.35),
@@ -181,12 +182,12 @@ LAYERS: List[Layer] = [
 
     # --- Heritage and trees ---------------------------------------------------
     Layer("conservation_area", "Conservation area", G_HERITAGE, "planning", 1_000,
-          "Local planning authority", Style("none", "#d73027", "\\\\", 0.0, 0.8),
+          "Local planning authority", Style("none", "#ff7f00", "\\\\", 0.0, 1.0),
           dataset="conservation-area"),
     Layer("listed_building", "Listed building", G_HERITAGE, "planning", 500,
           "Historic England", Style("#fc8d59", "#b30000", None, 0.9, 0.4, "^"),
           dataset="listed-building", geom="point",
-          label_fields=["name"], grade_field="listed-building-grade"),
+          label_fields=["name"], grade_field="listed-building-grade", summary="grades"),
     Layer("scheduled_monument", "Scheduled monument", G_HERITAGE, "planning", 1_000,
           "Historic England", Style("#fdae61", "#a50026", "xx", 0.35),
           dataset="scheduled-monument"),

@@ -6,6 +6,7 @@ A finding states what the published data shows and where — "Box Hill SSSI,
 is acceptable. That judgement belongs to the ecologist reading the sheet.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List
 
@@ -24,6 +25,7 @@ class Item:
     distance_m: float           # 0 = within or touching the red line
     direction: str
     count: int = 1              # polygons sharing this label
+    grade: str = ""
 
     def where(self) -> str:
         if self.distance_m <= ON_SITE_TOLERANCE_M:
@@ -62,6 +64,7 @@ class LayerFinding:
     areas: List[AreaItem] = field(default_factory=list)
     site_ha: float = 0.0
     labelled: bool = True
+    mode: str = "list"
 
     def summary(self, max_items: int = 3) -> str:
         if self.status == NOT_ASSESSED:
@@ -74,6 +77,10 @@ class LayerFinding:
             return s
         if self.areas:
             return self._area_summary(max_items)
+        if self.mode == "grades" and len(self.items) > 5:
+            return self._grade_summary(max_items)
+        if self.mode == "zones":
+            return self._zone_summary()
         parts = []
         for it in self.items[:max_items]:
             name = it.label or "Unnamed area"
@@ -118,23 +125,68 @@ class LayerFinding:
         parts.append(f"Within {self._radius()}: {text}")
         return ". ".join(parts) + "."
 
+    def _grade_summary(self, max_items: int) -> str:
+        """"178 within 500 m: 2 Grade I, 6 Grade II*, 170 Grade II", then by
+        name only the highest grades and anything on the red line itself."""
+        n = sum(i.count for i in self.items)
+        by_grade: Dict[str, int] = {}
+        for i in self.items:
+            by_grade[i.grade or "ungraded"] = by_grade.get(i.grade or "ungraded", 0) + i.count
+        order = {"I": 0, "II*": 1, "II": 2}
+        grades = sorted(by_grade, key=lambda g: (order.get(g, 9), g))
+        head = f"{n} within {self._radius()}: " + ", ".join(
+            f"{by_grade[g]} Grade {g}" if g != "ungraded" else f"{by_grade[g]} ungraded" for g in grades)
+        named = [i for i in self.items if i.grade in ("I", "II*") or i.distance_m <= ON_SITE_TOLERANCE_M]
+        if not named:
+            return head + "."
+        shown = "; ".join(f"{i.label}, {i.where()}" for i in named[:max_items])
+        more = len(named) - max_items
+        return f"{head}. {shown}" + (f"; +{more} more" if more > 0 else "") + "."
+
+    def _zone_summary(self) -> str:
+        """Impact risk zones are not places; what matters is that the red line
+        is in one, and where to read what it asks to be consulted on."""
+        links = [i.label for i in self.items if i.label]
+        n = sum(i.count for i in self.items)
+        head = f"The red line falls in {n} impact risk zone{'s' if n > 1 else ''}"
+        if not links:
+            return head + "."
+        shown = "; ".join(links[:3]) + (f"; +{len(links) - 3} more" if len(links) > 3 else "")
+        return f"{head}. Criteria: {shown}."
+
     def _radius(self) -> str:
         m = self.search_m
         return f"{m:,} m" if m < 1000 else f"{m // 1000} km"
 
 
+_FILLER = {"the", "and", "river", "conservation", "area", "of"}
+
+
+def same_name_key(label: str) -> str:
+    """One key for one place published twice under different spellings.
+
+    Neighbouring councils both publish a shared conservation area:
+    "RIVER WEY AND GODALMING NAVIGATIONS" and "Wey and Godalming Navigations"
+    must read as one finding, not two.
+    """
+    words = re.findall(r"[a-z0-9*]+", label.lower().replace("&", " and "))
+    return " ".join(w for w in words if w not in _FILLER) or label.lower()
+
+
 def _items(result: LayerResult, site: BaseGeometry) -> List[Item]:
     by_label: Dict[str, Item] = {}
-    for f in result.features:
+    # Buildings are separate things even when they share a name ("Barn").
+    merge = result.layer.summary != "grades"
+    for n, f in enumerate(result.features):
         d = site.distance(f.geom)
-        key = f.label or ""
+        key = same_name_key(f.label) if (merge and f.label) else (f.label if merge else str(n))
         if key in by_label:
             it = by_label[key]
             it.count += 1
             if d < it.distance_m:
                 it.distance_m, it.direction = d, bearing_word(site, f.geom)
         else:
-            by_label[key] = Item(f.label, d, bearing_word(site, f.geom))
+            by_label[key] = Item(f.label, d, bearing_word(site, f.geom), grade=f.grade)
     items = sorted(by_label.values(), key=lambda i: (i.distance_m, i.label))
     # Unlabelled pieces of one dataset (e.g. surface-water extents) read as
     # one line: "Unnamed area (14 parcels), within the red line".
@@ -156,7 +208,8 @@ def build_findings(results: List[LayerResult], site: BaseGeometry) -> List[Layer
     out = []
     for r in results:
         lf = LayerFinding(r.layer.id, r.layer.name, r.layer.group, r.status, r.layer.search_m,
-                          partial_coverage=r.partial_coverage, note=r.layer.note, error=r.error)
+                          partial_coverage=r.partial_coverage, note=r.layer.note, error=r.error,
+                          mode=r.layer.summary)
         if r.status == PRESENT:
             lf.items = _items(r, site)
             lf.on_site = any(i.distance_m <= ON_SITE_TOLERANCE_M for i in lf.items)
