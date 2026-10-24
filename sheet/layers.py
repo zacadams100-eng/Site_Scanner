@@ -25,6 +25,9 @@ from typing import Dict, List, Optional
 PLANNING_API = "https://www.planning.data.gov.uk/entity.geojson"
 NE = "https://services.arcgis.com/JJzESW51TqeY9uat/arcgis/rest/services"
 DEFRA = "https://services1.arcgis.com/JZM7qJpmv7vJ0Hzx/arcgis/rest/services"
+# Forestry Commission open data. planning.data's forest-inventory dataset is an
+# empty placeholder (0 records nationally), so woodland comes from here.
+FC = "https://services2.arcgis.com/mHXjwgl3OARRqqD4/arcgis/rest/services"
 
 OGL = "Open Government Licence v3.0"
 
@@ -54,6 +57,11 @@ class Layer:
     label_template: str = "{}"           # e.g. "Flood Zone {}"
     label_map: Dict[str, str] = field(default_factory=dict)   # code → words, e.g. ASNW
     default_label: str = ""              # when the publisher sends no name at all
+    grade_field: str = ""                # appended as "(Grade II)" when present
+    # "list": named features with distance and direction ("Box Hill SSSI, 450 m NE").
+    # "area": hectares by type and the share of the red line covered — for
+    # layers made of thousands of small parcels, where a list says nothing.
+    summary: str = "list"
     on_map: bool = True                  # False = reported in findings only
     geom: str = "polygon"                # polygon | line | point
     licence: str = OGL
@@ -90,7 +98,8 @@ LAYERS: List[Layer] = [
           "Natural England", Style("none", "#999999"),
           url=f"{NE}/SSSI_Impact_Risk_Zones_England/FeatureServer/0",
           # The live service carries no SSSI name, only an IRZ link and code.
-          label_fields=["SSSI_NAME", "sssi_name", "NAME"], default_label="SSSI impact risk zone",
+          label_fields=["IRZURL"], label_template="SSSI impact risk zone, criteria at {}",
+          default_label="SSSI impact risk zone",
           on_map=False,
           note="Reported only where the red line falls inside a zone. "
                "Check the zone's consultation criteria for the proposal type."),
@@ -111,7 +120,8 @@ LAYERS: List[Layer] = [
     Layer("priority_habitat", "Priority habitat inventory", G_HAB, "arcgis", 2_000,
           "Natural England", Style("#b8e186", "#7fbc41", None, 0.45, 0.4),
           url=f"{NE}/Priority_Habitats_Inventory_England/FeatureServer/0",
-          label_fields=["MainHabs", "Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"]),
+          label_fields=["MainHabs", "Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"],
+          summary="area"),
     Layer("gcn_soa", "GCN strategic opportunity area", G_HAB, "arcgis", 2_000,
           "Natural England", Style("none", "#e6550d", "--", 0.0, 0.6),
           url=f"{NE}/GCN_Strategic_Opportunity_Areas_England/FeatureServer/0",
@@ -126,9 +136,10 @@ LAYERS: List[Layer] = [
     Layer("nutrient", "Nutrient neutrality catchment", G_HAB, "planning", 0,
           "Natural England", Style("none", "#8c6d31"), dataset="nutrient-neutrality-catchment",
           on_map=False, note="Reported only where the red line falls inside one."),
-    Layer("woodland", "Woodland (National Forest Inventory)", G_HAB, "planning", 1_000,
+    Layer("woodland", "Woodland (National Forest Inventory)", G_HAB, "arcgis", 1_000,
           "Forestry Commission", Style("#a1d99b", "#74c476", None, 0.35, 0.3),
-          dataset="forest-inventory"),
+          url=f"{FC}/National_Forest_Inventory_Woodland_England_2018/FeatureServer/0",
+          label_fields=["IFT_IOA", "CATEGORY", "Category", "ift_ioa"], summary="area"),
     Layer("common_land", "Common land and village green", G_HAB, "planning", 1_000,
           "Defra", Style("#fee391", "#cc9a06", None, 0.4),
           dataset="common-land-and-village-green"),
@@ -163,7 +174,7 @@ LAYERS: List[Layer] = [
     Layer("surface_water", "Surface water flooding (1% AEP)", G_WATER, "arcgis", 250,
           "Environment Agency", Style("#c6dbef", "#6baed6", None, 0.5, 0.2),
           url=f"{DEFRA}/Risk_of_Flooding_from_Surface_Water_Extents/FeatureServer/1",
-          label_fields=[]),
+          label_fields=[], summary="area"),
     Layer("flood_storage", "Flood storage area", G_WATER, "planning", 1_000,
           "Environment Agency", Style("none", "#2171b5", "..", 0.0, 0.6),
           dataset="flood-storage-area"),
@@ -175,7 +186,7 @@ LAYERS: List[Layer] = [
     Layer("listed_building", "Listed building", G_HERITAGE, "planning", 500,
           "Historic England", Style("#fc8d59", "#b30000", None, 0.9, 0.4, "^"),
           dataset="listed-building", geom="point",
-          label_fields=["name", "listed-building-grade"]),
+          label_fields=["name"], grade_field="listed-building-grade"),
     Layer("scheduled_monument", "Scheduled monument", G_HERITAGE, "planning", 1_000,
           "Historic England", Style("#fdae61", "#a50026", "xx", 0.35),
           dataset="scheduled-monument"),

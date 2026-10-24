@@ -300,7 +300,10 @@ def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings:
         nearest = sorted((f for f in findings if f.status == PRESENT and not f.on_site and f.items),
                          key=lambda f: f.items[0].distance_m)[:4]
         for f in nearest:
-            lines.append(f"{f.name}: {f.items[0].label or 'unnamed'}, {f.items[0].where()}.")
+            if f.areas:   # parcel layers read as hectares, not "unnamed, 30 m"
+                lines.append(f"{f.name}: {f.summary(max_items=2)}")
+            else:
+                lines.append(f"{f.name}: {f.items[0].label or 'unnamed'}, {f.items[0].where()}.")
         lines.append("Full schedule overleaf.")
         for ln in lines:
             for w in _wrap(ln, 62):

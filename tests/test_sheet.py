@@ -63,9 +63,33 @@ def test_arcgis_error_body_is_not_assessed():
     assert r.status == NOT_ASSESSED and "Invalid query" in r.error
 
 
+EMPTY_FC = {"type": "FeatureCollection", "features": []}
+# The national probe: one record somewhere in England, so the dataset is real.
+SOMEWHERE = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+                                                         "geometry": None}]}
+
+
 def test_empty_answer_is_none_found():
-    f = Fetcher(FakeSession([FakeResponse({"type": "FeatureCollection", "features": []})]))
+    f = Fetcher(FakeSession([FakeResponse(EMPTY_FC), FakeResponse(SOMEWHERE)]))
     assert f.fetch(LAYER_BY_ID["sssi"], SITE).status == NONE_FOUND
+
+
+def test_dataset_empty_nationally_is_not_assessed():
+    """planning.data's forest-inventory had 0 records and printed "none found"."""
+    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse(EMPTY_FC)])
+    r = Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE)
+    assert r.status == NOT_ASSESSED and "empty nationally" in r.error
+    assert s.calls[1][1] == {"dataset": "site-of-special-scientific-interest", "limit": 1}
+
+
+def test_arcgis_dataset_empty_nationally_is_not_assessed():
+    s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse({"count": 0})])
+    assert Fetcher(s).fetch(LAYER_BY_ID["main_river"], SITE).status == NOT_ASSESSED
+
+
+def test_failed_national_probe_is_not_assessed():
+    s = FakeSession([FakeResponse(EMPTY_FC), requests.ConnectionError("down")])
+    assert Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE).status == NOT_ASSESSED
 
 
 def test_planning_follows_next_links():
@@ -87,7 +111,8 @@ def test_features_outside_radius_are_dropped():
     from sheet.geometry import to_wgs
     far = Point(SITE.centroid.x + 5000, SITE.centroid.y).buffer(50)   # SSSI radius is 2 km
     s = FakeSession([FakeResponse({"type": "FeatureCollection", "features": [
-        {"type": "Feature", "properties": {"name": "Far"}, "geometry": mapping(to_wgs(far))}]})])
+        {"type": "Feature", "properties": {"name": "Far"}, "geometry": mapping(to_wgs(far))}]}),
+        FakeResponse(SOMEWHERE)])
     assert Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE).status == NONE_FOUND
 
 
@@ -154,7 +179,8 @@ def test_api_returns_map_features(tmp_path, fixture_dir, monkeypatch):
     c = TestClient(api.app)
     assert c.get("/api/info").json()["test_data"] is True
     assert len(c.get("/api/layers").json()) == 30
-    r = c.post("/api/sheet", json={"red_line": site_geojson(), "title": "Fixture Field"})
+    assert c.post("/api/sheet", json={"red_line": site_geojson(), "title": "Fixture Field"}).status_code == 400
+    r = c.post("/api/sheet", json={"red_line": site_geojson(), "title": "Fixture Field", "client_ref": "T-1"})
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["test_data"] is True and d["counts"]["not_assessed"] == 1
@@ -168,7 +194,7 @@ def test_api_rejects_a_point():
     from fastapi.testclient import TestClient
     from sheet.api import app
     r = TestClient(app).post("/api/sheet", json={
-        "red_line": {"type": "Point", "coordinates": [-0.3, 51.2]}, "title": "x"})
+        "red_line": {"type": "Point", "coordinates": [-0.3, 51.2]}, "title": "x", "client_ref": "T-1"})
     assert r.status_code == 400 and "must be an area" in r.json()["detail"]
 
 
@@ -193,4 +219,21 @@ def test_label_codes_and_defaults_from_live_field_names():
     assert label("ancient_woodland", {"name": "", "ancient-woodland-status": "ASNW"}) == \
         "Ancient semi-natural woodland"
     assert label("priority_habitat", {"MainHabs": "Deciduous woodland"}) == "Deciduous woodland"
-    assert label("sssi_irz", {"IRZURL": "https://irz.geodata.org.uk/x"}) == "SSSI impact risk zone"
+    assert label("sssi_irz", {"IRZURL": "https://irz.geodata.org.uk/x"}) == \
+        "SSSI impact risk zone, criteria at https://irz.geodata.org.uk/x"
+    assert label("sssi_irz", {"OBJECTID": 1}) == "SSSI impact risk zone"
+    assert label("listed_building", {"name": "CHURCH OF ST JOHN THE EVANGELIST",
+                                     "listed-building-grade": "II*"}) == \
+        "Church of St John the Evangelist (Grade II*)"
+    assert label("ancient_woodland", {"name": "(Epoch3:Watley's Copse)(Tithe:Watleys Copse)"}) == \
+        "Watley's Copse"
+    assert label("sssi", {"name": "RSPB"}) == "RSPB"
+
+
+def test_parcel_layers_report_area_not_counts(results):
+    f = {x.layer_id: x for x in build_findings(results, SITE)}
+    sw = f["surface_water"].summary()          # two small ponds, one on the red line
+    assert sw.startswith("Covers ") and "of the red line" in sw and "parcels" not in sw
+    ph = f["priority_habitat"].summary()
+    assert ph.startswith("Within the red line: Lowland meadows ")
+    assert "Within 2 km: " in ph and "Deciduous woodland" in ph and " ha" in ph

@@ -110,13 +110,13 @@ export const useStore = create<State>((set, get) => ({
 
   make: async () => {
     const { redLine, title, clientRef } = get()
-    if (!redLine) return
+    if (!redLine || !title.trim() || !clientRef.trim()) return
     inflight?.abort()
     const ctrl = new AbortController()
     inflight = ctrl
     set({ making: true, error: null, sheet: null })
     try {
-      const sheet = await makeSheet(redLine, title.trim() || 'Untitled site', clientRef.trim(), ctrl.signal)
+      const sheet = await makeSheet(redLine, title.trim(), clientRef.trim(), ctrl.signal)
       if (!ctrl.signal.aborted) set({ sheet, making: false })
     } catch (e: any) {
       if (e?.name === 'AbortError') return

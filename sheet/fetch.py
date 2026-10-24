@@ -12,6 +12,8 @@ exists to keep (carried over from Site Scanner's "not assessed ≠ clear").
 """
 
 import json
+import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -62,8 +64,38 @@ def _label(props: Dict[str, Any], fields: List[str]) -> str:
     for f in fields:
         v = props.get(f)
         if v not in (None, ""):
-            return str(v).strip()
+            return clean_name(str(v))
     return ""
+
+
+# Names keep these lower case mid-name once block capitals are undone.
+_SMALL = {"a", "an", "and", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"}
+_ROMAN = re.compile(r"^[IVX]+\*?$")
+
+
+def _title(word: str, first: bool) -> str:
+    if _ROMAN.match(word):
+        return word
+    w = word.lower()
+    if not first and w in _SMALL:
+        return w
+    # "WATLEY'S" -> "Watley's", "CROSS-ROADS" -> "Cross-Roads"
+    return "-".join(p[:1].upper() + p[1:] for p in w.split("-"))
+
+
+def clean_name(raw: str) -> str:
+    """Publishers' names as a person would write them.
+
+    Ancient woodland names arrive as "(Epoch3:Watley's Copse)(Tithe:…)" —
+    the first name given is kept. Listed buildings arrive in block capitals.
+    """
+    s = " ".join(raw.split())
+    parts = re.findall(r"\(\s*[^:()]+:\s*([^()]*?)\s*\)", s)
+    if parts:
+        s = next((p for p in parts if p), "")
+    if (" " in s or len(s) > 6) and s.isupper():   # leave acronyms like RSPB alone
+        s = " ".join(_title(w, i == 0) for i, w in enumerate(s.split(" ")))
+    return s
 
 
 def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry) -> List[Feature]:
@@ -83,6 +115,9 @@ def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry)
         label = _label(props, layer.label_fields)
         label = layer.label_map.get(label, label)
         label = layer.label_template.format(label) if label else layer.default_label
+        grade = str(props.get(layer.grade_field) or "").strip() if layer.grade_field else ""
+        if label and grade:
+            label += f" (Grade {grade})"
         out.append(Feature(g, label, props))
     return out
 
@@ -92,6 +127,8 @@ class Fetcher:
 
     def __init__(self, session: Optional[requests.Session] = None, contact: str = ""):
         self.s = session or requests.Session()
+        self._holds_data: Dict[str, bool] = {}
+        self._lock = threading.Lock()
         ua = USER_AGENT if not contact else f"Contour desk-study sheet ({contact})"
         self.s.headers.update({"User-Agent": ua, "Accept": "application/geo+json, application/json"})
 
@@ -155,12 +192,42 @@ class Fetcher:
             raise RuntimeError(f"more than {MAX_PAGES} pages — narrow the search")
         return {"type": "FeatureCollection", "features": feats}
 
+    # --- is the dataset empty everywhere? -------------------------------------
+    def holds_data(self, layer: Layer) -> bool:
+        """True if the dataset has at least one record anywhere in England.
+
+        An empty dataset answers every query with nothing, which would print as
+        "none found" when nobody has looked. planning.data's forest-inventory
+        did exactly this. Asked once per layer per run.
+        """
+        with self._lock:
+            if layer.id in self._holds_data:
+                return self._holds_data[layer.id]
+        if layer.source == "planning":
+            r = self.s.get(PLANNING_API, params={"dataset": layer.dataset, "limit": 1}, timeout=TIMEOUT_S)
+            r.raise_for_status()
+            found = bool(r.json().get("features"))
+        else:
+            r = self.s.get(f"{layer.url}/query", params={"where": "1=1", "returnCountOnly": "true",
+                                                         "f": "json"}, timeout=TIMEOUT_S)
+            r.raise_for_status()
+            body = r.json()
+            if "error" in body:
+                raise RuntimeError(f"ArcGIS error: {body['error'].get('message', body['error'])}")
+            found = int(body.get("count") or 0) > 0
+        with self._lock:
+            self._holds_data[layer.id] = found
+        return found
+
     def fetch(self, layer: Layer, site: BaseGeometry) -> LayerResult:
         area = search_area(site, layer.search_m)
         stamp = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())
         try:
             fc = self._planning(layer, area) if layer.source == "planning" else self._arcgis(layer, area)
             feats = _features_from_geojson(fc, layer, area)
+            if not feats and not self.holds_data(layer):
+                return LayerResult(layer, NOT_ASSESSED, fetched_at=stamp,
+                                   error="the publisher's dataset is empty nationally, so nothing was checked")
         except Exception as e:  # any failure is NOT ASSESSED, never "clear"
             return LayerResult(layer, NOT_ASSESSED, error=f"{type(e).__name__}: {e}"[:300], fetched_at=stamp)
         return LayerResult(layer, PRESENT if feats else NONE_FOUND, feats, fetched_at=stamp)

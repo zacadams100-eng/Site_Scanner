@@ -84,6 +84,8 @@ def sheet(req: SheetRequest):
         site = site_from_geojson(req.red_line)
     except Exception as e:
         raise HTTPException(400, f"Red line not usable: {e}")
+    if not req.title.strip() or not req.client_ref.strip():
+        raise HTTPException(400, "A sheet needs a site title and an order reference.")
     if site.area > MAX_HA * 10_000:
         raise HTTPException(400, f"Red line over {MAX_HA:,} ha — split it up.")
     job = uuid.uuid4().hex[:10]

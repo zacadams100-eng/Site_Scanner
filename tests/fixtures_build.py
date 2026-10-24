@@ -50,7 +50,7 @@ def build(folder: Path) -> Path:
         "sssi_irz": [(box(CX - 3000, CY - 3000, CX + 3000, CY + 3000), {"SSSI_NAME": "Fixture Down"})],
         "alc": [(box(CX - 2000, CY - 2000, CX + 2000, CY + 2000), {"agricultural-land-classification-grade": "Grade 3"})],
         "woodland": [(Polygon([(CX - 700, CY - 500), (CX - 300, CY - 450), (CX - 350, CY - 150),
-                               (CX - 750, CY - 200)]), {"name": "Broadleaved"})],
+                               (CX - 750, CY - 200)]), {"IFT_IOA": "Broadleaved"})],
     }
     # every other layer: answered, nothing there
     from sheet.layers import LAYERS

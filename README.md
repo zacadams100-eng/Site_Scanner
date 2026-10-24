@@ -97,14 +97,15 @@ website; you make the sheet.
 | `sheet/api.py` | API for the map app; serves `web/dist` once built. |
 | `sheet/static/index.html` | Bare fallback draw page, used before `web/` is built. |
 | `web/` | The map app (React + MapLibre). |
-| `examples/guildford.geojson` | Example red line that CI makes a real sheet for. |
+| `examples/` | Two small example red lines that CI makes real sheets for. |
+| `scripts/inspect_layers.py` | Prints the real field names and record counts for every layer. Run it before changing `label_fields`. |
 | `tests/` | `python -m pytest`. Fictional fixtures, no network. |
 
 ## CI makes a real sheet on every push
 
 The tool was written where the publishers couldn't be reached. GitHub's
 runners can reach them, so the **Live sheet** job makes a real sheet for
-`examples/guildford.geojson` on every push:
+`examples/guildford.geojson` (Merrow) and `examples/crowthorne.geojson` on every push, after printing the field names each publisher actually sends (`scripts/inspect_layers.py`):
 
 - Download the PDF, GeoPackage and JSON from the run's **Artifacts**.
 - Any layer that came back not assessed appears as a warning with its reason.

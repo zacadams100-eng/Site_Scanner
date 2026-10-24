@@ -27,7 +27,7 @@ def main(argv=None):
     m = sub.add_parser("make", help="make a desk-study sheet for a red line")
     m.add_argument("red_line", type=Path)
     m.add_argument("--title", required=True)
-    m.add_argument("--ref", default="")
+    m.add_argument("--ref", required=True, help="order reference, printed on every page")
     m.add_argument("--out", type=Path, default=Path("jobs"))
     m.add_argument("--context", type=float, default=1000,
                    help="metres of context around the red line on the map (default 1000)")

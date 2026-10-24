@@ -1,0 +1,11 @@
+{
+  "type": "Feature",
+  "properties": {"name": "Example red line: small site near Crowthorne (test only)"},
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-0.8022, 51.3672], [-0.7988, 51.3676], [-0.7983, 51.3652],
+      [-0.8016, 51.3647], [-0.8022, 51.3672]
+    ]]
+  }
+}

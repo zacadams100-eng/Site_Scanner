@@ -62,19 +62,27 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Make a real sheet for the example red line
+      - name: What the publishers actually send
+        # Field names and record counts, read off the live services.
+        run: python scripts/inspect_layers.py
+
+      - name: Make real sheets for the example red lines
         env:
           OS_API_KEY: ${{ secrets.OS_API_KEY }}
         run: |
-          set +e
-          python -m sheet make examples/guildford.geojson \
-            --title "Example: Merrow, Guildford" --ref CI-LIVE --out live
-          code=$?
-          set -e
-          python - <<'PY'
-          import glob, json
-          rec = json.load(open(glob.glob("live/*.json")[0]))
+          status=0
+          for site in merrow:guildford crowthorne:crowthorne; do
+            name=${site%%:*}; file=${site##*:}
+            set +e
+            python -m sheet make examples/$file.geojson \
+              --title "Example: $name" --ref CI-$name --out live/$name
+            code=$?
+            set -e
+            python - live/$name <<'PY'
+          import glob, json, sys
+          rec = json.load(open(glob.glob(sys.argv[1] + "/*.json")[0]))
           c = rec["counts"]
+          print(f"\n{rec['title']} · {rec['area_ha']} ha · 1:{rec['scale']:,}")
           print(f"present {c['present']} · none found {c['none_found']} · not assessed {c['not_assessed']}")
           for f in rec["findings"]:
               print(f"  {f['status']:<13} {f['name']}: {f['summary']}")
@@ -83,8 +91,10 @@ jobs:
               if f["status"] == "not_assessed":
                   print(f"::warning title=Not assessed: {f['name']}::{f['error']}")
           PY
-          # 3 = some layer not assessed (warned above). Anything else non-zero is a crash.
-          if [ "$code" != 0 ] && [ "$code" != 3 ]; then exit "$code"; fi
+            # 3 = some layer not assessed (warned above). Anything else non-zero is a crash.
+            if [ "$code" != 0 ] && [ "$code" != 3 ]; then status=$code; fi
+          done
+          exit $status
 
       - uses: actions/upload-artifact@v4
         if: always()

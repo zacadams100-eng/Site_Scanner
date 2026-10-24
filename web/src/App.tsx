@@ -92,6 +92,11 @@ export default function App() {
 
   const areaHa = redLine ? turf.area({ type: 'Feature', geometry: redLine, properties: {} }) / 10_000 : 0
   const tooBig = !!info && areaHa > info.max_ha
+  // Real orders are fields of 2–50 ha, printed at 1:5,000–1:12,500. A red line
+  // far beyond that forces a small scale and a busy sheet.
+  const unusuallyBig = !tooBig && areaHa > 100
+  // A sheet without both looks like a draft, so it isn't made without them.
+  const missing = !title.trim() ? 'site title' : !clientRef.trim() ? 'order ref' : null
 
   const hint = drawMode
     ? TOOLS.find((t) => t.id === drawMode)!.hint
@@ -223,9 +228,17 @@ export default function App() {
                 <span>Order ref</span>
                 <input value={clientRef} onChange={(e) => setClientRef(e.target.value)} placeholder="ORD-001" />
               </label>
-              <button className="make" type="submit" disabled={making || tooBig || !!apiError}>
+              <button className="make" type="submit" disabled={making || tooBig || !!missing || !!apiError}
+                      title={missing ? `Add the ${missing} first` : undefined}>
                 {making ? 'Making…' : sheet ? 'Make it again' : 'Make the sheet'}
               </button>
+              {missing && !making && <p className="sheet-hint">Add the {missing} to make the sheet.</p>}
+              {unusuallyBig && (
+                <p className="sheet-warn">
+                  This red line is {formatArea(areaHa)}. Real orders are usually 2–50 ha;
+                  anything this big prints at a small scale and looks busy.
+                </p>
+              )}
               {tooBig && (
                 <p className="sheet-warn">Red line over {info!.max_ha.toLocaleString('en-GB')} ha — split it up.</p>
               )}

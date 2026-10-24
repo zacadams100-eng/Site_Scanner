@@ -12,7 +12,7 @@ from typing import Dict, List
 from shapely.geometry.base import BaseGeometry
 
 from .fetch import NONE_FOUND, NOT_ASSESSED, PRESENT, LayerResult
-from .geometry import bearing_word
+from .geometry import bearing_word, search_area
 from .layers import GROUPS
 
 ON_SITE_TOLERANCE_M = 0.5   # survey slop: touching the line counts as on site
@@ -33,6 +33,19 @@ class Item:
         return f"{dist} {self.direction}".strip()
 
 
+def fmt_ha(ha: float) -> str:
+    if ha < 0.1:
+        return "under 0.1 ha"
+    return f"{ha:.1f} ha" if ha < 10 else f"{ha:,.0f} ha"
+
+
+@dataclass
+class AreaItem:
+    label: str
+    ha_in_radius: float
+    ha_on_site: float
+
+
 @dataclass
 class LayerFinding:
     layer_id: str
@@ -45,6 +58,10 @@ class LayerFinding:
     partial_coverage: bool = False
     note: str = ""
     error: str = ""
+    # Area-mode layers only (summary="area" in layers.py).
+    areas: List[AreaItem] = field(default_factory=list)
+    site_ha: float = 0.0
+    labelled: bool = True
 
     def summary(self, max_items: int = 3) -> str:
         if self.status == NOT_ASSESSED:
@@ -55,6 +72,8 @@ class LayerFinding:
             if self.partial_coverage:
                 s += " Published data is incomplete for some councils — confirm locally."
             return s
+        if self.areas:
+            return self._area_summary(max_items)
         parts = []
         for it in self.items[:max_items]:
             name = it.label or "Unnamed area"
@@ -65,6 +84,39 @@ class LayerFinding:
         if more > 0:
             parts.append(f"+{more} more")
         return "; ".join(parts) + "."
+
+    def _area_summary(self, max_items: int) -> str:
+        """Hectares by type, and how much of the red line is covered.
+
+        "Surface water flooding: covers 6% of the red line (0.4 ha)" says
+        something; "Unnamed area (2,430 parcels)" does not.
+        """
+        on_site = sum(a.ha_on_site for a in self.areas)
+        parts = []
+        if not self.labelled:
+            if on_site > 0:
+                pct = 100 * on_site / self.site_ha if self.site_ha else 0
+                share = "under 1%" if pct < 1 else f"{pct:.0f}%"
+                parts.append(f"Covers {share} of the red line ({fmt_ha(on_site)})")
+            else:
+                near = self.items[0]
+                parts.append(f"Not on the red line; nearest {near.where()}")
+            total = sum(a.ha_in_radius for a in self.areas)
+            parts.append(f"{fmt_ha(total)} within {self._radius()}")
+            return "; ".join(parts) + "."
+        here = sorted((a for a in self.areas if a.ha_on_site > 0), key=lambda a: -a.ha_on_site)
+        if here:
+            parts.append("Within the red line: " + ", ".join(
+                f"{a.label} {fmt_ha(a.ha_on_site)}" for a in here[:max_items]))
+        elif self.items:
+            parts.append(f"Nearest: {self.items[0].label or 'unnamed'}, {self.items[0].where()}")
+        around = sorted(self.areas, key=lambda a: -a.ha_in_radius)
+        text = ", ".join(f"{a.label} {fmt_ha(a.ha_in_radius)}" for a in around[:max_items + 1])
+        more = len(around) - (max_items + 1)
+        if more > 0:
+            text += f", +{more} more type{'s' if more > 1 else ''}"
+        parts.append(f"Within {self._radius()}: {text}")
+        return ". ".join(parts) + "."
 
     def _radius(self) -> str:
         m = self.search_m
@@ -89,6 +141,17 @@ def _items(result: LayerResult, site: BaseGeometry) -> List[Item]:
     return items
 
 
+def _areas(result: LayerResult, site: BaseGeometry) -> List[AreaItem]:
+    area = search_area(site, result.layer.search_m)
+    by_label: Dict[str, AreaItem] = {}
+    for f in result.features:
+        key = f.label or "Unnamed"
+        a = by_label.setdefault(key, AreaItem(key, 0.0, 0.0))
+        a.ha_in_radius += f.geom.intersection(area).area / 10_000
+        a.ha_on_site += f.geom.intersection(site).area / 10_000
+    return list(by_label.values())
+
+
 def build_findings(results: List[LayerResult], site: BaseGeometry) -> List[LayerFinding]:
     out = []
     for r in results:
@@ -97,6 +160,10 @@ def build_findings(results: List[LayerResult], site: BaseGeometry) -> List[Layer
         if r.status == PRESENT:
             lf.items = _items(r, site)
             lf.on_site = any(i.distance_m <= ON_SITE_TOLERANCE_M for i in lf.items)
+            if r.layer.summary == "area":
+                lf.areas = _areas(r, site)
+                lf.site_ha = site.area / 10_000
+                lf.labelled = bool(r.layer.label_fields)
         out.append(lf)
     order = {g: i for i, g in enumerate(GROUPS)}
     return sorted(out, key=lambda f: order.get(f.group, 99))  # stable within group
