@@ -1,6 +1,6 @@
 {
   "type": "Feature",
-  "properties": {"name": "Example red line: farmland east of Guildford, near Merrow"},
+  "properties": {"name": "Example red line: Merrow, east of Guildford"},
   "geometry": {
     "type": "Polygon",
     "coordinates": [[

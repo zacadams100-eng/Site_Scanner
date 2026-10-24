@@ -170,3 +170,11 @@ def test_api_rejects_a_point():
     r = TestClient(app).post("/api/sheet", json={
         "red_line": {"type": "Point", "coordinates": [-0.3, 51.2]}, "title": "x"})
     assert r.status_code == 400 and "must be an area" in r.json()["detail"]
+
+
+def test_record_keeps_fields_of_unlabelled_features(tmp_path, fixture_dir):
+    rec = make_sheet(site_from_geojson(site_geojson()), tmp_path, "x", "", FixtureFetcher(fixture_dir))
+    f = {x["layer"]: x for x in rec["findings"]}
+    assert f["sssi"]["unlabelled_fields"] == {}
+    # surface water has no label fields by design, so nothing to report
+    assert f["surface_water"]["unlabelled_fields"] == {}

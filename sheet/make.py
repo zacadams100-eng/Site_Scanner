@@ -32,6 +32,14 @@ def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
         results = fetch_all(site, fetcher or Fetcher())
     findings = build_findings(results, site)
 
+    # When a layer's features come back without a label, keep one example of
+    # what the publisher did send, so the right field can go in label_fields.
+    unlabelled = {}
+    for r in results:
+        f = next((f for f in r.features if not f.label), None)
+        if f and r.layer.label_fields:
+            unlabelled[r.layer.id] = {k: str(v)[:60] for k, v in f.props.items()}
+
     pdf = out / f"{stem}.pdf"
     info = render_sheet(pdf, site, results, findings, title, client_ref, display_m, os_key, made_at)
     gpkg = out / f"{stem}.gpkg"
@@ -52,7 +60,8 @@ def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
         "findings": [
             {"layer": f.layer_id, "name": f.name, "group": f.group, "status": f.status,
              "search_m": f.search_m, "on_site": f.on_site, "summary": f.summary(max_items=50),
-             "error": f.error}
+             "error": f.error,
+             "unlabelled_fields": unlabelled.get(f.layer_id, {})}
             for f in findings
         ],
         "files": {"pdf": pdf.name, "gpkg": gpkg.name},

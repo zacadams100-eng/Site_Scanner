@@ -68,7 +68,7 @@ jobs:
         run: |
           set +e
           python -m sheet make examples/guildford.geojson \
-            --title "Example: farmland near Merrow, Guildford" --ref CI-LIVE --out live
+            --title "Example: Merrow, Guildford" --ref CI-LIVE --out live
           code=$?
           set -e
           python - <<'PY'
@@ -78,6 +78,8 @@ jobs:
           print(f"present {c['present']} · none found {c['none_found']} · not assessed {c['not_assessed']}")
           for f in rec["findings"]:
               print(f"  {f['status']:<13} {f['name']}: {f['summary']}")
+              if f.get("unlabelled_fields"):
+                  print(f"::warning title=Unnamed: {f['name']}::fields sent: {f['unlabelled_fields']}")
               if f["status"] == "not_assessed":
                   print(f"::warning title=Not assessed: {f['name']}::{f['error']}")
           PY
