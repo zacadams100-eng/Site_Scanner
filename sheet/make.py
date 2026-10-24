@@ -36,7 +36,7 @@ def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
     # what the publisher did send, so the right field can go in label_fields.
     unlabelled = {}
     for r in results:
-        f = next((f for f in r.features if not f.label), None)
+        f = next((f for f in r.features if not f.label or f.label == r.layer.default_label), None)
         if f and r.layer.label_fields:
             unlabelled[r.layer.id] = {k: str(v)[:60] for k, v in f.props.items()}
 

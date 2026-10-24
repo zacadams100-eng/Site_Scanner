@@ -178,3 +178,19 @@ def test_record_keeps_fields_of_unlabelled_features(tmp_path, fixture_dir):
     assert f["sssi"]["unlabelled_fields"] == {}
     # surface water has no label fields by design, so nothing to report
     assert f["surface_water"]["unlabelled_fields"] == {}
+
+
+def test_label_codes_and_defaults_from_live_field_names():
+    """Field names as the publishers actually sent them on the first live run."""
+    from shapely.geometry import mapping
+    from sheet.fetch import _features_from_geojson
+    from sheet.geometry import search_area, to_wgs
+    g = mapping(to_wgs(SITE.centroid.buffer(10)))
+    def label(layer_id, props):
+        fc = {"features": [{"type": "Feature", "properties": props, "geometry": g}]}
+        l = LAYER_BY_ID[layer_id]
+        return _features_from_geojson(fc, l, search_area(SITE, l.search_m))[0].label
+    assert label("ancient_woodland", {"name": "", "ancient-woodland-status": "ASNW"}) == \
+        "Ancient semi-natural woodland"
+    assert label("priority_habitat", {"MainHabs": "Deciduous woodland"}) == "Deciduous woodland"
+    assert label("sssi_irz", {"IRZURL": "https://irz.geodata.org.uk/x"}) == "SSSI impact risk zone"

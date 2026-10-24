@@ -81,7 +81,9 @@ def _features_from_geojson(fc: Dict[str, Any], layer: Layer, area: BaseGeometry)
             continue   # bbox queries over-fetch; keep only what is truly in range
         props = f.get("properties") or {}
         label = _label(props, layer.label_fields)
-        out.append(Feature(g, layer.label_template.format(label) if label else "", props))
+        label = layer.label_map.get(label, label)
+        label = layer.label_template.format(label) if label else layer.default_label
+        out.append(Feature(g, label, props))
     return out
 
 

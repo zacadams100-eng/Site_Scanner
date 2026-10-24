@@ -20,7 +20,7 @@ To add or drop a layer, edit this list. Nothing else needs to change.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 PLANNING_API = "https://www.planning.data.gov.uk/entity.geojson"
 NE = "https://services.arcgis.com/JJzESW51TqeY9uat/arcgis/rest/services"
@@ -52,6 +52,8 @@ class Layer:
     url: Optional[str] = None            # arcgis layer url (…/FeatureServer/N)
     label_fields: List[str] = field(default_factory=lambda: ["name"])
     label_template: str = "{}"           # e.g. "Flood Zone {}"
+    label_map: Dict[str, str] = field(default_factory=dict)   # code → words, e.g. ASNW
+    default_label: str = ""              # when the publisher sends no name at all
     on_map: bool = True                  # False = reported in findings only
     geom: str = "polygon"                # polygon | line | point
     licence: str = OGL
@@ -87,7 +89,9 @@ LAYERS: List[Layer] = [
     Layer("sssi_irz", "SSSI Impact Risk Zone", G_NAT, "arcgis", 0,
           "Natural England", Style("none", "#999999"),
           url=f"{NE}/SSSI_Impact_Risk_Zones_England/FeatureServer/0",
-          label_fields=["SSSI_NAME", "sssi_name", "NAME"], on_map=False,
+          # The live service carries no SSSI name, only an IRZ link and code.
+          label_fields=["SSSI_NAME", "sssi_name", "NAME"], default_label="SSSI impact risk zone",
+          on_map=False,
           note="Reported only where the red line falls inside a zone. "
                "Check the zone's consultation criteria for the proposal type."),
 
@@ -97,11 +101,17 @@ LAYERS: List[Layer] = [
           dataset="local-nature-reserve"),
     Layer("ancient_woodland", "Ancient woodland", G_HAB, "planning", 2_000,
           "Natural England", Style("#4d7c0f", "#365314", None, 0.55),
-          dataset="ancient-woodland"),
+          dataset="ancient-woodland",
+          # planning.data leaves most names blank; the status is always there.
+          label_fields=["name", "ancient-woodland-status"],
+          label_map={"ASNW": "Ancient semi-natural woodland",
+                     "PAWS": "Plantation on ancient woodland site",
+                     "ARW": "Ancient replanted woodland",
+                     "AWPP": "Ancient wood pasture"}),
     Layer("priority_habitat", "Priority habitat inventory", G_HAB, "arcgis", 2_000,
           "Natural England", Style("#b8e186", "#7fbc41", None, 0.45, 0.4),
           url=f"{NE}/Priority_Habitats_Inventory_England/FeatureServer/0",
-          label_fields=["Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"]),
+          label_fields=["MainHabs", "Main_Habit", "mainhabs", "MAIN_HABIT", "habitat"]),
     Layer("gcn_soa", "GCN strategic opportunity area", G_HAB, "arcgis", 2_000,
           "Natural England", Style("none", "#e6550d", "--", 0.0, 0.6),
           url=f"{NE}/GCN_Strategic_Opportunity_Areas_England/FeatureServer/0",
