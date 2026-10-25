@@ -20,7 +20,7 @@ def slug(s: str) -> str:
 
 
 def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
-               fetcher=None, display_m: float = 1000, os_key: Optional[str] = None,
+               fetcher=None, display_m: float = 500, os_key: Optional[str] = None,
                results: Optional[List[LayerResult]] = None, on_done=None) -> Dict[str, Any]:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)

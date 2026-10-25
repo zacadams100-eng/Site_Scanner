@@ -203,7 +203,7 @@ def _section(fig, y, title):
 
 # --- the sheet ------------------------------------------------------------------
 def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings: List[LayerFinding],
-                 title: str, client_ref: str = "", display_m: float = 1000,
+                 title: str, client_ref: str = "", display_m: float = 500,
                  os_key: Optional[str] = None, made_at: Optional[dt.datetime] = None) -> dict:
     made_at = made_at or dt.datetime.now()
     scale = choose_scale(site, display_m)

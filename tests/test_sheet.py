@@ -270,7 +270,7 @@ def test_risk_zones_say_the_red_line_is_in_them_with_criteria():
     url = "https://irz.geodata.org.uk/IRZ/step2.html?irzcode={}&notes=11401&location=1,2 %20(IRZ%20polygon%20centre)"
     items = [Item(url.format("0111242322201"), 0, "", count=2), Item(url.format("3111241211101"), 0, "")]
     f = LayerFinding("sssi_irz", "SSSI Impact Risk Zone", "", PRESENT, 0, items=items, mode="zones")
-    assert f.summary() == ("The red line falls in 3 impact risk zones (IRZ codes 0111242322201, 3111241211101). "
+    assert f.summary() == ("The red line falls in 2 impact risk zones (IRZ codes 0111242322201, 3111241211101). "
                            "Check the consultation criteria for the proposal type at irz.geodata.org.uk.")
 
 
@@ -324,3 +324,16 @@ def test_an_unrecognised_probe_reply_is_not_called_empty():
     s = FakeSession([FakeResponse(EMPTY_FC), FakeResponse({"detail": "oops"})])
     r = Fetcher(s).fetch(LAYER_BY_ID["sssi"], SITE)
     assert r.status == NOT_ASSESSED and "unexpected reply" in r.error
+
+
+def test_tiled_layers_do_not_count_tiles_as_parcels():
+    items = [Item("Flood Zone 2", 503, "S", count=92)]
+    f = LayerFinding("flood_zone", "Flood Zone 2 / 3", "", PRESENT, 1000, items=items, count_parcels=False)
+    assert f.summary() == "Flood Zone 2, 503 m S."
+
+
+def test_small_and_medium_sites_print_at_1_to_10000():
+    from shapely.geometry import box
+    from sheet.render import choose_scale
+    for side in (140, 420, 700):          # about 2, 18 and 50 ha
+        assert choose_scale(box(0, 0, side, side), 500) == 10000

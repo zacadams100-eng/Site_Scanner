@@ -29,8 +29,8 @@ def main(argv=None):
     m.add_argument("--title", required=True)
     m.add_argument("--ref", required=True, help="order reference, printed on every page")
     m.add_argument("--out", type=Path, default=Path("jobs"))
-    m.add_argument("--context", type=float, default=1000,
-                   help="metres of context around the red line on the map (default 1000)")
+    m.add_argument("--context", type=float, default=500,
+                   help="metres of context around the red line on the map (default 500: sites of 2–50 ha print at 1:10,000)")
     m.add_argument("--fixtures", type=Path, help="TEST ONLY: read layers from this folder")
 
     sub.add_parser("layers", help="list the 30 layers")

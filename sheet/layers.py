@@ -70,6 +70,9 @@ class Layer:
     # "zones": how many zones the red line falls in, with their criteria links.
     summary: str = "list"
     where: str = "1=1"                   # ArcGIS only: server-side filter
+    # False where the publisher splits one thing into map tiles, so "(92 parcels)"
+    # counts tiles, not places (flood zones, main rivers).
+    count_parcels: bool = True
     on_map: bool = True                  # False = reported in findings only
     geom: str = "polygon"                # polygon | line | point
     licence: str = OGL
@@ -177,13 +180,13 @@ LAYERS: List[Layer] = [
     # --- Water and flooding — 1 km ---------------------------------------------
     Layer("flood_zone", "Flood Zone 2 / 3", G_WATER, "planning", 1_000,
           "Environment Agency", Style("#9ecae1", "#3182bd", None, 0.4, 0.3),
-          dataset="flood-risk-zone", label_fields=["flood-risk-level"],
+          dataset="flood-risk-zone", label_fields=["flood-risk-level"], count_parcels=False,
           label_template="Flood Zone {}"),
     Layer("main_river", "Statutory main river", G_WATER, "arcgis", 1_000,
           "Environment Agency", Style("none", "#08519c", None, 0.0, 1.6),
           url=f"{DEFRA}/Statutory_Main_River_Map/FeatureServer/0",
           # The EA service carries no river names (only STATUS and LENGTH_KM).
-          label_fields=[], default_label="Main river", geom="line"),
+          label_fields=[], default_label="Main river", geom="line", count_parcels=False),
     Layer("surface_water", "Surface water flooding (1% AEP)", G_WATER, "arcgis", 250,
           "Environment Agency", Style("#c6dbef", "#6baed6", None, 0.5, 0.2),
           url=f"{DEFRA}/Risk_of_Flooding_from_Surface_Water_Extents/FeatureServer/1",

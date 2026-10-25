@@ -41,7 +41,7 @@ class SheetRequest(BaseModel):
     red_line: dict
     title: str
     client_ref: str = ""
-    context_m: float = 1000
+    context_m: float = 500
 
 
 def _fetcher():

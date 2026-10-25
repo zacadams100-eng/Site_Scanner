@@ -65,6 +65,7 @@ class LayerFinding:
     site_ha: float = 0.0
     labelled: bool = True
     mode: str = "list"
+    count_parcels: bool = True
 
     def summary(self, max_items: int = 3) -> str:
         if self.status == NOT_ASSESSED:
@@ -84,7 +85,7 @@ class LayerFinding:
         parts = []
         for it in self.items[:max_items]:
             name = it.label or "Unnamed area"
-            if it.count > 1:
+            if it.count > 1 and self.count_parcels:
                 name += f" ({it.count} parcels)"
             parts.append(f"{name}, {it.where()}")
         more = len(self.items) - max_items
@@ -151,7 +152,8 @@ class LayerFinding:
             m = re.search(r"irzcode=(\d+)", i.label or "")
             if m and m.group(1) not in codes:
                 codes.append(m.group(1))
-        n = sum(i.count for i in self.items)
+        # Count zones by code: one zone can arrive as several polygons.
+        n = len(codes) or sum(i.count for i in self.items)
         head = f"The red line falls in {n} impact risk zone{'s' if n > 1 else ''}"
         if codes:
             head += f" (IRZ code{'s' if len(codes) > 1 else ''} {', '.join(codes[:4])}"
@@ -217,7 +219,7 @@ def build_findings(results: List[LayerResult], site: BaseGeometry) -> List[Layer
     for r in results:
         lf = LayerFinding(r.layer.id, r.layer.name, r.layer.group, r.status, r.layer.search_m,
                           partial_coverage=r.partial_coverage, note=r.layer.note, error=r.error,
-                          mode=r.layer.summary)
+                          mode=r.layer.summary, count_parcels=r.layer.count_parcels)
         if r.status == PRESENT:
             lf.items = _items(r, site)
             lf.on_site = any(i.distance_m <= ON_SITE_TOLERANCE_M for i in lf.items)
