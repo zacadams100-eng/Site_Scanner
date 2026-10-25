@@ -65,6 +65,9 @@ website; you make the sheet.
   renders on a 1 km grid.
 - `CONTOUR_CONTACT` puts your email in the User-Agent so publishers can reach
   you if something goes wrong.
+- `CONTOUR_OPEN_RIVERS=<file>` names main rivers from OS Open Rivers ("River
+  Wey, 577 m S"); the Environment Agency's own data has no names. Run
+  `scripts/get_open_rivers.sh` once to download it (free, OGL, about 100 MB).
 - `CONTOUR_FIXTURES=<folder>` reads fictional fixture layers instead of the
   publishers, for working offline. Make the folder with
   `python -m tests.fixtures_build demo-fixtures`. Everything made this way is

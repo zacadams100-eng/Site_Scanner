@@ -62,6 +62,17 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: OS Open Rivers, for river names
+        uses: actions/cache@v4
+        with:
+          path: data/oprvrs_gb.gpkg
+          key: os-open-rivers-v1
+
+      - name: Download OS Open Rivers if not cached
+        run: |
+          [ -f data/oprvrs_gb.gpkg ] || scripts/get_open_rivers.sh || echo "::warning::OS Open Rivers download failed; rivers will read 'Main river'"
+          [ -f data/oprvrs_gb.gpkg ] && echo "CONTOUR_OPEN_RIVERS=$PWD/data/oprvrs_gb.gpkg" >> "$GITHUB_ENV" || true
+
       - name: What the publishers actually send
         # Field names and record counts, read off the live services. Never
         # blocks the sheets below: a slow publisher only cuts this short.

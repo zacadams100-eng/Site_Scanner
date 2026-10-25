@@ -19,3 +19,5 @@ venv/
 jobs/
 live/
 demo-fixtures/
+# OS Open Rivers download (scripts/get_open_rivers.sh)
+data/

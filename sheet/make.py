@@ -10,7 +10,9 @@ from shapely.geometry.base import BaseGeometry
 
 from .fetch import Fetcher, LayerResult, fetch_all
 from .findings import build_findings, counts
-from .geometry import area_ha, to_geojson_wgs
+from .layers import LAYER_BY_ID
+from .rivers import name_main_rivers
+from .geometry import area_ha, search_area, to_geojson_wgs
 from .gpkg import write_gpkg
 from .render import render_sheet
 
@@ -30,6 +32,8 @@ def make_sheet(site: BaseGeometry, out_dir, title: str, client_ref: str = "",
     # The draw page fetches first so it can put the same features on its map.
     if results is None:
         results = fetch_all(site, fetcher or Fetcher(), on_done=on_done)
+    # River names from OS Open Rivers, when the file is present.
+    name_main_rivers(results, search_area(site, LAYER_BY_ID["main_river"].search_m))
     findings = build_findings(results, site)
 
     # When a layer's features come back without a label, keep one example of

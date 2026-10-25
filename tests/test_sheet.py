@@ -347,3 +347,25 @@ def test_headline_is_never_clear_when_layers_were_not_assessed(tmp_path):
     findings = build_findings(results, SITE)
     text = " ".join(headline_lines(findings, counts(findings)))
     assert "No mapped constraint" not in text and "30 not assessed" in text
+
+
+def test_main_rivers_take_their_names_from_os_open_rivers(tmp_path, monkeypatch):
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    from sheet.fetch import Feature, LayerResult
+    from sheet.geometry import BNG, search_area
+    from sheet.rivers import name_main_rivers
+    cx, cy = SITE.centroid.x, SITE.centroid.y
+    ea = LineString([(cx - 800, cy - 500), (cx + 800, cy - 500)])          # EA line, no name
+    os_wey = LineString([(cx - 900, cy - 505), (cx + 900, cy - 495)])      # runs alongside
+    os_ditch = LineString([(cx, cy - 900), (cx, cy - 100)])                # crosses only
+    gpkg = tmp_path / "oprvrs.gpkg"
+    gpd.GeoDataFrame({"name1": ["River Wey", "Mill Ditch"]}, geometry=[os_wey, os_ditch],
+                     crs=BNG).to_file(gpkg, layer="watercourse_link", driver="GPKG")
+    r = LayerResult(LAYER_BY_ID["main_river"], PRESENT, [Feature(ea, "Main river", {})])
+    assert name_main_rivers([r], search_area(SITE, 1000), gpkg) == 1
+    assert r.features[0].label == "River Wey"
+    # Without the file nothing changes.
+    r2 = LayerResult(LAYER_BY_ID["main_river"], PRESENT, [Feature(ea, "Main river", {})])
+    monkeypatch.delenv("CONTOUR_OPEN_RIVERS", raising=False)
+    assert name_main_rivers([r2], search_area(SITE, 1000)) == 0 and r2.features[0].label == "Main river"
