@@ -1,0 +1,377 @@
+{
+  "title": "Garlick's Arch, Send Marsh (local plan allocation)",
+  "client_ref": "TRIAL-garlicks-arch",
+  "made_at": "2026-10-25T19:57:16",
+  "area_ha": 12.25,
+  "red_line_wgs84": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          -0.49756367144583064,
+          51.294750250055685
+        ],
+        [
+          -0.4985065715996808,
+          51.297840923589824
+        ],
+        [
+          -0.5034364400098769,
+          51.29724965828111
+        ],
+        [
+          -0.5024932192199965,
+          51.29415902152475
+        ],
+        [
+          -0.49756367144583064,
+          51.294750250055685
+        ]
+      ]
+    ]
+  },
+  "scale": 10000,
+  "basemap": false,
+  "test_data": false,
+  "counts": {
+    "present": 15,
+    "none_found": 12,
+    "not_assessed": 3
+  },
+  "findings": [
+    {
+      "layer": "sac",
+      "name": "Special Area of Conservation",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Thursley, Ash, Pirbright & Chobham, 8.3 km W.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "spa",
+      "name": "Special Protection Area",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Thames Basin Heaths, 2.7 km NE.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ramsar",
+      "name": "Ramsar site",
+      "group": "International designations",
+      "status": "none_found",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "None found within 10 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi",
+      "name": "Site of Special Scientific Interest",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Papercourt SSSI, 80 m NW.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nnr",
+      "name": "National Nature Reserve",
+      "group": "National designations",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi_irz",
+      "name": "SSSI Impact Risk Zone",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "The red line falls in 5 impact risk zones (IRZ codes 0111252211101, 0111252211121, 0121054322201, 3111221111101, +1 more). Check the consultation criteria for the proposal type at irz.geodata.org.uk.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnr",
+      "name": "Local Nature Reserve",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Ockham and Wisley, 1.9 km NE.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ancient_woodland",
+      "name": "Ancient woodland",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Ancient semi-natural woodland (20 parcels), 767 m S.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "priority_habitat",
+      "name": "Priority habitat inventory",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Nearest: Deciduous woodland, 280 m W. Within 2 km: Deciduous woodland 141 ha, Good quality semi improved grassland 26 ha, Additional habitats only (no main habitat) 16 ha, Lowland fens 4.7 ha, Traditional orchard 2.2 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "gcn_soa",
+      "name": "GCN strategic opportunity area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nia",
+      "name": "Nature improvement area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnrs",
+      "name": "Local nature recovery strategy area",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-nature-recovery-strategy' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nutrient",
+      "name": "Nutrient neutrality catchment",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 0,
+      "on_site": false,
+      "summary": "None found within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "woodland",
+      "name": "Woodland (National Forest Inventory)",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Nearest: Broadleaved, 280 m W. Within 1 km: Broadleaved 29 ha, Young trees 2.5 ha, Felled 0.9 ha, Conifer 0.5 ha, Assumed woodland 0.2 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "common_land",
+      "name": "Common land and village green",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'common-land-and-village-green' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_landscape",
+      "name": "National Landscape (AONB)",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_park",
+      "name": "National Park",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "green_belt",
+      "name": "Green Belt",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": true,
+      "summary": "Guildford, within the red line; Woking, 984 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "local_green_space",
+      "name": "Local green space",
+      "group": "Landscape and open land",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-green-space' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "alc",
+      "name": "Agricultural land classification",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "Grade 3, within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_zone",
+      "name": "Flood Zone 2 / 3",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Flood Zone 2, 157 m NW; Flood Zone 3, 183 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "main_river",
+      "name": "Statutory main river",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "East Clandon Stream, 83 m NW; Ockham Mill Stream, 713 m N; Guileshill Brook, 885 m NE; West Clandon Stream, 895 m NW; River Wey, 987 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "surface_water",
+      "name": "Surface water flooding (1% AEP)",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 250,
+      "on_site": true,
+      "summary": "Covers 3% of the red line (0.4 ha); 3.7 ha within 250 m.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_storage",
+      "name": "Flood storage area",
+      "group": "Water and flooding",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "conservation_area",
+      "name": "Conservation area",
+      "group": "Heritage and trees",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Ripley, 170 m NE; Wey and Godalming Navigations (2 parcels), 964 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "listed_building",
+      "name": "Listed building",
+      "group": "Heritage and trees",
+      "status": "present",
+      "search_m": 500,
+      "on_site": false,
+      "summary": "15 within 500 m: 1 Grade II*, 14 Grade II. Church of St Mary the Virgin (Grade II*), 376 m NE.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "scheduled_monument",
+      "name": "Scheduled monument",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "park_garden",
+      "name": "Registered park and garden",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_area",
+      "name": "Tree preservation order (area)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_tree",
+      "name": "Tree preservation order (tree)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    }
+  ],
+  "files": {
+    "pdf": "20261025-garlick-s-arch-send-marsh-local-plan-allocation.pdf",
+    "gpkg": "20261025-garlick-s-arch-send-marsh-local-plan-allocation.gpkg"
+  }
+}

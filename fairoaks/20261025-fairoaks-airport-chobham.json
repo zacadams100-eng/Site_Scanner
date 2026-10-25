@@ -1,0 +1,377 @@
+{
+  "title": "Fairoaks Airport, Chobham",
+  "client_ref": "TRIAL-fairoaks",
+  "made_at": "2026-10-25T19:57:00",
+  "area_ha": 12.25,
+  "red_line_wgs84": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          -0.5560587573211463,
+          51.346751689328244
+        ],
+        [
+          -0.557006596779476,
+          51.34984190428265
+        ],
+        [
+          -0.561941354470652,
+          51.34924821889149
+        ],
+        [
+          -0.5609931936796838,
+          51.34615804105016
+        ],
+        [
+          -0.5560587573211463,
+          51.346751689328244
+        ]
+      ]
+    ]
+  },
+  "scale": 10000,
+  "basemap": false,
+  "test_data": false,
+  "counts": {
+    "present": 14,
+    "none_found": 13,
+    "not_assessed": 3
+  },
+  "findings": [
+    {
+      "layer": "sac",
+      "name": "Special Area of Conservation",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Thursley, Ash, Pirbright & Chobham, 1.4 km NW; Windsor Forest & Great Park, 7.2 km NW.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "spa",
+      "name": "Special Protection Area",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Thames Basin Heaths, 602 m S; South West London Waterbodies, 6.1 km N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ramsar",
+      "name": "Ramsar site",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "South West London Waterbodies, 6.1 km N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi",
+      "name": "Site of Special Scientific Interest",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Horsell Common SSSI, 602 m S; Chobham Common SSSI, 1.4 km NW; Basingstoke Canal SSSI, 1.9 km SE.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nnr",
+      "name": "National Nature Reserve",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Chobham Common, 1.4 km NW.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi_irz",
+      "name": "SSSI Impact Risk Zone",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "The red line falls in 2 impact risk zones (IRZ codes 0111242322201, 0111344322302). Check the consultation criteria for the proposal type at irz.geodata.org.uk.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnr",
+      "name": "Local Nature Reserve",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ancient_woodland",
+      "name": "Ancient woodland",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Ancient semi-natural woodland (6 parcels), 515 m N; Plantation on ancient woodland site (2 parcels), 1.6 km E.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "priority_habitat",
+      "name": "Priority habitat inventory",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Nearest: Deciduous woodland, 125 m E. Within 2 km: Deciduous woodland 319 ha, Additional habitats only (no main habitat) 89 ha, Lowland heathland 39 ha, Lowland fens 7.4 ha, Traditional orchard 0.9 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "gcn_soa",
+      "name": "GCN strategic opportunity area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nia",
+      "name": "Nature improvement area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnrs",
+      "name": "Local nature recovery strategy area",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-nature-recovery-strategy' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nutrient",
+      "name": "Nutrient neutrality catchment",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 0,
+      "on_site": false,
+      "summary": "None found within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "woodland",
+      "name": "Woodland (National Forest Inventory)",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Nearest: Broadleaved, 126 m E. Within 1 km: Broadleaved 49 ha, Conifer 7.3 ha, Mixed mainly broadleaved 1.5 ha, Felled 0.7 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "common_land",
+      "name": "Common land and village green",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'common-land-and-village-green' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_landscape",
+      "name": "National Landscape (AONB)",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_park",
+      "name": "National Park",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "green_belt",
+      "name": "Green Belt",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": true,
+      "summary": "Surrey Heath, within the red line; Woking, 172 m S; Runnymede, 509 m E.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "local_green_space",
+      "name": "Local green space",
+      "group": "Landscape and open land",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-green-space' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "alc",
+      "name": "Agricultural land classification",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "Grade 4, within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_zone",
+      "name": "Flood Zone 2 / 3",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": true,
+      "summary": "Flood Zone 2, within the red line; Flood Zone 3, within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "main_river",
+      "name": "Statutory main river",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "The Bourne, 170 m S; Mill Bourne, 248 m SW; Main river, 475 m E.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "surface_water",
+      "name": "Surface water flooding (1% AEP)",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "Not on the red line; nearest 22 m S; 5.3 ha within 250 m.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_storage",
+      "name": "Flood storage area",
+      "group": "Water and flooding",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "conservation_area",
+      "name": "Conservation area",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "listed_building",
+      "name": "Listed building",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 500,
+      "on_site": false,
+      "summary": "None found within 500 m of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "scheduled_monument",
+      "name": "Scheduled monument",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "park_garden",
+      "name": "Registered park and garden",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_area",
+      "name": "Tree preservation order (area)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_tree",
+      "name": "Tree preservation order (tree)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    }
+  ],
+  "files": {
+    "pdf": "20261025-fairoaks-airport-chobham.pdf",
+    "gpkg": "20261025-fairoaks-airport-chobham.gpkg"
+  }
+}

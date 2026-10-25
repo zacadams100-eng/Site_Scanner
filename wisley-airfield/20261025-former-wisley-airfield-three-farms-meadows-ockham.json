@@ -1,0 +1,377 @@
+{
+  "title": "Former Wisley Airfield / Three Farms Meadows, Ockham",
+  "client_ref": "TRIAL-wisley-airfield",
+  "made_at": "2026-10-25T19:58:14",
+  "area_ha": 12.25,
+  "red_line_wgs84": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          -0.44756432979495236,
+          51.30624900387362
+        ],
+        [
+          -0.4485040810223412,
+          51.30934004732404
+        ],
+        [
+          -0.453435781760218,
+          51.3087509045836
+        ],
+        [
+          -0.45249570946321244,
+          51.30565989770367
+        ],
+        [
+          -0.44756432979495236,
+          51.30624900387362
+        ]
+      ]
+    ]
+  },
+  "scale": 10000,
+  "basemap": false,
+  "test_data": false,
+  "counts": {
+    "present": 15,
+    "none_found": 12,
+    "not_assessed": 3
+  },
+  "findings": [
+    {
+      "layer": "sac",
+      "name": "Special Area of Conservation",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Mole Gap to Reigate Escarpment, 7.5 km SE; Thursley, Ash, Pirbright & Chobham, 10.0 km NW.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "spa",
+      "name": "Special Protection Area",
+      "group": "International designations",
+      "status": "present",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "Thames Basin Heaths, 222 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ramsar",
+      "name": "Ramsar site",
+      "group": "International designations",
+      "status": "none_found",
+      "search_m": 10000,
+      "on_site": false,
+      "summary": "None found within 10 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi",
+      "name": "Site of Special Scientific Interest",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Ockham and Wisley Commons SSSI, 222 m N.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nnr",
+      "name": "National Nature Reserve",
+      "group": "National designations",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "sssi_irz",
+      "name": "SSSI Impact Risk Zone",
+      "group": "National designations",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "The red line falls in 3 impact risk zones (IRZ codes 0111242322231, 3111211211121, 3111241211121). Check the consultation criteria for the proposal type at irz.geodata.org.uk.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnr",
+      "name": "Local Nature Reserve",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": true,
+      "summary": "Ockham and Wisley, within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "ancient_woodland",
+      "name": "Ancient woodland",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": true,
+      "summary": "Ancient semi-natural woodland (33 parcels), within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "priority_habitat",
+      "name": "Priority habitat inventory",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 2000,
+      "on_site": true,
+      "summary": "Within the red line: Deciduous woodland 0.5 ha. Within 2 km: Deciduous woodland 284 ha, Additional habitats only (no main habitat) 123 ha, Lowland heathland 60 ha, Good quality semi improved grassland 7.2 ha, Traditional orchard 1.7 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "gcn_soa",
+      "name": "GCN strategic opportunity area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nia",
+      "name": "Nature improvement area",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "lnrs",
+      "name": "Local nature recovery strategy area",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-nature-recovery-strategy' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "nutrient",
+      "name": "Nutrient neutrality catchment",
+      "group": "Habitats and nature recovery",
+      "status": "none_found",
+      "search_m": 0,
+      "on_site": false,
+      "summary": "None found within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "woodland",
+      "name": "Woodland (National Forest Inventory)",
+      "group": "Habitats and nature recovery",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": true,
+      "summary": "Within the red line: Broadleaved 0.5 ha. Within 1 km: Broadleaved 61 ha, Conifer 34 ha, Felled 29 ha, Mixed mainly broadleaved 2.3 ha.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "common_land",
+      "name": "Common land and village green",
+      "group": "Habitats and nature recovery",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'common-land-and-village-green' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_landscape",
+      "name": "National Landscape (AONB)",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "national_park",
+      "name": "National Park",
+      "group": "Landscape and open land",
+      "status": "none_found",
+      "search_m": 2000,
+      "on_site": false,
+      "summary": "None found within 2 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "green_belt",
+      "name": "Green Belt",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": true,
+      "summary": "Guildford, within the red line; Elmbridge, 351 m E.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "local_green_space",
+      "name": "Local green space",
+      "group": "Landscape and open land",
+      "status": "not_assessed",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Not assessed \u2014 data could not be retrieved.",
+      "error": "the publisher's dataset is empty nationally (planning.data 'local-green-space' returned 0 records anywhere in England), so nothing was checked",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "alc",
+      "name": "Agricultural land classification",
+      "group": "Landscape and open land",
+      "status": "present",
+      "search_m": 0,
+      "on_site": true,
+      "summary": "Grade 4, within the red line; Non Agricultural, within the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_zone",
+      "name": "Flood Zone 2 / 3",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Flood Zone 2, 329 m SW; Flood Zone 3, 450 m S.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "main_river",
+      "name": "Statutory main river",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Stratford Brook, 459 m SW; Main river, 570 m S.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "surface_water",
+      "name": "Surface water flooding (1% AEP)",
+      "group": "Water and flooding",
+      "status": "present",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "Not on the red line; nearest 33 m N; 0.8 ha within 250 m.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "flood_storage",
+      "name": "Flood storage area",
+      "group": "Water and flooding",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "conservation_area",
+      "name": "Conservation area",
+      "group": "Heritage and trees",
+      "status": "present",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "Ockham, 366 m SW.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "listed_building",
+      "name": "Listed building",
+      "group": "Heritage and trees",
+      "status": "present",
+      "search_m": 500,
+      "on_site": false,
+      "summary": "Upton Farmhouse (Grade II), 426 m SE; Bridge End House (Grade II), 451 m SW; YARNE (Grade II), 488 m SE.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "scheduled_monument",
+      "name": "Scheduled monument",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "park_garden",
+      "name": "Registered park and garden",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 1000,
+      "on_site": false,
+      "summary": "None found within 1 km of the red line.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_area",
+      "name": "Tree preservation order (area)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    },
+    {
+      "layer": "tpo_tree",
+      "name": "Tree preservation order (tree)",
+      "group": "Heritage and trees",
+      "status": "none_found",
+      "search_m": 250,
+      "on_site": false,
+      "summary": "None found within 250 m of the red line. Published data is incomplete for some councils \u2014 confirm locally.",
+      "error": "",
+      "unlabelled_fields": {}
+    }
+  ],
+  "files": {
+    "pdf": "20261025-former-wisley-airfield-three-farms-meadows-ockham.pdf",
+    "gpkg": "20261025-former-wisley-airfield-three-farms-meadows-ockham.gpkg"
+  }
+}
