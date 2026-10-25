@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Gosden Hill Farm, Burpham (Guildford local plan allocation)",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.5210652767392169,
+     51.25925085007512
+    ],
+    [
+     -0.5220090806522223,
+     51.26234135941156
+    ],
+    [
+     -0.5269348588318112,
+     51.26174906778336
+    ],
+    [
+     -0.5259907350391633,
+     51.2586585952795
+    ],
+    [
+     -0.5210652767392169,
+     51.25925085007512
+    ]
+   ]
+  ]
+ }
+}

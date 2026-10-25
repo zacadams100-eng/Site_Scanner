@@ -1,0 +1,62 @@
+name: Surrey trial sheets
+
+# Makes real sheets for every red line in examples/surrey/ and pushes the PDFs
+# and JSON records to the `trial-sheets` branch, so they can be read without
+# downloading build artifacts. Run it from the Actions tab, or by pushing a
+# change to examples/surrey/.
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ['examples/surrey/**', '.github/workflows/surrey-trial.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  sheets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Make a sheet for each Surrey site
+        env:
+          OS_API_KEY: ${{ secrets.OS_API_KEY }}
+          PYTHONUNBUFFERED: '1'
+        run: |
+          mkdir -p out
+          for f in examples/surrey/*.geojson; do
+            slug=$(basename "$f" .geojson)
+            title=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['properties']['name'])" "$f")
+            echo "::group::$title"
+            python -m sheet make "$f" --title "$title" --ref "TRIAL-$slug" --out "out/$slug" || [ $? = 3 ]
+            echo "::endgroup::"
+          done
+          python - <<'PY'
+          import glob, json
+          lines = ["# Surrey trial sheets", "", "| Site | ha | Scale | Present | None found | Not assessed |", "|---|---|---|---|---|---|"]
+          for p in sorted(glob.glob("out/*/*.json")):
+              r = json.load(open(p)); c = r["counts"]
+              lines.append(f"| {r['title']} | {r['area_ha']} | 1:{r['scale']:,} | {c['present']} | {c['none_found']} | {c['not_assessed']} |")
+          open("out/README.md", "w").write("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+
+      - name: Push PDFs and records to the trial-sheets branch
+        run: |
+          cd out
+          find . -name "*.gpkg" -delete
+          git init -q -b trial-sheets
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Trial sheets from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" trial-sheets

@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Farmland at Loseley Park, Guildford",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.6120657334824726,
+     51.212253126345935
+    ],
+    [
+     -0.6130147488576362,
+     51.21534296452584
+    ],
+    [
+     -0.6179344015933035,
+     51.21474679135758
+    ],
+    [
+     -0.6169850676040668,
+     51.21165699034937
+    ],
+    [
+     -0.6120657334824726,
+     51.212253126345935
+    ]
+   ]
+  ]
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Longcross Garden Village, Runnymede",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.5920555481875247,
+     51.381752580609195
+    ],
+    [
+     -0.5930064937563899,
+     51.384842510317256
+    ],
+    [
+     -0.5979445882772398,
+     51.384247336948654
+    ],
+    [
+     -0.5969933208910988,
+     51.38115744456454
+    ],
+    [
+     -0.5920555481875247,
+     51.381752580609195
+    ]
+   ]
+  ]
+ }
+}

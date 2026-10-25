@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Former Wisley Airfield / Three Farms Meadows, Ockham",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.44756434204046674,
+     51.30624900863273
+    ],
+    [
+     -0.44850409326921836,
+     51.309340052080884
+    ],
+    [
+     -0.4534357940045237,
+     51.308750909340944
+    ],
+    [
+     -0.45249572170615604,
+     51.305659902463304
+    ],
+    [
+     -0.44756434204046674,
+     51.30624900863273
+    ]
+   ]
+  ]
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Land at Meath Green, Horley North West Sector",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.18507959148521566,
+     51.17974255532417
+    ],
+    [
+     -0.1859993359847346,
+     51.182835561504206
+    ],
+    [
+     -0.19092054388827032,
+     51.18225736339687
+    ],
+    [
+     -0.19000047949609955,
+     51.17916439243668
+    ],
+    [
+     -0.18507959148521566,
+     51.17974255532417
+    ]
+   ]
+  ]
+ }
+}

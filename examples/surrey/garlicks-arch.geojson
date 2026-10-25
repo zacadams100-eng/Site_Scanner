@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Garlick's Arch, Send Marsh (local plan allocation)",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.4975636836620248,
+     51.29475025482422
+    ],
+    [
+     -0.4985065838172284,
+     51.2978409283561
+    ],
+    [
+     -0.503436452224837,
+     51.29724966304789
+    ],
+    [
+     -0.502493231433605,
+     51.294159026293805
+    ],
+    [
+     -0.4975636836620248,
+     51.29475025482422
+    ]
+   ]
+  ]
+ }
+}

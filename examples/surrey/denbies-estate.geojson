@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Denbies Wine Estate, Dorking",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.33607159856910906,
+     51.2402462660322
+    ],
+    [
+     -0.3370026038655586,
+     51.24333815608606
+    ],
+    [
+     -0.34192853709160487,
+     51.24275365227218
+    ],
+    [
+     -0.34099721144825273,
+     51.23966179819757
+    ],
+    [
+     -0.33607159856910906,
+     51.2402462660322
+    ]
+   ]
+  ]
+ }
+}

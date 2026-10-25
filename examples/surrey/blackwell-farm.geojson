@@ -1,0 +1,34 @@
+{
+ "type": "Feature",
+ "properties": {
+  "name": "Blackwell Farm, Guildford (local plan allocation)",
+  "note": "Approximate test red line, not the real site boundary"
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     -0.6185642929829187,
+     51.23225328247436
+    ],
+    [
+     -0.6195141301656081,
+     51.23534306407973
+    ],
+    [
+     -0.6244358422439413,
+     51.234746635191705
+    ],
+    [
+     -0.6234856861110498,
+     51.231656890815415
+    ],
+    [
+     -0.6185642929829187,
+     51.23225328247436
+    ]
+   ]
+  ]
+ }
+}
