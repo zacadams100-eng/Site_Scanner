@@ -50,6 +50,11 @@ jobs:
           print("\n".join(lines))
           PY
 
+      - name: Cross-check against second sources
+        timeout-minutes: 15
+        continue-on-error: true
+        run: python -u scripts/crosscheck.py out
+
       - name: Push PDFs and records to the trial-sheets branch
         run: |
           cd out
