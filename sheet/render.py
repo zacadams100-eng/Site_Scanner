@@ -186,8 +186,16 @@ def _title_block(fig, meta):
                                  transform=fig.dpi_scale_trans, facecolor=FOREST, edgecolor="none"))
     t = lambda y, s, **k: fig.text((PANEL_X + 3) / PAGE_W, y / PAGE_H, s, color="white", **k)
     t(top - 5, "CONTOUR · DESK STUDY MAP", fontsize=5.5, weight="bold", family="DejaVu Sans Mono")
-    for i, line in enumerate(_wrap(meta["title"], 30)[:2]):
-        t(top - 11 - i * 5, line, fontsize=9.5, weight="bold")
+    # Two lines at most. A long site name drops a size rather than losing
+    # its end ("Gosden Hill Farm, Burpham (Guildford local plan" lost
+    # "allocation)"); only a very long one is shortened, and visibly.
+    lines, size = _wrap(meta["title"], 30), 9.5
+    if len(lines) > 2:
+        lines, size = _wrap(meta["title"], 38), 7.5
+    if len(lines) > 2:
+        lines = [lines[0], lines[1].rstrip(" ,") + "…"]
+    for i, line in enumerate(lines):
+        t(top - 11 - i * 5, line, fontsize=size, weight="bold")
     t(top - 23, meta["subtitle"], fontsize=6)
     t(top - 27, meta["ref_line"], fontsize=5.5, family="DejaVu Sans Mono")
     return top - h
