@@ -39,7 +39,7 @@ PRESENT, NONE_FOUND, NOT_ASSESSED = "present", "none_found", "not_assessed"
 # Layers published by local authorities are not complete nationally: a council
 # that has not uploaded its conservation areas returns nothing, which is not
 # the same as there being none. These say so on the sheet.
-PARTIAL_COVERAGE = {"Local planning authority", "Responsible authority"}
+PARTIAL_COVERAGE = {"Local planning authority", "Responsible authority", "MHCLG (from council returns)"}
 
 
 @dataclass

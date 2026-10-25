@@ -53,9 +53,11 @@ SECOND = {
     "nnr": ("National Nature Reserves (England)", "JJzESW51TqeY9uat"),
     "lnr": ("Local Nature Reserves (England)", "JJzESW51TqeY9uat"),
     "ancient_woodland": ("Ancient Woodland (England)", "JJzESW51TqeY9uat"),
-    "listed_building": ("Listed Buildings", "historic"),
-    "scheduled_monument": ("Scheduled Monuments", "historic"),
-    "park_garden": ("Parks and Gardens", "historic"),
+    # Historic England's own services only. A loose match once picked Historic
+    # Environment Scotland and a Suffolk council, which can only ever say 0.
+    "listed_building": ("Listed Building", "historicengland"),
+    "scheduled_monument": ("Scheduled Monument", "historicengland"),
+    "park_garden": ("Park and Garden", "historicengland"),
 }
 
 
@@ -82,9 +84,13 @@ def find_service(title, prefer):
         "q": f'title:"{title}" AND type:"Feature Service"', "num": 30, "f": "json"}).json()
     hits = [i for i in r.get("results", []) if i.get("url")]
     for i in hits:
-        if prefer.lower() in (i["url"] + i.get("owner", "")).lower():
+        where = (i["url"] + " " + i.get("owner", "")).lower().replace("_", "").replace(" ", "")
+        if prefer.lower() in where and "scotland" not in where and "wales" not in where:
             return i["url"].rstrip("/") + "/0", i.get("owner")
-    return None, None
+    # No exact publisher: say so, and show what was offered, rather than
+    # comparing against someone else's data.
+    offered = ", ".join(f"{i.get('title')} ({i.get('owner')})" for i in hits[:5])
+    return None, f"none from the publisher; offered: {offered or 'nothing'}"
 
 
 def count_in(url, area_bng):

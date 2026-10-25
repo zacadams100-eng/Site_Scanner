@@ -167,8 +167,10 @@ LAYERS: List[Layer] = [
           "Natural England", Style("none", "#7f3b08", None, 0.0, 1.4),
           dataset="national-park"),
     Layer("green_belt", "Green Belt", G_LAND, "planning", 1_000,
-          "Local planning authority", Style("none", "#5aae61", None, 0.0, 1.4),
-          dataset="green-belt"),
+          "MHCLG (from council returns)", Style("none", "#5aae61", None, 0.0, 1.4),
+          dataset="green-belt",
+          note="A national compilation by MHCLG from councils' yearly returns, not each council's "
+               "adopted policies map. Confirm the boundary there before relying on it."),
     Layer("local_green_space", "Local green space", G_LAND, "planning", 1_000,
           "Local planning authority", Style("#c7e9c0", "#31a354", "++", 0.35),
           dataset="local-green-space"),
