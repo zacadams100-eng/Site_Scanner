@@ -337,3 +337,13 @@ def test_small_and_medium_sites_print_at_1_to_10000():
     from sheet.render import choose_scale
     for side in (140, 420, 700):          # about 2, 18 and 50 ha
         assert choose_scale(box(0, 0, side, side), 500) == 10000
+
+
+def test_headline_is_never_clear_when_layers_were_not_assessed(tmp_path):
+    """Every layer failing must not print "No mapped constraint falls within the red line"."""
+    from sheet.findings import counts
+    from sheet.render import headline_lines
+    results = fetch_all(SITE, FixtureFetcher(tmp_path / "no-fixtures-here"))
+    findings = build_findings(results, SITE)
+    text = " ".join(headline_lines(findings, counts(findings)))
+    assert "No mapped constraint" not in text and "30 not assessed" in text

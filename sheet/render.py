@@ -179,6 +179,29 @@ def _watermark(fig):
              color=RED, alpha=0.22, ha="center", va="center", weight="bold", zorder=100)
 
 
+def headline_lines(findings, c) -> List[str]:
+    """Page 1's findings summary. Never a clear headline while anything
+    went unchecked: "not assessed" is not "nothing there"."""
+    on_site = [f for f in findings if f.on_site]
+    lines = [f"{c[PRESENT]} layers present · {c[NONE_FOUND]} none found · {c[NOT_ASSESSED]} not assessed"]
+    if on_site:
+        lines.append("Within the red line: " + ", ".join(f.name for f in on_site) + ".")
+    elif c[NOT_ASSESSED]:
+        # Never a clear headline while anything went unchecked.
+        lines.append(f"Nothing found within the red line in the {c[PRESENT] + c[NONE_FOUND]} layers "
+                     f"assessed. {c[NOT_ASSESSED]} not assessed: see the schedule.")
+    else:
+        lines.append("No mapped constraint falls within the red line.")
+    nearest = sorted((f for f in findings if f.status == PRESENT and not f.on_site and f.items),
+                     key=lambda f: f.items[0].distance_m)[:4]
+    for f in nearest:
+        if f.areas:   # parcel layers read as hectares, not "unnamed, 30 m"
+            lines.append(f"{f.name}: {f.summary(max_items=2)}")
+        else:
+            lines.append(f"{f.name}: {f.items[0].label or 'unnamed'}, {f.items[0].where()}.")
+    return lines
+
+
 def _title_block(fig, meta):
     top = PAGE_H - MARGIN
     h = 30
@@ -247,7 +270,8 @@ def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings:
             ax.imshow(img, extent=e, zorder=0, interpolation="bilinear", alpha=0.75)
         else:
             ax.set_facecolor("#fbfaf6")
-        _grid(ax, extent, 1000 if scale >= 10000 else (500 if scale >= 5000 else 100))
+        grid_m = 1000 if scale >= 10000 else (500 if scale >= 5000 else 100)
+        _grid(ax, extent, grid_m)
 
         simplify = scale * 0.2 / 1000  # 0.2 mm on paper
         by_id = {r.layer.id: r for r in results}
@@ -267,10 +291,13 @@ def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings:
                 on_map.append(r.layer)
 
         # search rings and the red line, always on top
+        rings_shown = []
         for d in (1000, 2000):
             ring = search_area(site, d).boundary
             for part in ([ring] if ring.geom_type in ("LineString", "LinearRing") else list(ring.geoms)):
                 if part.intersects(ext_box):
+                    if d not in rings_shown:
+                        rings_shown.append(d)
                     xs, ys = part.xy
                     ax.plot(xs, ys, color=INK, lw=0.5, ls=(0, (4, 3)), zorder=40, alpha=0.6)
         for p in ([site] if site.geom_type == "Polygon" else list(site.geoms)):
@@ -281,13 +308,16 @@ def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings:
         _north_arrow(fig, MARGIN + MAP_W - 12, MARGIN + MAP_H - 16)
         if not bm:
             ax.text(xmax - (xmax - xmin) * 0.01, ymin + (ymax - ymin) * 0.01,
-                    "No basemap · 1 km grid shown", fontsize=4.8, color=MUTED, ha="right", zorder=52)
+                    f"No basemap · {grid_m // 1000 if grid_m >= 1000 else grid_m}{' km' if grid_m >= 1000 else ' m'} grid shown", fontsize=4.8, color=MUTED, ha="right", zorder=52)
 
         # --- right panel ---
         y = _title_block(fig, meta) - 6
         y = _section(fig, y, "Key")
-        key_items = [(Line2D([0], [0], color=RED, lw=1.6), "Red line (site boundary)"),
-                     (Line2D([0], [0], color=INK, lw=0.6, ls=(0, (4, 3))), "1 km and 2 km from red line")]
+        key_items = [(Line2D([0], [0], color=RED, lw=1.6), "Red line (site boundary)")]
+        # Only the rings actually drawn: at 1:10,000 they usually fall off the map.
+        if rings_shown:
+            key_items.append((Line2D([0], [0], color=INK, lw=0.6, ls=(0, (4, 3))),
+                              " and ".join(f"{d // 1000} km" for d in rings_shown) + " from red line"))
         key_items += [(_swatch(l.style, l.geom), l.name) for l in on_map]
         rows = len(key_items)
         kh = rows * 3.55 + 1
@@ -299,19 +329,7 @@ def render_sheet(path, site: BaseGeometry, results: List[LayerResult], findings:
         y -= kh + 4
 
         y = _section(fig, y, "Findings")
-        on_site = [f for f in findings if f.on_site]
-        lines = [f"{c[PRESENT]} layers present · {c[NONE_FOUND]} none found · {c[NOT_ASSESSED]} not assessed"]
-        if on_site:
-            lines.append("Within the red line: " + ", ".join(f.name for f in on_site) + ".")
-        else:
-            lines.append("No mapped constraint falls within the red line.")
-        nearest = sorted((f for f in findings if f.status == PRESENT and not f.on_site and f.items),
-                         key=lambda f: f.items[0].distance_m)[:4]
-        for f in nearest:
-            if f.areas:   # parcel layers read as hectares, not "unnamed, 30 m"
-                lines.append(f"{f.name}: {f.summary(max_items=2)}")
-            else:
-                lines.append(f"{f.name}: {f.items[0].label or 'unnamed'}, {f.items[0].where()}.")
+        lines = headline_lines(findings, c)
         lines.append("Full schedule overleaf.")
         for ln in lines:
             for w in _wrap(ln, 62):
